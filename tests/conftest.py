@@ -30,4 +30,4 @@ def autoencoder() -> AutoEncoder:
         }
     )
 
-    return AutoEncoder(cfg)
+    return autoencoder

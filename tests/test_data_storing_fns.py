@@ -87,3 +87,59 @@ def test_SaeVisData_create_and_save_feature_centric_vis(
             assert f.read() in html_contents
 
     assert json.dumps(data.feature_stats.aggdata) in html_contents
+
+
+
+def test_SaeVisData_save_json_snapshot(
+    model: HookedTransformer,
+    autoencoder: AutoEncoder,
+    tmp_path: Path,
+):
+    cfg = SaeVisConfig(hook_point="blocks.2.hook_resid_pre", minibatch_size_tokens=2)
+    tokens = model.to_tokens(
+        [
+            "But what about second breakfast?" * 3,
+            "Nothing is cheesier than cheese." * 3,
+        ]
+    )
+    data = SaeVisData.create(encoder=autoencoder, model=model, tokens=tokens, cfg=cfg)
+    save_path = tmp_path / "feature_data.json"
+    
+    data.save_json(save_path)
+    
+    # load in fixtures/feature_data.json and do a diff
+    with open(save_path) as f:
+        saved_json = json.load(f)
+        
+    with open("tests/fixtures/feature_data.json") as f:
+        expected_json = json.load(f)
+        
+    assert saved_json == expected_json
+    
+    
+def test_SaeVisData_save_html_snapshot(
+    model: HookedTransformer,
+    autoencoder: AutoEncoder,
+    tmp_path: Path,
+):
+    cfg = SaeVisConfig(hook_point="blocks.2.hook_resid_pre", minibatch_size_tokens=2)
+    tokens = model.to_tokens(
+        [
+            "But what about second breakfast?" * 3,
+            "Nothing is cheesier than cheese." * 3,
+        ]
+    )
+    data = SaeVisData.create(encoder=autoencoder, model=model, tokens=tokens, cfg=cfg)    
+    save_path = tmp_path / "feature_centric_vis_test.html"
+    data.save_feature_centric_vis(save_path)
+    
+    # load in fixtures/feature_data.json and do a diff
+    expected_path = "tests/fixtures/feature_centric_vis.html"
+    
+    with open(save_path) as f:
+        saved_html = f.read()
+        
+    with open(expected_path) as f:
+        expected_html = f.read()
+        
+    assert saved_html == expected_html
