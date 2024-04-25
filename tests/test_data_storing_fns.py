@@ -1,19 +1,27 @@
 import json
 from pathlib import Path
 
+import pytest
 from transformer_lens import HookedTransformer
 
 from sae_vis.data_config_classes import SaeVisConfig
+from sae_vis.data_storing_fns import SaeVisData
 from sae_vis.model_fns import AutoEncoder
 from sae_vis.sae_vis_runner import SaeVisRunner
 
 ROOT_DIR = Path(__file__).parent.parent
 
 
-def test_SaeVisData_create_results_look_reasonable(
-    model: HookedTransformer, autoencoder: AutoEncoder
-):
+@pytest.fixture
+def cfg() -> SaeVisConfig:
     cfg = SaeVisConfig(hook_point="blocks.2.hook_resid_pre", minibatch_size_tokens=2)
+    return cfg
+
+
+@pytest.fixture()
+def sae_vis_data(
+    cfg: SaeVisConfig, model: HookedTransformer, autoencoder: AutoEncoder
+) -> SaeVisData:
     tokens = model.to_tokens(
         [
             "But what about second breakfast?" * 3,
@@ -21,47 +29,46 @@ def test_SaeVisData_create_results_look_reasonable(
         ]
     )
     data = SaeVisRunner(cfg).run(encoder=autoencoder, model=model, tokens=tokens)
-    # data = SaeVisData.create(encoder=autoencoder, model=model, tokens=tokens, cfg=cfg)
+    return data
 
-    assert data.encoder == autoencoder
-    assert data.model == model
-    assert data.cfg == cfg
+
+def test_SaeVisData_create_results_look_reasonable(
+    sae_vis_data: SaeVisData,
+    model: HookedTransformer,
+    autoencoder: AutoEncoder,
+    cfg: SaeVisConfig,
+):
+    assert sae_vis_data.encoder == autoencoder
+    assert sae_vis_data.model == model
+    assert sae_vis_data.cfg == cfg
     # kurtosis and skew are both empty, is this itentional?
-    assert len(data.feature_stats.max) == 128
-    assert len(data.feature_stats.frac_nonzero) == 128
-    assert len(data.feature_stats.quantile_data) == 128
-    assert len(data.feature_stats.quantiles) > 1000
-    for val in data.feature_stats.max:
+    assert len(sae_vis_data.feature_stats.max) == 128
+    assert len(sae_vis_data.feature_stats.frac_nonzero) == 128
+    assert len(sae_vis_data.feature_stats.quantile_data) == 128
+    assert len(sae_vis_data.feature_stats.quantiles) > 1000
+    for val in sae_vis_data.feature_stats.max:
         assert val >= 0
-    for val in data.feature_stats.frac_nonzero:
+    for val in sae_vis_data.feature_stats.frac_nonzero:
         assert 0 <= val <= 1
     for prev_val, next_val in zip(
-        data.feature_stats.quantiles[:-1], data.feature_stats.quantiles[1:]
+        sae_vis_data.feature_stats.quantiles[:-1],
+        sae_vis_data.feature_stats.quantiles[1:],
     ):
         assert prev_val <= next_val
-    for bounds, prec in data.feature_stats.ranges_and_precisions:
+    for bounds, prec in sae_vis_data.feature_stats.ranges_and_precisions:
         assert len(bounds) == 2
         assert bounds[0] <= bounds[1]
         assert prec > 0
     # each feature should get its own key
-    assert set(data.feature_data_dict.keys()) == set(range(128))
+    assert set(sae_vis_data.feature_data_dict.keys()) == set(range(128))
 
 
 def test_SaeVisData_create_and_save_feature_centric_vis(
-    model: HookedTransformer,
-    autoencoder: AutoEncoder,
+    sae_vis_data: SaeVisData,
     tmp_path: Path,
 ):
-    cfg = SaeVisConfig(hook_point="blocks.2.hook_resid_pre", minibatch_size_tokens=2)
-    tokens = model.to_tokens(
-        [
-            "But what about second breakfast?" * 3,
-            "Nothing is cheesier than cheese." * 3,
-        ]
-    )
-    data = SaeVisRunner(cfg).run(encoder=autoencoder, model=model, tokens=tokens)
     save_path = tmp_path / "feature_centric_vis.html"
-    data.save_feature_centric_vis(save_path)
+    sae_vis_data.save_feature_centric_vis(save_path)
     assert (save_path).exists()
     with open(save_path) as f:
         html_contents = f.read()
@@ -87,25 +94,16 @@ def test_SaeVisData_create_and_save_feature_centric_vis(
         with open(html_file) as f:
             assert f.read() in html_contents
 
-    assert json.dumps(data.feature_stats.aggdata) in html_contents
+    assert json.dumps(sae_vis_data.feature_stats.aggdata) in html_contents
 
 
 def test_SaeVisData_save_json_snapshot(
-    model: HookedTransformer,
-    autoencoder: AutoEncoder,
+    sae_vis_data: SaeVisData,
     tmp_path: Path,
 ):
-    cfg = SaeVisConfig(hook_point="blocks.2.hook_resid_pre", minibatch_size_tokens=2)
-    tokens = model.to_tokens(
-        [
-            "But what about second breakfast?" * 3,
-            "Nothing is cheesier than cheese." * 3,
-        ]
-    )
-    data = SaeVisRunner(cfg).run(encoder=autoencoder, model=model, tokens=tokens)
     save_path = tmp_path / "feature_data.json"
 
-    data.save_json(save_path)
+    sae_vis_data.save_json(save_path)
 
     # load in fixtures/feature_data.json and do a diff
     with open(save_path) as f:
@@ -118,20 +116,11 @@ def test_SaeVisData_save_json_snapshot(
 
 
 def test_SaeVisData_save_html_snapshot(
-    model: HookedTransformer,
-    autoencoder: AutoEncoder,
+    sae_vis_data: SaeVisData,
     tmp_path: Path,
 ):
-    cfg = SaeVisConfig(hook_point="blocks.2.hook_resid_pre", minibatch_size_tokens=2)
-    tokens = model.to_tokens(
-        [
-            "But what about second breakfast?" * 3,
-            "Nothing is cheesier than cheese." * 3,
-        ]
-    )
-    data = SaeVisRunner(cfg).run(encoder=autoencoder, model=model, tokens=tokens)
     save_path = tmp_path / "feature_centric_vis_test.html"
-    data.save_feature_centric_vis(save_path)
+    sae_vis_data.save_feature_centric_vis(save_path)
 
     # load in fixtures/feature_data.json and do a diff
     expected_path = "tests/fixtures/feature_centric_vis.html"
