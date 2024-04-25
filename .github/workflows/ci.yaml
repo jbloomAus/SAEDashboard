@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - refactor
 jobs:
   build:
     runs-on: ubuntu-latest
