@@ -1,6 +1,4 @@
-import math
 import time
-from collections import defaultdict
 
 import einops
 import numpy as np
@@ -8,8 +6,6 @@ import torch
 import torch.nn.functional as F
 from eindex import eindex
 from jaxtyping import Float, Int
-from rich import print as rprint
-from rich.table import Table
 from torch import Tensor
 from tqdm.auto import tqdm
 from transformer_lens import HookedTransformer, utils
@@ -395,7 +391,7 @@ def parse_feature_data(
 
 
 @torch.inference_mode()
-def _get_feature_data(
+def get_feature_data(
     encoder: AutoEncoder,
     encoder_B: AutoEncoder | None,
     model: TransformerLensWrapper,
@@ -540,101 +536,27 @@ def _get_feature_data(
     return sae_vis_data, time_logs
 
 
-@torch.inference_mode()
-def get_feature_data(
-    encoder: AutoEncoder,
-    model: HookedTransformer,
-    tokens: Int[Tensor, "batch seq"],
-    cfg: SaeVisConfig,
-    encoder_B: AutoEncoder | None = None,
-) -> SaeVisData:
-    """
-    This is the main function which users will run to generate the feature visualization data. It batches this
-    computation over features, in accordance with the arguments in the SaeVisConfig object (we don't want to compute all
-    the features at once, since might give OOMs).
+# @torch.inference_mode()
+# def get_feature_data(
+#     encoder: AutoEncoder,
+#     model: HookedTransformer,
+#     tokens: Int[Tensor, "batch seq"],
+#     cfg: SaeVisConfig,
+#     encoder_B: AutoEncoder | None = None,
+# ) -> SaeVisData:
+#     """
+#     This is the main function which users will run to generate the feature visualization data. It batches this
+#     computation over features, in accordance with the arguments in the SaeVisConfig object (we don't want to compute all
+#     the features at once, since might give OOMs).
 
-    See the `_get_feature_data` function for an explanation of the arguments, as well as a more detailed explanation
-    of what this function is doing.
+#     See the `_get_feature_data` function for an explanation of the arguments, as well as a more detailed explanation
+#     of what this function is doing.
 
-    The return object is the merged SaeVisData objects returned by the `_get_feature_data` function.
-    """
-    # Apply random seed
-    if cfg.seed is not None:
-        torch.manual_seed(cfg.seed)
-        np.random.seed(cfg.seed)
+#     The return object is the merged SaeVisData objects returned by the `_get_feature_data` function.
+#     """
+#     pass
 
-    # Create objects to store all the data we'll get from `_get_feature_data`
-    sae_vis_data = SaeVisData()
-    time_logs = defaultdict(float)
-
-    # Slice tokens, if we're only doing a subset of them
-    if cfg.batch_size is None:
-        tokens = tokens
-    else:
-        tokens = tokens[: cfg.batch_size]
-
-    # Get a feature list (need to deal with the case where `cfg.features` is an int, or None)
-    if cfg.features is None:
-        assert isinstance(encoder.cfg.d_hidden, int)
-        features_list = list(range(encoder.cfg.d_hidden))
-    elif isinstance(cfg.features, int):
-        features_list = [cfg.features]
-    else:
-        features_list = list(cfg.features)
-
-    # Break up the features into batches
-    feature_batches = [
-        x.tolist()
-        for x in torch.tensor(features_list).split(cfg.minibatch_size_features)
-    ]
-    # Calculate how many minibatches of tokens there will be (for the progress bar)
-    n_token_batches = (
-        1
-        if (cfg.minibatch_size_tokens is None)
-        else math.ceil(len(tokens) / cfg.minibatch_size_tokens)
-    )
-    # Get the denominator for each of the 2 progress bars
-    totals = (n_token_batches * len(feature_batches), len(features_list))
-
-    # Optionally add two progress bars (one for the forward passes, one for getting the sequence data)
-    if cfg.verbose:
-        progress = [
-            tqdm(total=totals[0], desc="Forward passes to cache data for vis"),
-            tqdm(total=totals[1], desc="Extracting vis data from cached data"),
-        ]
-    else:
-        progress = None
-
-    # If the model is from TransformerLens, we need to apply a wrapper to it for standardization
-    assert isinstance(
-        model, HookedTransformer
-    ), "Error: non-HookedTransformer models are not yet supported."
-    assert isinstance(cfg.hook_point, str), "Error: cfg.hook_point must be a string"
-    model_wrapper = TransformerLensWrapper(model, cfg.hook_point)
-
-    # For each batch of features: get new data and update global data storage objects
-    for features in feature_batches:
-        new_feature_data, new_time_logs = _get_feature_data(
-            encoder, encoder_B, model_wrapper, tokens, features, cfg, progress
-        )
-        sae_vis_data.update(new_feature_data)
-        for key, value in new_time_logs.items():
-            time_logs[key] += value
-
-    # Now exited, make sure the progress bar is at 100%
-    if progress is not None:
-        for pbar in progress:
-            pbar.n = pbar.total
-
-    # If verbose, then print the output
-    if cfg.verbose:
-        total_time = sum(time_logs.values())
-        table = Table("Task", "Time", "Pct %")
-        for task, duration in time_logs.items():
-            table.add_row(task, f"{duration:.2f}s", f"{duration/total_time:.1%}")
-        rprint(table)
-
-    return sae_vis_data
+#     # return sae_vis_data
 
 
 @torch.inference_mode()

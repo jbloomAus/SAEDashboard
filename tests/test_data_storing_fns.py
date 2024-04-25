@@ -4,8 +4,8 @@ from pathlib import Path
 from transformer_lens import HookedTransformer
 
 from sae_vis.data_config_classes import SaeVisConfig
-from sae_vis.data_storing_fns import SaeVisData
 from sae_vis.model_fns import AutoEncoder
+from sae_vis.sae_vis_runner import SaeVisRunner
 
 ROOT_DIR = Path(__file__).parent.parent
 
@@ -20,7 +20,8 @@ def test_SaeVisData_create_results_look_reasonable(
             "Nothing is cheesier than cheese." * 3,
         ]
     )
-    data = SaeVisData.create(encoder=autoencoder, model=model, tokens=tokens, cfg=cfg)
+    data = SaeVisRunner(cfg).run(encoder=autoencoder, model=model, tokens=tokens)
+    # data = SaeVisData.create(encoder=autoencoder, model=model, tokens=tokens, cfg=cfg)
 
     assert data.encoder == autoencoder
     assert data.model == model
@@ -58,7 +59,7 @@ def test_SaeVisData_create_and_save_feature_centric_vis(
             "Nothing is cheesier than cheese." * 3,
         ]
     )
-    data = SaeVisData.create(encoder=autoencoder, model=model, tokens=tokens, cfg=cfg)
+    data = SaeVisRunner(cfg).run(encoder=autoencoder, model=model, tokens=tokens)
     save_path = tmp_path / "feature_centric_vis.html"
     data.save_feature_centric_vis(save_path)
     assert (save_path).exists()
@@ -101,7 +102,7 @@ def test_SaeVisData_save_json_snapshot(
             "Nothing is cheesier than cheese." * 3,
         ]
     )
-    data = SaeVisData.create(encoder=autoencoder, model=model, tokens=tokens, cfg=cfg)
+    data = SaeVisRunner(cfg).run(encoder=autoencoder, model=model, tokens=tokens)
     save_path = tmp_path / "feature_data.json"
 
     data.save_json(save_path)
@@ -128,7 +129,7 @@ def test_SaeVisData_save_html_snapshot(
             "Nothing is cheesier than cheese." * 3,
         ]
     )
-    data = SaeVisData.create(encoder=autoencoder, model=model, tokens=tokens, cfg=cfg)
+    data = SaeVisRunner(cfg).run(encoder=autoencoder, model=model, tokens=tokens)
     save_path = tmp_path / "feature_centric_vis_test.html"
     data.save_feature_centric_vis(save_path)
 
