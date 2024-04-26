@@ -106,13 +106,13 @@ class SaeVisRunner:
         # For each batch of features: get new data and update global data storage objects
         for features in feature_batches:
             new_feature_data, new_time_logs = get_feature_data(
-                encoder_wrapper,
-                encoder_B,
-                model_wrapper,
-                tokens,
-                features,
-                self.cfg,
-                progress,
+                encoder=encoder_wrapper,
+                encoder_B=encoder_B,
+                model=model_wrapper,
+                tokens=tokens,
+                feature_indices=features,
+                cfg=self.cfg,
+                progress=progress,
             )
             sae_vis_data.update(new_feature_data)
             for key, value in new_time_logs.items():
