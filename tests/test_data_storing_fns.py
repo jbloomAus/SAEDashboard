@@ -4,9 +4,9 @@ from pathlib import Path
 import pytest
 from transformer_lens import HookedTransformer
 
-from sae_vis.config import SaeVisConfig
-from sae_vis.data_storing_fns import SaeVisData
-from sae_vis.model_fns import AutoEncoder
+from sae_vis.autoencoder import AutoEncoder
+from sae_vis.data_writing_fns import save_feature_centric_vis
+from sae_vis.sae_vis_data import SaeVisConfig, SaeVisData
 from sae_vis.sae_vis_runner import SaeVisRunner
 
 ROOT_DIR = Path(__file__).parent.parent
@@ -72,7 +72,7 @@ def test_SaeVisData_create_and_save_feature_centric_vis(
     tmp_path: Path,
 ):
     save_path = tmp_path / "feature_centric_vis.html"
-    sae_vis_data.save_feature_centric_vis(save_path)
+    save_feature_centric_vis(sae_vis_data=sae_vis_data, filename=save_path)
     assert (save_path).exists()
     with open(save_path) as f:
         html_contents = f.read()

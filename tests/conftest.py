@@ -2,7 +2,7 @@ import pytest
 import torch
 from transformer_lens import HookedTransformer
 
-from sae_vis.model_fns import AutoEncoder, AutoEncoderConfig
+from sae_vis.autoencoder import AutoEncoder, AutoEncoderConfig
 
 
 @pytest.fixture
