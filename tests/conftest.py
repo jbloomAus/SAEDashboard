@@ -14,7 +14,7 @@ def model() -> HookedTransformer:
 
 @pytest.fixture
 def autoencoder() -> AutoEncoder:
-    cfg = AutoEncoderConfig(d_in=64, dict_mult=2)
+    cfg = AutoEncoderConfig(d_in=64, d_hidden=64 * 2, dict_mult=2)
     autoencoder = AutoEncoder(cfg)
     # set weights and biases to hardcoded values so tests are consistent
     seed1 = torch.tensor([0.1, -0.2, 0.3, -0.4] * 16)  # 64

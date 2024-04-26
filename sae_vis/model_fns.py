@@ -46,20 +46,20 @@ class AutoEncoderConfig:
     """Class for storing configuration parameters for the autoencoder"""
 
     d_in: int
-    d_hidden: int | None = None
-    dict_mult: int | None = None
+    d_hidden: int  # | None = None
+    dict_mult: int  # | None = None
 
     l1_coeff: float = 3e-4
 
-    def __post_init__(self):
-        assert (
-            int(self.d_hidden is None) + int(self.dict_mult is None) == 1
-        ), "Exactly one of d_hidden or dict_mult must be provided"
-        if (self.d_hidden is None) and isinstance(self.dict_mult, int):
-            self.d_hidden = self.d_in * self.dict_mult
-        elif (self.dict_mult is None) and isinstance(self.d_hidden, int):
-            assert self.d_hidden % self.d_in == 0, "d_hidden must be a multiple of d_in"
-            self.dict_mult = self.d_hidden // self.d_in
+    # def __post_init__(self):
+    #     assert (
+    #         int(self.d_hidden is None) + int(self.dict_mult is None) == 1
+    #     ), "Exactly one of d_hidden or dict_mult must be provided"
+    #     if (self.d_hidden is None) and isinstance(self.dict_mult, int):
+    #         self.d_hidden = self.d_in * self.dict_mult
+    #     elif (self.dict_mult is None) and isinstance(self.d_hidden, int):
+    #         assert self.d_hidden % self.d_in == 0, "d_hidden must be a multiple of d_in"
+    #         self.dict_mult = self.d_hidden // self.d_in
 
 
 class AutoEncoder(nn.Module):
@@ -121,7 +121,9 @@ class AutoEncoder(nn.Module):
         d_in, d_hidden = state_dict["W_enc"].shape
 
         # Create autoencoder
-        cfg = AutoEncoderConfig(d_in=d_in, d_hidden=d_hidden)
+        cfg = AutoEncoderConfig(
+            d_in=d_in, d_hidden=d_hidden, dict_mult=d_hidden // d_in
+        )
         encoder = cls(cfg)
         encoder.load_state_dict(state_dict)
         return encoder

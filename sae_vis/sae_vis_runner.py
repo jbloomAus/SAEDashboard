@@ -1,21 +1,21 @@
 import math
 from collections import defaultdict
+from typing import Iterable
 
 import numpy as np
 import torch
 from jaxtyping import Int
 from rich import print as rprint
 from rich.table import Table
-from torch import Tensor, nn
+from torch import Tensor
 from tqdm.auto import tqdm
 from transformer_lens import HookedTransformer
 
-from sae_vis.data_config_classes import SaeVisConfig
+from sae_vis.config import SaeVisConfig
 from sae_vis.data_fetching_fns import get_feature_data
 from sae_vis.data_storing_fns import SaeVisData
 from sae_vis.model_fns import (
     AutoEncoder,
-    AutoEncoderConfig,
     TransformerLensWrapper,
 )
 
@@ -27,49 +27,20 @@ class SaeVisRunner:
     @torch.inference_mode()
     def run(
         self,
-        encoder: nn.Module,
+        encoder: AutoEncoder,
         model: HookedTransformer,
         tokens: Int[Tensor, "batch seq"],
         encoder_B: AutoEncoder | None = None,
     ) -> SaeVisData:
-        # If encoder isn't an AutoEncoder, we wrap it in one
-        if not isinstance(encoder, AutoEncoder):
-            assert set(
-                encoder.state_dict().keys()
-            ).issuperset(
-                {"W_enc", "W_dec", "b_enc", "b_dec"}
-            ), "If encoder isn't an AutoEncoder, it should have weights 'W_enc', 'W_dec', 'b_enc', 'b_dec'"
-            d_in, d_hidden = encoder.W_enc.shape
-            device = encoder.W_enc.device
-            encoder_cfg = AutoEncoderConfig(d_in=d_in, d_hidden=d_hidden)
-            encoder_wrapper = AutoEncoder(encoder_cfg).to(device)
-            encoder_wrapper.load_state_dict(encoder.state_dict(), strict=False)
-        else:
-            encoder_wrapper = encoder
-
         # Apply random seed
-        if self.cfg.seed is not None:
-            torch.manual_seed(self.cfg.seed)
-            np.random.seed(self.cfg.seed)
+        self.set_seeds()
 
         # Create objects to store all the data we'll get from `_get_feature_data`
-        sae_vis_data = SaeVisData()
+        sae_vis_data = SaeVisData(cfg=self.cfg)
         time_logs = defaultdict(float)
 
-        # Slice tokens, if we're only doing a subset of them
-        if self.cfg.batch_size is None:
-            tokens = tokens
-        else:
-            tokens = tokens[: self.cfg.batch_size]
-
-        # Get a feature list (need to deal with the case where `self.cfg.features` is an int, or None)
-        if self.cfg.features is None:
-            assert isinstance(encoder_wrapper.cfg.d_hidden, int)
-            features_list = list(range(encoder_wrapper.cfg.d_hidden))
-        elif isinstance(self.cfg.features, int):
-            features_list = [self.cfg.features]
-        else:
-            features_list = list(self.cfg.features)
+        tokens = self.subset_tokens(tokens)
+        features_list = self.handle_features(self.cfg.features, encoder)
 
         # Break up the features into batches
         feature_batches = [
@@ -95,18 +66,12 @@ class SaeVisRunner:
             progress = None
 
         # If the model is from TransformerLens, we need to apply a wrapper to it for standardization
-        assert isinstance(
-            model, HookedTransformer
-        ), "Error: non-HookedTransformer models are not yet supported."
-        assert isinstance(
-            self.cfg.hook_point, str
-        ), "Error: self.cfg.hook_point must be a string"
         model_wrapper = TransformerLensWrapper(model, self.cfg.hook_point)
 
         # For each batch of features: get new data and update global data storage objects
         for features in feature_batches:
             new_feature_data, new_time_logs = get_feature_data(
-                encoder=encoder_wrapper,
+                encoder=encoder,
                 encoder_B=encoder_B,
                 model=model_wrapper,
                 tokens=tokens,
@@ -133,7 +98,32 @@ class SaeVisRunner:
 
         sae_vis_data.cfg = self.cfg
         sae_vis_data.model = model
-        sae_vis_data.encoder = encoder_wrapper
+        sae_vis_data.encoder = encoder
         sae_vis_data.encoder_B = encoder_B
 
         return sae_vis_data
+
+    def set_seeds(self) -> None:
+        if self.cfg.seed is not None:
+            torch.manual_seed(self.cfg.seed)
+            np.random.seed(self.cfg.seed)
+        return None
+
+    def subset_tokens(
+        self, tokens: Int[Tensor, "batch seq"]
+    ) -> Int[Tensor, "batch seq"]:
+        """
+        We should remove this soon. Not worth it.
+        """
+        if self.cfg.batch_size is None:
+            return tokens
+        else:
+            return tokens[: self.cfg.batch_size]
+
+    def handle_features(
+        self, features: Iterable[int] | None, encoder_wrapper: AutoEncoder
+    ) -> list[int]:
+        if features is None:
+            return list(range(encoder_wrapper.cfg.d_hidden))
+        else:
+            return list(features)

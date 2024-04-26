@@ -10,7 +10,7 @@ from dataclasses_json import dataclass_json
 from tqdm.auto import tqdm
 from transformer_lens import HookedTransformer
 
-from sae_vis.data_config_classes import (
+from sae_vis.config import (
     ActsHistogramConfig,
     FeatureTablesConfig,
     GenericComponentConfig,
@@ -26,9 +26,7 @@ from sae_vis.html_fns import (
     bgColorMap,
     uColorMap,
 )
-from sae_vis.model_fns import (
-    AutoEncoder
-)
+from sae_vis.model_fns import AutoEncoder
 from sae_vis.utils_fns import (
     FeatureStatistics,
     HistogramData,
@@ -986,9 +984,9 @@ class SaeVisData:
         encoder_B:          The encoder used to get the feature activations for the second model (if applicable).
     """
 
+    cfg: SaeVisConfig  # = field(default_factory=SaeVisConfig)
     feature_data_dict: dict[int, FeatureData] = field(default_factory=dict)
     feature_stats: FeatureStatistics = field(default_factory=FeatureStatistics)
-    cfg: SaeVisConfig = field(default_factory=SaeVisConfig)
 
     model: HookedTransformer | None = None
     encoder: AutoEncoder | None = None
@@ -1240,9 +1238,9 @@ class SaeVisData:
         _self = _SaeVisData.from_dict(data)
 
         self = SaeVisData(
+            cfg=cfg,
             feature_data_dict=_self.feature_data_dict,
             feature_stats=_self.feature_stats,
-            cfg=cfg,
             model=model,
             encoder=encoder,
             encoder_B=encoder_B,

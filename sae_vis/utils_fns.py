@@ -1,5 +1,3 @@
-# %%
-
 import re
 from dataclasses import dataclass, field
 from typing import (
@@ -446,8 +444,6 @@ def pad_with_zeros(
         return [0.0] * (n - len(x)) + x
 
 
-# %%
-
 # This defines the number of decimal places we'll use. It's assumed to refer to values in the range [0, 1] rather than
 # pct, e.g. precision of 5 would be 99.497% = 0.99497. In other words, decimal_places = precision - 2.
 
@@ -661,9 +657,6 @@ if MAIN:
         print(f"Value: {v:.3f}, Precision: {p}, Quantile: {q:.{p-2}%}")
 
 
-# %%
-
-
 def split_string(
     input_string: str,
     str1: str,
@@ -697,9 +690,6 @@ if MAIN:
     print(split_string(input_string, str1, str2))
 
 
-# %%
-
-
 def apply_indent(
     text: str,
     prefix: str,
@@ -722,9 +712,6 @@ def apply_indent(
         text_indented = text_indented[len(prefix) :]
 
     return text_indented
-
-
-# %%
 
 
 def deep_union(
@@ -809,8 +796,6 @@ if MAIN:
         {"x": [1, 2]},
         {"x": [3, 4]},
     ) == {"x": [1, 2, 3, 4]}
-
-# %%
 
 
 # class RollingStats:
@@ -1090,9 +1075,6 @@ class HistogramData:
             tick_vals=tick_vals,
             title=title,
         )
-
-
-# %%
 
 
 def max_or_1(mylist: Sequence[float | int], abs: bool = False) -> float | int:

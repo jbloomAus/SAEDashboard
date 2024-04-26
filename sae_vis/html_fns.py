@@ -5,7 +5,7 @@ from typing import Any
 
 from matplotlib import colors
 
-from sae_vis.data_config_classes import (
+from sae_vis.config import (
     Column,
     SaeVisLayoutConfig,
 )

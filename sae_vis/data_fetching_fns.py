@@ -10,7 +10,7 @@ from torch import Tensor
 from tqdm.auto import tqdm
 from transformer_lens import HookedTransformer, utils
 
-from sae_vis.data_config_classes import (
+from sae_vis.config import (
     SaeVisConfig,
     SaeVisLayoutConfig,
     SequencesConfig,
@@ -386,7 +386,9 @@ def parse_feature_data(
     t0 = time.time()
 
     # ! Return the output, as a dict of FeatureData items
-    sae_vis_data = SaeVisData(feature_data_dict, feature_stats, cfg)
+    sae_vis_data = SaeVisData(
+        cfg=cfg, feature_data_dict=feature_data_dict, feature_stats=feature_stats
+    )
     return sae_vis_data, time_logs
 
 

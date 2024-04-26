@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from transformer_lens import HookedTransformer
 
-from sae_vis.data_config_classes import SaeVisConfig
+from sae_vis.config import SaeVisConfig
 from sae_vis.data_storing_fns import SaeVisData
 from sae_vis.model_fns import AutoEncoder
 from sae_vis.sae_vis_runner import SaeVisRunner
@@ -14,7 +14,11 @@ ROOT_DIR = Path(__file__).parent.parent
 
 @pytest.fixture
 def cfg() -> SaeVisConfig:
-    cfg = SaeVisConfig(hook_point="blocks.2.hook_resid_pre", minibatch_size_tokens=2)
+    cfg = SaeVisConfig(
+        hook_point="blocks.2.hook_resid_pre",
+        features=list(range(128)),
+        minibatch_size_tokens=2,
+    )
     return cfg
 
 
