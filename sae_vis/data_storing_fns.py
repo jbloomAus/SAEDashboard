@@ -7,8 +7,6 @@ from typing import Any, Callable, Literal
 
 import numpy as np
 from dataclasses_json import dataclass_json
-from jaxtyping import Int
-from torch import Tensor, nn
 from tqdm.auto import tqdm
 from transformer_lens import HookedTransformer
 
@@ -29,8 +27,7 @@ from sae_vis.html_fns import (
     uColorMap,
 )
 from sae_vis.model_fns import (
-    AutoEncoder,
-    AutoEncoderConfig,
+    AutoEncoder
 )
 from sae_vis.utils_fns import (
     FeatureStatistics,
@@ -1008,45 +1005,45 @@ class SaeVisData:
         self.feature_data_dict.update(other.feature_data_dict)
         self.feature_stats.update(other.feature_stats)
 
-    @classmethod
-    def create(
-        cls,
-        encoder: nn.Module,
-        model: HookedTransformer,
-        tokens: Int[Tensor, "batch seq"],
-        cfg: SaeVisConfig,
-        encoder_B: AutoEncoder | None = None,
-    ) -> "SaeVisData":
-        from sae_vis.data_fetching_fns import get_feature_data
+    # @classmethod
+    # def create(
+    #     cls,
+    #     encoder: nn.Module,
+    #     model: HookedTransformer,
+    #     tokens: Int[Tensor, "batch seq"],
+    #     cfg: SaeVisConfig,
+    #     encoder_B: AutoEncoder | None = None,
+    # ) -> "SaeVisData":
+    #     from sae_vis.data_fetching_fns import get_feature_data
 
-        # If encoder isn't an AutoEncoder, we wrap it in one
-        if not isinstance(encoder, AutoEncoder):
-            assert set(
-                encoder.state_dict().keys()
-            ).issuperset(
-                {"W_enc", "W_dec", "b_enc", "b_dec"}
-            ), "If encoder isn't an AutoEncoder, it should have weights 'W_enc', 'W_dec', 'b_enc', 'b_dec'"
-            d_in, d_hidden = encoder.W_enc.shape
-            device = encoder.W_enc.device
-            encoder_cfg = AutoEncoderConfig(d_in=d_in, d_hidden=d_hidden)
-            encoder_wrapper = AutoEncoder(encoder_cfg).to(device)
-            encoder_wrapper.load_state_dict(encoder.state_dict(), strict=False)
-        else:
-            encoder_wrapper = encoder
+    #     # If encoder isn't an AutoEncoder, we wrap it in one
+    #     if not isinstance(encoder, AutoEncoder):
+    #         assert set(
+    #             encoder.state_dict().keys()
+    #         ).issuperset(
+    #             {"W_enc", "W_dec", "b_enc", "b_dec"}
+    #         ), "If encoder isn't an AutoEncoder, it should have weights 'W_enc', 'W_dec', 'b_enc', 'b_dec'"
+    #         d_in, d_hidden = encoder.W_enc.shape
+    #         device = encoder.W_enc.device
+    #         encoder_cfg = AutoEncoderConfig(d_in=d_in, d_hidden=d_hidden)
+    #         encoder_wrapper = AutoEncoder(encoder_cfg).to(device)
+    #         encoder_wrapper.load_state_dict(encoder.state_dict(), strict=False)
+    #     else:
+    #         encoder_wrapper = encoder
 
-        sae_vis_data = get_feature_data(
-            encoder=encoder_wrapper,
-            model=model,
-            tokens=tokens,
-            cfg=cfg,
-            encoder_B=encoder_B,
-        )
-        sae_vis_data.cfg = cfg
-        sae_vis_data.model = model
-        sae_vis_data.encoder = encoder_wrapper
-        sae_vis_data.encoder_B = encoder_B
+    #     sae_vis_data = get_feature_data(
+    #         encoder=encoder_wrapper,
+    #         model=model,
+    #         tokens=tokens,
+    #         cfg=cfg,
+    #         encoder_B=encoder_B,
+    #     )
+    #     sae_vis_data.cfg = cfg
+    #     sae_vis_data.model = model
+    #     sae_vis_data.encoder = encoder_wrapper
+    #     sae_vis_data.encoder_B = encoder_B
 
-        return sae_vis_data
+    #     return sae_vis_data
 
     def save_feature_centric_vis(
         self,
