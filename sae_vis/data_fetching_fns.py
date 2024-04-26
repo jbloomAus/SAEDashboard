@@ -396,7 +396,7 @@ def get_feature_data(
     encoder_B: AutoEncoder | None,
     model: TransformerLensWrapper,
     tokens: Int[Tensor, "batch seq"],
-    feature_indices: int | list[int],
+    feature_indices: list[int],
     cfg: SaeVisConfig,
     progress: list[tqdm] | None = None,
 ) -> tuple[SaeVisData, dict[str, float]]:
@@ -450,18 +450,6 @@ def get_feature_data(
 
     t0 = time.time()
 
-    # Make feature_indices a list, for convenience
-    if isinstance(feature_indices, int):
-        feature_indices = [feature_indices]
-
-    # Get tokens into minibatches, for the fwd pass
-    token_minibatches = (
-        (tokens,)
-        if cfg.minibatch_size_tokens is None
-        else tokens.split(cfg.minibatch_size_tokens)
-    )
-    token_minibatches = [tok.to(device) for tok in token_minibatches]
-
     # ! Data setup code (defining the main objects we'll eventually return, for each of 5 possible vis components)
 
     # Create lists to store the feature activations & final values of the residual stream
@@ -476,6 +464,14 @@ def get_feature_data(
     # Get encoder & decoder directions
     feature_out_dir = encoder.W_dec[feature_indices]  # [feats d_autoencoder]
     feature_resid_dir = to_resid_dir(feature_out_dir, model)  # [feats d_model]
+
+    # Get tokens into minibatches, for the fwd pass
+    token_minibatches = (
+        (tokens,)
+        if cfg.minibatch_size_tokens is None
+        else tokens.split(cfg.minibatch_size_tokens)
+    )
+    token_minibatches = [tok.to(device) for tok in token_minibatches]
 
     time_logs["(1) Initialization"] = time.time() - t0
 
