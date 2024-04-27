@@ -1,19 +1,13 @@
-import time
-
 import einops
 import numpy as np
 import torch
 from eindex import eindex
 from jaxtyping import Float, Int
 from torch import Tensor
-from tqdm.auto import tqdm
 from transformer_lens import HookedTransformer, utils
 
 from sae_vis.autoencoder import AutoEncoder
 from sae_vis.components import (
-    ActsHistogramData,
-    FeatureTablesData,
-    LogitsHistogramData,
     LogitsTableData,
     SequenceData,
     SequenceGroupData,
@@ -23,11 +17,9 @@ from sae_vis.components_config import (
     SequencesConfig,
 )
 from sae_vis.data_fetching_fns import compute_feat_acts
-from sae_vis.feature_data import FeatureData
-from sae_vis.sae_vis_data import SaeVisConfig, SaeVisData
+from sae_vis.sae_vis_data import SaeVisData
 from sae_vis.transformer_lens_wrapper import TransformerLensWrapper, to_resid_dir
 from sae_vis.utils_fns import (
-    FeatureStatistics,
     RollingCorrCoef,
     TopK,
     k_largest_indices,
@@ -37,209 +29,80 @@ from sae_vis.utils_fns import (
 Arr = np.ndarray
 
 
-@torch.inference_mode()
-def parse_feature_data(
-    tokens: Int[Tensor, "batch seq"],
-    feature_indices: list[int],
-    all_feat_acts: Float[Tensor, "... feats"],
-    feature_resid_dir: Float[Tensor, "feats d_model"],
-    all_resid_post: Float[Tensor, "... d_model"],
-    W_U: Float[Tensor, "d_model d_vocab"],
-    cfg: SaeVisConfig,
-    feature_out_dir: Float[Tensor, "feats d_out"],
-    corrcoef_neurons: RollingCorrCoef | None = None,
-    corrcoef_encoder: RollingCorrCoef | None = None,
-    corrcoef_encoder_B: RollingCorrCoef | None = None,
-    progress: list[tqdm] | None = None,
-) -> tuple[SaeVisData, dict[str, float]]:
-    """Convert generic activation data into a SaeVisData object, which can be used to create the feature-centric vis.
+# @torch.inference_mode()
+# def parse_feature_data(
+#     tokens: Int[Tensor, "batch seq"],
+#     feature_indices: list[int],
+#     all_feat_acts: Float[Tensor, "... feats"],
+#     feature_resid_dir: Float[Tensor, "feats d_model"],
+#     all_resid_post: Float[Tensor, "... d_model"],
+#     W_U: Float[Tensor, "d_model d_vocab"],
+#     cfg: SaeVisConfig,
+#     progress: list[tqdm] | None = None,
+# ) -> tuple[SaeVisData, dict[str, float]]:
+#     """Convert generic activation data into a SaeVisData object, which can be used to create the feature-centric vis.
 
-    This function exists so that feature dashboards can be generated without using our AutoEncoder or
-    TransformerLens(Wrapper) classes. We pass through W_U & other data needed for computing the logit lens, so we don't
-    need the models.
+#     This function exists so that feature dashboards can be generated without using our AutoEncoder or
+#     TransformerLens(Wrapper) classes. We pass through W_U & other data needed for computing the logit lens, so we don't
+#     need the models.
 
-    Args:
-        tokens: Int[Tensor, "batch seq"]
-            The tokens we'll be using to get the feature activations.
+#     Args:
+#         tokens: Int[Tensor, "batch seq"]
+#             The tokens we'll be using to get the feature activations.
 
-        feature_indices: Union[int, list[int]]
-            The features we're actually computing. These might just be a subset of the model's full features.
+#         feature_indices: Union[int, list[int]]
+#             The features we're actually computing. These might just be a subset of the model's full features.
 
-        all_feat_acts: Float[Tensor, "... feats"]
-            The activations values of the features across the batch & sequence.
+#         all_feat_acts: Float[Tensor, "... feats"]
+#             The activations values of the features across the batch & sequence.
 
-        feature_resid_dir: Float[Tensor, "feats d_model"]
-            The directions that each feature writes to the residual stream.
-            For example, feature_resid_dir = encoder.W_dec[feature_indices] # [feats d_autoencoder]
+#         feature_resid_dir: Float[Tensor, "feats d_model"]
+#             The directions that each feature writes to the residual stream.
+#             For example, feature_resid_dir = encoder.W_dec[feature_indices] # [feats d_autoencoder]
 
-        all_resid_post: Float[Tensor, "... d_model"]
-            The activations of the final layer of the model before the unembed.
+#         all_resid_post: Float[Tensor, "... d_model"]
+#             The activations of the final layer of the model before the unembed.
 
-        W_U: Float[Tensor, "d_model d_vocab"]
-            The model's unembed weights for the logit lens.
+#         W_U: Float[Tensor, "d_model d_vocab"]
+#             The model's unembed weights for the logit lens.
 
-        cfg: SaeVisConfig
-            Feature visualization parameters, containing a bunch of other stuff. See the SaeVisConfig docstring for
-            more information.
+#         cfg: SaeVisConfig
+#             Feature visualization parameters, containing a bunch of other stuff. See the SaeVisConfig docstring for
+#             more information.
 
-        feature_out_dir: Optional[Float[Tensor, "feats d_out"]]
-            The directions that each SAE feature writes to the residual stream. This will be the same as
-            feature_resid_dir if the SAE is in the residual stream (as we will assume if it not provided)
-            For example, feature_out_dir = encoder.W_dec[feature_indices] # [feats d_autoencoder]
+#         feature_out_dir: Optional[Float[Tensor, "feats d_out"]]
+#             The directions that each SAE feature writes to the residual stream. This will be the same as
+#             feature_resid_dir if the SAE is in the residual stream (as we will assume if it not provided)
+#             For example, feature_out_dir = encoder.W_dec[feature_indices] # [feats d_autoencoder]
 
-        corrcoef_neurons: Optional[RollingCorrCoef]
-            The object storing the minimal data necessary to compute corrcoef between feature activations & neurons.
+#         corrcoef_neurons: Optional[RollingCorrCoef]
+#             The object storing the minimal data necessary to compute corrcoef between feature activations & neurons.
 
-        corrcoef_encoder: Optional[RollingCorrCoef]
-            The object storing the minimal data necessary to compute corrcoef between feature activations (pairwise).
+#         corrcoef_encoder: Optional[RollingCorrCoef]
+#             The object storing the minimal data necessary to compute corrcoef between feature activations (pairwise).
 
-        corrcoef_encoder_B: Optional[RollingCorrCoef]
-            The object storing minimal data to compute corrcoef between feature activations & encoder-B features.
+#         corrcoef_encoder_B: Optional[RollingCorrCoef]
+#             The object storing minimal data to compute corrcoef between feature activations & encoder-B features.
 
-        progress: Optional[list[tqdm]]
-            An optional list containing progress bars for the forward passes and the sequence data. This is used to
-            update the progress bars as the computation runs.
+#         progress: Optional[list[tqdm]]
+#             An optional list containing progress bars for the forward passes and the sequence data. This is used to
+#             update the progress bars as the computation runs.
 
-    Returns:
-        sae_vis_data: SaeVisData
-            Containing data for creating each feature visualization, as well as data for rank-ordering the feature
-            visualizations when it comes time to make the prompt-centric view (the `feature_act_quantiles` attribute).
+#     Returns:
+#         sae_vis_data: SaeVisData
+#             Containing data for creating each feature visualization, as well as data for rank-ordering the feature
+#             visualizations when it comes time to make the prompt-centric view (the `feature_act_quantiles` attribute).
 
-        time_logs: dict[str, float]
-            A dictionary containing the time taken for each step of the computation. This is optionally printed at the
-            end of the `get_feature_data` function, if `cfg.verbose` is set to True.
-    """
-    time_logs = {
-        "(4) Getting data for tables": 0.0,
-        "(5) Getting data for histograms": 0.0,
-        "(6) Getting data for sequences": 0.0,
-        "(7) Getting data for quantiles": 0.0,
-    }
-    t0 = time.time()
+#         time_logs: dict[str, float]
+#             A dictionary containing the time taken for each step of the computation. This is optionally printed at the
+#             end of the `get_feature_data` function, if `cfg.verbose` is set to True.
+#     """
 
-    # ! Data setup code (defining the main objects we'll eventually return)
-    feature_data_dict: dict[int, FeatureData] = {
-        feat: FeatureData() for feat in feature_indices
-    }
+#     t0 = time.time()
 
-    # We're using `cfg.feature_centric_layout` to figure out what data we'll need to calculate during this function
-    layout = cfg.feature_centric_layout
+#     # ! Get all data for the middle column visualisations, i.e. the two histograms & the logit table
 
-    feature_tables_data = get_features_table_data(
-        feature_out_dir=feature_out_dir,
-        corrcoef_neurons=corrcoef_neurons,
-        corrcoef_encoder=corrcoef_encoder,
-        corrcoef_encoder_B=corrcoef_encoder_B,
-        n_rows=layout.feature_tables_cfg.n_rows,  # type: ignore
-    )
-
-    # Add all this data to the list of FeatureTablesData objects
-    for i, feat in enumerate(feature_indices):
-        feature_data_dict[feat].feature_tables_data = FeatureTablesData(
-            **{k: v[i] for k, v in feature_tables_data.items()}  # type: ignore
-        )
-
-    time_logs["(4) Getting data for tables"] = time.time() - t0
-    t0 = time.time()
-
-    # ! Get all data for the middle column visualisations, i.e. the two histograms & the logit table
-
-    # Get the logits of all features (i.e. the directions this feature writes to the logit output)
-    logits = einops.einsum(
-        feature_resid_dir, W_U, "feats d_model, d_model d_vocab -> feats d_vocab"
-    )
-    if any(
-        x is not None
-        for x in [layout.act_hist_cfg, layout.logits_hist_cfg, layout.logits_table_cfg]
-    ):
-        for i, (feat, logit_vector) in enumerate(zip(feature_indices, logits)):
-            # Get logits histogram data (no title)
-            if layout.logits_hist_cfg is not None:
-                feature_data_dict[
-                    feat
-                ].logits_histogram_data = LogitsHistogramData.from_data(
-                    data=logit_vector,
-                    n_bins=layout.logits_hist_cfg.n_bins,
-                    tickmode="5 ticks",
-                    title=None,
-                )
-
-            # Get data for feature activations histogram (including the title!)
-            if layout.act_hist_cfg is not None:
-                feat_acts = all_feat_acts[..., i]
-                nonzero_feat_acts = feat_acts[feat_acts > 0]
-                frac_nonzero = nonzero_feat_acts.numel() / feat_acts.numel()
-                feature_data_dict[
-                    feat
-                ].acts_histogram_data = ActsHistogramData.from_data(
-                    data=nonzero_feat_acts,
-                    n_bins=layout.act_hist_cfg.n_bins,
-                    tickmode="5 ticks",
-                    title=f"ACTIVATIONS<br>DENSITY = {frac_nonzero:.3%}",
-                )
-
-            if layout.logits_table_cfg is not None:
-                # Get logits table data
-                top_logits = TopK(
-                    logit_vector, k=layout.logits_table_cfg.n_rows, largest=True
-                )
-                bottom_logits = TopK(
-                    logit_vector, k=layout.logits_table_cfg.n_rows, largest=False
-                )
-
-                top_logits, top_token_ids = (
-                    top_logits.values.tolist(),
-                    top_logits.indices.tolist(),
-                )
-                bottom_logits, bottom_token_ids = (
-                    bottom_logits.values.tolist(),
-                    bottom_logits.indices.tolist(),
-                )
-
-                # Create a MiddlePlotsData object from this, and add it to the dict
-                feature_data_dict[feat].logits_table_data = LogitsTableData(
-                    bottom_logits=bottom_logits,
-                    bottom_token_ids=bottom_token_ids,
-                    top_logits=top_logits,
-                    top_token_ids=top_token_ids,
-                )
-
-    time_logs["(5) Getting data for histograms"] = time.time() - t0
-    t0 = time.time()
-
-    # ! Calculate all data for the right-hand visualisations, i.e. the sequences
-
-    if layout.seq_cfg is not None:
-        for i, feat in enumerate(feature_indices):
-            # Add this feature's sequence data to the list
-            feature_data_dict[feat].sequence_data = get_sequences_data(
-                tokens=tokens,
-                feat_acts=all_feat_acts[..., i],
-                feat_logits=logits[i],
-                resid_post=all_resid_post,
-                feature_resid_dir=feature_resid_dir[i],
-                W_U=W_U,
-                seq_cfg=layout.seq_cfg,
-            )
-            # Update the 2nd progress bar (fwd passes & getting sequence data dominates the runtime of these computations)
-            if progress is not None:
-                progress[1].update(1)
-
-    time_logs["(6) Getting data for sequences"] = time.time() - t0
-    t0 = time.time()
-
-    # ! Get stats (including quantiles, which will be useful for the prompt-centric visualisation)
-    feature_stats = FeatureStatistics.create(
-        data=einops.rearrange(all_feat_acts, "b s feats -> feats (b s)")
-    )
-    time_logs["(7) Getting data for quantiles"] = time.time() - t0
-    t0 = time.time()
-
-    # ! Return the output, as a dict of FeatureData items
-    sae_vis_data = SaeVisData(
-        cfg=cfg, feature_data_dict=feature_data_dict, feature_stats=feature_stats
-    )
-    return sae_vis_data, time_logs
+#     return sae_vis_data, time_logs
 
 
 def get_features_table_data(
@@ -346,6 +209,29 @@ def add_encoder_B_feature_correlations(
     feature_tables_data["correlated_b_features_indices"] = encB_indices
     feature_tables_data["correlated_b_features_pearson"] = encB_pearson
     feature_tables_data["correlated_b_features_cossim"] = encB_cossim
+
+
+def get_logits_table_data(
+    logit_vector: Float[Tensor, "d_vocab"],
+    n_rows: int):
+    # Get logits table data
+    top_logits = TopK(logit_vector, k=n_rows, largest=True)
+    bottom_logits = TopK(logit_vector, k=n_rows, largest=False)
+
+    top_logit_values = top_logits.values.tolist()
+    top_token_ids = top_logits.indices.tolist()
+
+    bottom_logit_values = bottom_logits.values.tolist()
+    bottom_token_ids = bottom_logits.indices.tolist()
+
+    logits_table_data = LogitsTableData(
+        bottom_logits=bottom_logit_values,
+        bottom_token_ids=bottom_token_ids,
+        top_logits=top_logit_values,
+        top_token_ids=top_token_ids,
+    )
+
+    return logits_table_data
 
 
 # @torch.inference_mode()

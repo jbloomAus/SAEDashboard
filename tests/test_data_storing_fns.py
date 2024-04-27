@@ -124,7 +124,7 @@ def test_SaeVisData_save_html_snapshot(
     tmp_path: Path,
 ):
     save_path = tmp_path / "feature_centric_vis_test.html"
-    sae_vis_data.save_feature_centric_vis(save_path)
+    save_feature_centric_vis(sae_vis_data, save_path)
 
     # load in fixtures/feature_data.json and do a diff
     expected_path = "tests/fixtures/feature_centric_vis.html"

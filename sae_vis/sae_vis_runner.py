@@ -2,6 +2,7 @@ import math
 from collections import defaultdict
 from typing import Iterable
 
+import einops
 import numpy as np
 import torch
 from jaxtyping import Int
@@ -12,10 +13,23 @@ from tqdm.auto import tqdm
 from transformer_lens import HookedTransformer
 
 from sae_vis.autoencoder import AutoEncoder
+from sae_vis.components import (
+    ActsHistogramData,
+    FeatureTablesData,
+    LogitsHistogramData,
+)
 from sae_vis.data_fetching_fns import get_feature_data
-from sae_vis.data_parsing_fns import parse_feature_data
+from sae_vis.data_parsing_fns import (
+    get_features_table_data,
+    get_logits_table_data,
+    get_sequences_data,
+)
+from sae_vis.feature_data import FeatureData
 from sae_vis.sae_vis_data import SaeVisConfig, SaeVisData
 from sae_vis.transformer_lens_wrapper import TransformerLensWrapper
+from sae_vis.utils_fns import (
+    FeatureStatistics,
+)
 
 
 class SaeVisRunner:
@@ -47,6 +61,7 @@ class SaeVisRunner:
         # TODO: We should write out json files with the results as this runs rather than storing everything in memory
         # in memory.
         for features in feature_batches:
+            # model and sae activations calculations.
             (
                 all_feat_acts,
                 all_resid_post,
@@ -65,31 +80,94 @@ class SaeVisRunner:
                 progress=progress,
             )
 
-            # ! Use the data we've collected to make a MultiFeatureData object
-            new_feature_data, new_time_logs = parse_feature_data(
-                tokens=tokens,
-                feature_indices=features,
-                all_feat_acts=all_feat_acts,
-                feature_resid_dir=feature_resid_dir,
-                all_resid_post=all_resid_post,
-                W_U=model.W_U,
-                cfg=self.cfg,
+            # Get the logits of all features (i.e. the directions this feature writes to the logit output)
+            logits = einops.einsum(
+                feature_resid_dir,
+                model.W_U,
+                "feats d_model, d_model d_vocab -> feats d_vocab",
+            )
+
+            # ! Get stats (including quantiles, which will be useful for the prompt-centric visualisation)
+            feature_stats = FeatureStatistics.create(
+                data=einops.rearrange(all_feat_acts, "b s feats -> feats (b s)")
+            )
+
+            # ! Data setup code (defining the main objects we'll eventually return)
+            feature_data_dict: dict[int, FeatureData] = {
+                feat: FeatureData() for feat in features
+            }
+
+            # We're using `cfg.feature_centric_layout` to figure out what data we'll need to calculate during this function
+            layout = self.cfg.feature_centric_layout
+
+            feature_tables_data = get_features_table_data(
                 feature_out_dir=feature_out_dir,
                 corrcoef_neurons=corrcoef_neurons,
                 corrcoef_encoder=corrcoef_encoder,
                 corrcoef_encoder_B=corrcoef_encoder_B,
-                progress=progress,
+                n_rows=layout.feature_tables_cfg.n_rows,  # type: ignore
             )
 
-            assert (
-                set(time_logs.keys()) & set(new_time_logs.keys()) == set()
-            ), f"Invalid keys: {set(time_logs.keys()) & set(new_time_logs.keys())} should have zero overlap"
+            # Add all this data to the list of FeatureTablesData objects
 
-            time_logs.update(new_time_logs)
+            for i, (feat, logit_vector) in enumerate(zip(features, logits)):
+                feature_data_dict[feat].feature_tables_data = FeatureTablesData(
+                    **{k: v[i] for k, v in feature_tables_data.items()}  # type: ignore
+                )
+
+                # Get logits histogram data (no title)
+                feature_data_dict[
+                    feat
+                ].logits_histogram_data = LogitsHistogramData.from_data(
+                    data=logit_vector,
+                    n_bins=layout.logits_hist_cfg.n_bins,  # type: ignore
+                    tickmode="5 ticks",
+                    title=None,
+                )
+
+                # Get data for feature activations histogram (including the title!)
+                feat_acts = all_feat_acts[..., i]
+                nonzero_feat_acts = feat_acts[feat_acts > 0]
+                frac_nonzero = nonzero_feat_acts.numel() / feat_acts.numel()
+                feature_data_dict[
+                    feat
+                ].acts_histogram_data = ActsHistogramData.from_data(
+                    data=nonzero_feat_acts,
+                    n_bins=layout.act_hist_cfg.n_bins,  # type: ignore
+                    tickmode="5 ticks",
+                    title=f"ACTIVATIONS<br>DENSITY = {frac_nonzero:.3%}",
+                )
+
+                # Create a MiddlePlotsData object from this, and add it to the dict
+                feature_data_dict[feat].logits_table_data = get_logits_table_data(
+                    logit_vector=logit_vector,
+                    n_rows=layout.logits_table_cfg.n_rows,  # type: ignore
+                )
+
+                # ! Calculate all data for the right-hand visualisations, i.e. the sequences
+
+                # Add this feature's sequence data to the list
+                feature_data_dict[feat].sequence_data = get_sequences_data(
+                    tokens=tokens,
+                    feat_acts=all_feat_acts[..., i],
+                    feat_logits=logits[i],
+                    resid_post=all_resid_post,
+                    feature_resid_dir=feature_resid_dir[i],
+                    W_U=model.W_U,
+                    seq_cfg=layout.seq_cfg,  # type: ignore
+                )
+                # Update the 2nd progress bar (fwd passes & getting sequence data dominates the runtime of these computations)
+                if progress is not None:
+                    progress[1].update(1)
+
+            # ! Return the output, as a dict of FeatureData items
+            new_feature_data = SaeVisData(
+                cfg=self.cfg,
+                feature_data_dict=feature_data_dict,
+                feature_stats=feature_stats,
+            )
 
             sae_vis_data.update(new_feature_data)
-            for key, value in new_time_logs.items():
-                time_logs[key] += value
 
         # Now exited, make sure the progress bar is at 100%
         if progress is not None:
