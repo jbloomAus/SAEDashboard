@@ -8,7 +8,7 @@ lint:
 	poetry run pyright sae_vis
 
 test:
-	poetry run pytest
+	poetry run pytest tests/unit
 
 check-all:
 	make format

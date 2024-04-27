@@ -9,14 +9,17 @@ from sae_vis.data_writing_fns import save_feature_centric_vis
 from sae_vis.sae_vis_data import SaeVisConfig, SaeVisData
 from sae_vis.sae_vis_runner import SaeVisRunner
 
-ROOT_DIR = Path(__file__).parent.parent
+ROOT_DIR = Path(__file__).parent.parent.parent
+
+N_FEATURES  = 32
 
 
 @pytest.fixture
 def cfg() -> SaeVisConfig:
     cfg = SaeVisConfig(
         hook_point="blocks.2.hook_resid_pre",
-        features=list(range(128)),
+        features=list(range(N_FEATURES)),
+        minibatch_size_features=N_FEATURES,
         minibatch_size_tokens=2,
     )
     return cfg
@@ -46,9 +49,9 @@ def test_SaeVisData_create_results_look_reasonable(
     assert sae_vis_data.model == model
     assert sae_vis_data.cfg == cfg
     # kurtosis and skew are both empty, is this itentional?
-    assert len(sae_vis_data.feature_stats.max) == 128
-    assert len(sae_vis_data.feature_stats.frac_nonzero) == 128
-    assert len(sae_vis_data.feature_stats.quantile_data) == 128
+    assert len(sae_vis_data.feature_stats.max) == N_FEATURES
+    assert len(sae_vis_data.feature_stats.frac_nonzero) == N_FEATURES
+    assert len(sae_vis_data.feature_stats.quantile_data) == N_FEATURES
     assert len(sae_vis_data.feature_stats.quantiles) > 1000
     for val in sae_vis_data.feature_stats.max:
         assert val >= 0
@@ -64,7 +67,7 @@ def test_SaeVisData_create_results_look_reasonable(
         assert bounds[0] <= bounds[1]
         assert prec > 0
     # each feature should get its own key
-    assert set(sae_vis_data.feature_data_dict.keys()) == set(range(128))
+    assert set(sae_vis_data.feature_data_dict.keys()) == set(range(N_FEATURES))
 
 
 def test_SaeVisData_create_and_save_feature_centric_vis(
