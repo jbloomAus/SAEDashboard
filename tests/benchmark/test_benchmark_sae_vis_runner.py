@@ -52,7 +52,7 @@ def sae():
 
 
 @pytest.fixture
-def tokens(model: HookedTransformer, sae: SparseAutoencoder):
+def tokens(sae: SparseAutoencoder):
     def get_tokens(
         activation_store: ActivationsStore,
         n_batches_to_sample_from: int = 2**10,
