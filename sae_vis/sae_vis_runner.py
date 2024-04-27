@@ -22,10 +22,12 @@ from sae_vis.data_fetching_fns import get_feature_data
 from sae_vis.data_parsing_fns import (
     get_features_table_data,
     get_logits_table_data,
-    get_sequences_data,
 )
 from sae_vis.feature_data import FeatureData
 from sae_vis.sae_vis_data import SaeVisConfig, SaeVisData
+from sae_vis.sequence_data_generator import (
+    SequenceDataGenerator,
+)
 from sae_vis.transformer_lens_wrapper import TransformerLensWrapper
 from sae_vis.utils_fns import (
     FeatureStatistics,
@@ -147,14 +149,15 @@ class SaeVisRunner:
                 # ! Calculate all data for the right-hand visualisations, i.e. the sequences
 
                 # Add this feature's sequence data to the list
-                feature_data_dict[feat].sequence_data = get_sequences_data(
+                feature_data_dict[feat].sequence_data = SequenceDataGenerator(
+                    seq_cfg=layout.seq_cfg  # type: ignore
+                ).get_sequences_data(
                     tokens=tokens,
                     feat_acts=all_feat_acts[..., i],
                     feat_logits=logits[i],
                     resid_post=all_resid_post,
                     feature_resid_dir=feature_resid_dir[i],
                     W_U=model.W_U,
-                    seq_cfg=layout.seq_cfg,  # type: ignore
                 )
                 # Update the 2nd progress bar (fwd passes & getting sequence data dominates the runtime of these computations)
                 if progress is not None:
