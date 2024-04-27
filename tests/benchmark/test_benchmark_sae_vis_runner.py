@@ -1,20 +1,19 @@
-from pathlib import Path
 import os
-import pytest
-from transformer_lens import HookedTransformer
-import torch
+from pathlib import Path
 
+import pytest
+import torch
+from huggingface_hub import hf_hub_download
+from sae_lens.training.activations_store import ActivationsStore
+from sae_lens.training.session_loader import LMSparseAutoencoderSessionloader
+from sae_lens.training.sparse_autoencoder import SparseAutoencoder
+from tqdm import tqdm
+from transformer_lens import HookedTransformer
+
+from sae_vis.autoencoder import AutoEncoder, AutoEncoderConfig
 from sae_vis.data_writing_fns import save_feature_centric_vis
 from sae_vis.sae_vis_data import SaeVisConfig
 from sae_vis.sae_vis_runner import SaeVisRunner
-
-from huggingface_hub import hf_hub_download
-from sae_vis.autoencoder import AutoEncoder, AutoEncoderConfig
-
-from sae_lens.training.session_loader import LMSparseAutoencoderSessionloader
-from sae_lens.training.activations_store import ActivationsStore
-from sae_lens.training.sparse_autoencoder import SparseAutoencoder
-from tqdm import tqdm
 
 ROOT_DIR = Path(__file__).parent.parent
 
@@ -29,14 +28,14 @@ def model() -> HookedTransformer:
     model.to(DEVICE)
     return model
 
+
 @pytest.fixture()
 def sae():
-    
     # Get autoencoder
     hook_point = "blocks.0.hook_resid_pre"
     sae_path = hf_hub_download(
-        repo_id = "jbloom/GPT2-Small-SAEs-Reformatted",
-        filename = f"{hook_point}/sae_weights.safetensors",
+        repo_id="jbloom/GPT2-Small-SAEs-Reformatted",
+        filename=f"{hook_point}/sae_weights.safetensors",
     )
     hf_hub_download(
         repo_id="jbloom/GPT2-Small-SAEs-Reformatted",
@@ -51,9 +50,9 @@ def sae():
 
     return gpt2_sae
 
+
 @pytest.fixture
 def tokens(model: HookedTransformer, sae: SparseAutoencoder):
-
     def get_tokens(
         activation_store: ActivationsStore,
         n_batches_to_sample_from: int = 2**10,
@@ -72,34 +71,35 @@ def tokens(model: HookedTransformer, sae: SparseAutoencoder):
         all_tokens = all_tokens[torch.randperm(all_tokens.shape[0])]
         return all_tokens[:n_prompts_to_select]
 
-     # Get tokens, set model
+    # Get tokens, set model
     loader = LMSparseAutoencoderSessionloader(sae.cfg)
     _, _, activation_store = loader.load_sae_training_group_session()
     all_tokens_gpt = get_tokens(activation_store)
     return all_tokens_gpt
 
+
 @pytest.fixture
 def cfg(
     sae: SparseAutoencoder,
 ) -> SaeVisConfig:
-    
     feature_vis_config_gpt = SaeVisConfig(
-        hook_point = sae.cfg.hook_point,
-        features = TEST_FEATURES,
-        batch_size = 8192,
-        verbose = True,
+        hook_point=sae.cfg.hook_point,
+        features=TEST_FEATURES,
+        batch_size=8192,
+        verbose=True,
     )
-    
-    
+
     return feature_vis_config_gpt
 
 
 def test_benchmark_sae_vis_runner(
-    cfg: SaeVisConfig, sae: SparseAutoencoder, model: HookedTransformer, tokens: torch.Tensor
-):  
-    
-    # we've deleted the casting code so I'll have to re-implement it here 
-    
+    cfg: SaeVisConfig,
+    sae: SparseAutoencoder,
+    model: HookedTransformer,
+    tokens: torch.Tensor,
+):
+    # we've deleted the casting code so I'll have to re-implement it here
+
     assert set(
         sae.state_dict().keys()
     ).issuperset(
@@ -107,13 +107,15 @@ def test_benchmark_sae_vis_runner(
     ), "If encoder isn't an AutoEncoder, it should have weights 'W_enc', 'W_dec', 'b_enc', 'b_dec'"
     d_in, d_hidden = sae.W_enc.shape
     device = sae.W_enc.device
-    encoder_cfg = AutoEncoderConfig(d_in=d_in, d_hidden=d_hidden, dict_mult= d_hidden//d_in)
+    encoder_cfg = AutoEncoderConfig(
+        d_in=d_in, d_hidden=d_hidden, dict_mult=d_hidden // d_in
+    )
     autoencoder = AutoEncoder(encoder_cfg).to(device)
     autoencoder.load_state_dict(sae.state_dict(), strict=False)
-    
-    
-    sae_vis_data = SaeVisRunner(cfg).run(encoder=autoencoder, model=model, tokens=tokens)
-    
-    
-    save_path =  "./gpt2_feature_centric_vis_test.html"
+
+    sae_vis_data = SaeVisRunner(cfg).run(
+        encoder=autoencoder, model=model, tokens=tokens
+    )
+
+    save_path = "./gpt2_feature_centric_vis_test.html"
     save_feature_centric_vis(sae_vis_data, save_path)

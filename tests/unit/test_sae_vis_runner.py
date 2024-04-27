@@ -11,7 +11,7 @@ from sae_vis.sae_vis_runner import SaeVisRunner
 
 ROOT_DIR = Path(__file__).parent.parent.parent
 
-N_FEATURES  = 32
+N_FEATURES = 32
 
 
 @pytest.fixture
