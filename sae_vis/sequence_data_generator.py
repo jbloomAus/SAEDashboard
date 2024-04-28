@@ -70,15 +70,16 @@ class SequenceDataGenerator:
                 contains the data for a particular group of sequences (i.e. the top-k, bottom-k, and the quantile groups).
         """
 
-        seq_length = tokens.shape[0]
-
         # ! (1) Find the tokens from each group
-        buffer, padded_buffer_width = self.get_buffer_and_padding(tokens)
+        buffer, padded_buffer_width, seq_length = self.get_buffer_and_padding(tokens)
         indices_dict, indices_bold, n_bold = self.get_indices_dict(buffer, feat_acts)
 
         # ! (2) Get the buffer indices
         indices_buf = self.get_indices_buf(
-            indices_bold, seq_length, n_bold, padded_buffer_width
+            indices_bold=indices_bold,
+            seq_length=seq_length,
+            n_bold=n_bold,
+            padded_buffer_width=padded_buffer_width,
         )
 
         # ! (3) Extract the token IDs, feature activations & residual stream values for those positions
@@ -97,12 +98,20 @@ class SequenceDataGenerator:
             resid_post_pre_ablation,
             correct_tokens,
         ) = self.index_objects_for_ablation_experiments(
-            token_ids, tokens, feat_acts, resid_post, indices_bold, indices_buf
+            token_ids=token_ids,
+            tokens=tokens,
+            feat_acts=feat_acts,
+            resid_post=resid_post,
+            indices_bold=indices_bold,
+            indices_buf=indices_buf,
         )
 
         # ! (4) Compute the logit effect if this feature is ablated
         contribution_to_logprobs = self.direct_effect_feature_ablation_experiment(
-            feat_acts_pre_ablation, resid_post_pre_ablation, feature_resid_dir, W_U
+            feat_acts_pre_ablation=feat_acts_pre_ablation,
+            resid_post_pre_ablation=resid_post_pre_ablation,
+            feature_resid_dir=feature_resid_dir,
+            W_U=W_U,
         )
 
         # ! (4A) Use this to compute the most affected tokens by this feature
@@ -151,7 +160,7 @@ class SequenceDataGenerator:
             else seq_length
         )
 
-        return buffer, padded_buffer_width
+        return buffer, padded_buffer_width, seq_length
 
     def get_indices_dict(
         self, buffer: tuple[int, int] | None, feat_acts: Float[Tensor, "batch seq"]

@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 import torch
 from huggingface_hub import hf_hub_download
+from memray import Tracker
 from sae_lens.training.activations_store import ActivationsStore
 from sae_lens.training.session_loader import LMSparseAutoencoderSessionloader
 from sae_lens.training.sparse_autoencoder import SparseAutoencoder
@@ -11,7 +12,16 @@ from tqdm import tqdm
 from transformer_lens import HookedTransformer
 
 from sae_vis.autoencoder import AutoEncoder, AutoEncoderConfig
+from sae_vis.components_config import (
+    ActsHistogramConfig,
+    Column,
+    FeatureTablesConfig,
+    LogitsHistogramConfig,
+    LogitsTableConfig,
+    SequencesConfig,
+)
 from sae_vis.data_writing_fns import save_feature_centric_vis
+from sae_vis.layout import SaeVisLayoutConfig
 from sae_vis.sae_vis_data import SaeVisConfig
 from sae_vis.sae_vis_runner import SaeVisRunner
 
@@ -19,7 +29,7 @@ ROOT_DIR = Path(__file__).parent.parent
 
 DEVICE = "mps"
 
-TEST_FEATURES = [14057]
+TEST_FEATURES = list(range(128))
 
 
 @pytest.fixture
@@ -82,11 +92,31 @@ def tokens(sae: SparseAutoencoder):
 def cfg(
     sae: SparseAutoencoder,
 ) -> SaeVisConfig:
+    layout = SaeVisLayoutConfig(
+        columns=[
+            Column(
+                SequencesConfig(
+                    stack_mode="stack-all",
+                    buffer=None,  # type: ignore
+                    compute_buffer=True,
+                    n_quantiles=5,
+                    top_acts_group_size=20,
+                    quantile_group_size=5,
+                ),
+                ActsHistogramConfig(),
+                LogitsHistogramConfig(),
+                LogitsTableConfig(),
+                FeatureTablesConfig(n_rows=3),
+            )
+        ]
+    )
     feature_vis_config_gpt = SaeVisConfig(
         hook_point=sae.cfg.hook_point,
+        minibatch_size_features=128,
+        minibatch_size_tokens=64,
         features=TEST_FEATURES,
-        batch_size=8192,
         verbose=True,
+        feature_centric_layout=layout,
     )
 
     return feature_vis_config_gpt
@@ -99,6 +129,9 @@ def test_benchmark_sae_vis_runner(
     tokens: torch.Tensor,
 ):
     # we've deleted the casting code so I'll have to re-implement it here
+
+    os.remove("memory_profile.bin")
+    os.remove("flamegraph.html")
 
     assert set(
         sae.state_dict().keys()
@@ -113,9 +146,14 @@ def test_benchmark_sae_vis_runner(
     autoencoder = AutoEncoder(encoder_cfg).to(device)
     autoencoder.load_state_dict(sae.state_dict(), strict=False)
 
-    sae_vis_data = SaeVisRunner(cfg).run(
-        encoder=autoencoder, model=model, tokens=tokens
-    )
+    with Tracker("memory_profile.bin"):
+        sae_vis_data = SaeVisRunner(cfg).run(
+            encoder=autoencoder, model=model, tokens=tokens
+        )
+
+    # to view the flamegraph, run the following:
+    # ! memray flamegraph memory_profile.bin --output flamegraph.html
+    # ! open flamegraph.html
 
     save_path = "./gpt2_feature_centric_vis_test.html"
-    save_feature_centric_vis(sae_vis_data, save_path)
+    save_feature_centric_vis(sae_vis_data, save_path)  # type: ignore

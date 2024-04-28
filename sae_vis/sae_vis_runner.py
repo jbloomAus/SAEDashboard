@@ -1,4 +1,5 @@
 import math
+import random
 from collections import defaultdict
 from typing import Iterable
 
@@ -194,6 +195,7 @@ class SaeVisRunner:
 
     def set_seeds(self) -> None:
         if self.cfg.seed is not None:
+            random.seed(self.cfg.seed)
             torch.manual_seed(self.cfg.seed)
             np.random.seed(self.cfg.seed)
         return None

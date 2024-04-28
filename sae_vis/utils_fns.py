@@ -1,3 +1,4 @@
+import random
 import re
 from dataclasses import dataclass, field
 from typing import (
@@ -99,9 +100,8 @@ def sample_unique_indices(
 
     This is more efficient than using `torch.permutation`, because we don't need to shuffle everything.
     """
-    weights = torch.ones(large_number)  # Equal weights for all indices
-    sampled_indices = torch.multinomial(weights, small_number, replacement=False)
-    return sampled_indices
+    sampled_indices = random.sample(range(large_number), small_number)
+    return torch.Tensor(sampled_indices).to(torch.int64)
 
 
 def random_range_indices(
@@ -136,6 +136,7 @@ def random_range_indices(
     indices = torch.stack(torch.where(mask), dim=-1)
 
     # If we have more indices than we need, randomly select k of them
+
     if len(indices) > k:
         indices = indices[sample_unique_indices(len(indices), k)]
 

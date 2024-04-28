@@ -55,7 +55,7 @@ jobs:
         - name: check types
           run: poetry run pyright
         - name: test
-          run: poetry run pytest tests/unit # only want unit tests
+          run: poetry run pytest tests/unit # only want unit tests to run
         - name: build
           run: poetry build
 

@@ -5,6 +5,7 @@ import pytest
 from transformer_lens import HookedTransformer
 
 from sae_vis.autoencoder import AutoEncoder
+from sae_vis.components_config import SequencesConfig
 from sae_vis.data_writing_fns import save_feature_centric_vis
 from sae_vis.sae_vis_data import SaeVisConfig, SaeVisData
 from sae_vis.sae_vis_runner import SaeVisRunner
@@ -14,14 +15,36 @@ ROOT_DIR = Path(__file__).parent.parent.parent
 N_FEATURES = 32
 
 
-@pytest.fixture
-def cfg() -> SaeVisConfig:
-    cfg = SaeVisConfig(
-        hook_point="blocks.2.hook_resid_pre",
-        features=list(range(N_FEATURES)),
-        minibatch_size_features=N_FEATURES,
-        minibatch_size_tokens=2,
-    )
+@pytest.fixture(
+    params=[
+        {
+            "hook_point": "blocks.2.hook_resid_pre",
+            "features": list(range(N_FEATURES)),
+            "minibatch_size_features": N_FEATURES,
+            "minibatch_size_tokens": 2,
+        },
+        {
+            "hook_point": "blocks.2.hook_resid_pre",
+            "features": list(range(N_FEATURES)),
+            "minibatch_size_features": N_FEATURES,
+            "minibatch_size_tokens": 2,
+            # this doesn't take an arg for the buffer so we use the name + an if statement
+            # TODO: make this more elegant
+        },
+    ],
+    ids=["default", "neuronpedia"],
+)
+def cfg(request: pytest.FixtureRequest) -> SaeVisConfig:
+    cfg = SaeVisConfig(**request.param)
+    if "neuronpedia" in request.node.name:
+        cfg.feature_centric_layout.seq_cfg = SequencesConfig(
+            stack_mode="stack-all",
+            buffer=None,  # type: ignore
+            compute_buffer=True,
+            n_quantiles=5,
+            top_acts_group_size=20,
+            quantile_group_size=5,
+        )
     return cfg
 
 
@@ -105,10 +128,11 @@ def test_SaeVisData_create_and_save_feature_centric_vis(
 
 
 def test_SaeVisData_save_json_snapshot(
+    request: pytest.FixtureRequest,
     sae_vis_data: SaeVisData,
     tmp_path: Path,
 ):
-    save_path = tmp_path / "feature_data.json"
+    save_path = "./feature_data.json"
 
     sae_vis_data.save_json(save_path)
 
@@ -116,13 +140,45 @@ def test_SaeVisData_save_json_snapshot(
     with open(save_path) as f:
         saved_json = json.load(f)
 
-    with open("tests/fixtures/feature_data.json") as f:
+    with open(f"tests/fixtures/{request.node.name}/feature_data.json") as f:
         expected_json = json.load(f)
+
+    assert saved_json.keys() == expected_json.keys()
+    assert saved_json.keys() == {"feature_data_dict", "feature_stats"}
+
+    # are the feature statistics unchanged?
+    assert saved_json["feature_stats"].keys() == expected_json["feature_stats"].keys()
+    assert saved_json["feature_stats"].keys() == {
+        "max",
+        "skew",
+        "kurtosis",
+        "frac_nonzero",
+        "quantile_data",
+        "quantiles",
+        "ranges_and_precisions",
+    }
+    for key in saved_json["feature_stats"].keys():
+        assert (
+            saved_json["feature_stats"][key] == expected_json["feature_stats"][key]
+        ), key
+
+    # are the feature data dictionaries unchanged?
+    assert (
+        saved_json["feature_data_dict"].keys()
+        == expected_json["feature_data_dict"].keys()
+    )
+    assert saved_json["feature_data_dict"].keys() == {str(i) for i in range(N_FEATURES)}
+    for key in saved_json["feature_data_dict"].keys():
+        assert (
+            saved_json["feature_data_dict"][key]
+            == expected_json["feature_data_dict"][key]
+        ), key
 
     assert saved_json == expected_json
 
 
 def test_SaeVisData_save_html_snapshot(
+    request: pytest.FixtureRequest,
     sae_vis_data: SaeVisData,
     tmp_path: Path,
 ):
@@ -130,7 +186,7 @@ def test_SaeVisData_save_html_snapshot(
     save_feature_centric_vis(sae_vis_data, save_path)
 
     # load in fixtures/feature_data.json and do a diff
-    expected_path = "tests/fixtures/feature_centric_vis.html"
+    expected_path = f"tests/fixtures/{request.node.name}/feature_centric_vis.html"
 
     with open(save_path) as f:
         saved_html = f.read()
