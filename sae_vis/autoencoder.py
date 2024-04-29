@@ -1,8 +1,11 @@
 from dataclasses import dataclass
 
+import einops
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from jaxtyping import Float
+from torch import Tensor
 from transformer_lens import utils
 
 DTYPES = {"fp32": torch.float32, "fp16": torch.float16, "bf16": torch.bfloat16}
@@ -58,6 +61,20 @@ class AutoEncoder(nn.Module):
 
     def get_feature_acts(self, x: torch.Tensor) -> torch.Tensor:
         return F.relu(x - self.b_dec @ self.W_enc + self.b_enc)
+
+    def get_feature_acts_subset(
+        self, model_acts: Float[Tensor, "batch seq d_in"], feature_idx: list[int]
+    ) -> Float[Tensor, "batch seq feats"]:
+        # Get the feature act direction by indexing encoder.W_enc, and the bias by indexing encoder.b_enc
+        feature_act_dir = self.W_enc[:, feature_idx]  # (d_in, feats)
+        feature_bias = self.b_enc[feature_idx]  # (feats,)
+
+        # Calculate & store feature activations (we need to store them so we can get the sequence & histogram vis later)
+        x_cent = model_acts - self.b_dec
+        feat_acts_pre = einops.einsum(
+            x_cent, feature_act_dir, "batch seq d_in, d_in feats -> batch seq feats"
+        )
+        return F.relu(feat_acts_pre + feature_bias)
 
     @torch.no_grad()
     def remove_parallel_component_of_grads(self):

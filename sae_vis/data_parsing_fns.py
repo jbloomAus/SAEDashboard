@@ -11,7 +11,6 @@ from sae_vis.components import (
     LogitsTableData,
     SequenceData,
 )
-from sae_vis.data_fetching_fns import compute_feat_acts
 from sae_vis.sae_vis_data import SaeVisData
 from sae_vis.transformer_lens_wrapper import TransformerLensWrapper, to_resid_dir
 from sae_vis.utils_fns import (
@@ -471,7 +470,9 @@ def get_prompt_data(
     assert isinstance(cfg.hook_point, str), f"{cfg.hook_point=}, expected a string"
 
     str_toks: list[str] = model.tokenizer.tokenize(prompt)  # type: ignore
-    tokens = model.tokenizer.encode(prompt, return_tensors="pt").to(device)  # type: ignore
+    tokens = model.tokenizer.encode(prompt, return_tensors="pt").to(  # type: ignore
+        sae_vis_data.cfg.device
+    )
     assert isinstance(tokens, torch.Tensor)
 
     model_wrapped = TransformerLensWrapper(model, cfg.hook_point)
@@ -486,10 +487,9 @@ def get_prompt_data(
     )
 
     # ! Define hook functions to cache all the info required for feature ablation, then run those hook fns
-
     resid_post, act_post = model_wrapped(tokens, return_logits=False)
     resid_post: Tensor = resid_post.squeeze(0)
-    feat_acts = compute_feat_acts(act_post, feature_idx, encoder).squeeze(
+    feat_acts = encoder.get_feature_acts_subset(act_post, feature_idx).squeeze(
         0
     )  # [seq feats]
 

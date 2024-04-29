@@ -19,7 +19,7 @@ from sae_vis.components import (
     FeatureTablesData,
     LogitsHistogramData,
 )
-from sae_vis.data_fetching_fns import get_feature_data
+from sae_vis.data_fetching_fns import FeatureDataGenerator
 from sae_vis.data_parsing_fns import (
     get_features_table_data,
     get_logits_table_data,
@@ -33,6 +33,7 @@ from sae_vis.transformer_lens_wrapper import TransformerLensWrapper
 from sae_vis.utils_fns import (
     FeatureStatistics,
 )
+
 
 class SaeVisRunner:
     def __init__(self, cfg: SaeVisConfig) -> None:
@@ -64,19 +65,20 @@ class SaeVisRunner:
         progress = self.get_progress_bar(tokens, feature_batches, features_list)
         model_wrapper = TransformerLensWrapper(model, self.cfg.hook_point)
 
-        # Get tokens into minibatches, for the fwd pass
-        token_minibatches = (
-            (tokens,)
-            if self.cfg.minibatch_size_tokens is None
-            else tokens.split(self.cfg.minibatch_size_tokens)
+        feature_data_generator = FeatureDataGenerator(
+            cfg=self.cfg,
+            model=model_wrapper,
+            encoder=encoder,
+            encoder_B=encoder_B,
+            tokens=tokens,
         )
-        token_minibatches = [tok.to(self.cfg.device) for tok in token_minibatches]
 
         # For each batch of features: get new data and update global data storage objects
         # TODO: We should write out json files with the results as this runs rather than storing everything in memory
         # in memory.
         for features in feature_batches:
             # model and sae activations calculations.
+
             (
                 all_feat_acts,
                 all_resid_post,
@@ -85,15 +87,7 @@ class SaeVisRunner:
                 corrcoef_neurons,
                 corrcoef_encoder,
                 corrcoef_encoder_B,
-            ) = get_feature_data(
-                encoder=encoder,
-                encoder_B=encoder_B,
-                model=model_wrapper,
-                token_minibatches=token_minibatches,
-                feature_indices=features,
-                cfg=self.cfg,
-                progress=progress,
-            )
+            ) = feature_data_generator.get_feature_data(features, progress)
 
             # Get the logits of all features (i.e. the directions this feature writes to the logit output)
             logits = einops.einsum(
