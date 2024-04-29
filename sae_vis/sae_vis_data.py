@@ -37,6 +37,7 @@ class SaeVisConfig:
     batch_size: int | None = None
     minibatch_size_features: int = 256
     minibatch_size_tokens: int = 64
+    device: str = "cpu"
 
     # Vis
     feature_centric_layout: SaeVisLayoutConfig = field(
@@ -49,6 +50,7 @@ class SaeVisConfig:
     # Misc
     seed: int | None = 0
     verbose: bool = False
+    cache_dir: Path | None = None  # Path to cache the data
 
     def to_dict(self) -> dict[str, Any]:
         """Used for type hinting (the actual method comes from the `dataclass_json` decorator)."""

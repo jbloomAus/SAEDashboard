@@ -89,9 +89,12 @@ def tokens(sae: SparseAutoencoder):
 
 
 @pytest.fixture
-def cfg(
-    sae: SparseAutoencoder,
-) -> SaeVisConfig:
+def cache_path() -> Path:
+    return Path("tests/fixtures/cache_benchmark")
+
+
+@pytest.fixture
+def cfg(sae: SparseAutoencoder, cache_path: Path) -> SaeVisConfig:
     layout = SaeVisLayoutConfig(
         columns=[
             Column(
@@ -117,6 +120,7 @@ def cfg(
         features=TEST_FEATURES,
         verbose=True,
         feature_centric_layout=layout,
+        cache_dir=cache_path,
     )
 
     return feature_vis_config_gpt
@@ -130,8 +134,8 @@ def test_benchmark_sae_vis_runner(
 ):
     # we've deleted the casting code so I'll have to re-implement it here
 
-    os.remove("memory_profile.bin")
-    os.remove("flamegraph.html")
+    if os.path.exists("memory_profile.bin"):
+        os.remove("memory_profile.bin")
 
     assert set(
         sae.state_dict().keys()
@@ -139,7 +143,7 @@ def test_benchmark_sae_vis_runner(
         {"W_enc", "W_dec", "b_enc", "b_dec"}
     ), "If encoder isn't an AutoEncoder, it should have weights 'W_enc', 'W_dec', 'b_enc', 'b_dec'"
     d_in, d_hidden = sae.W_enc.shape
-    device = sae.W_enc.device
+    device = cfg.device
     encoder_cfg = AutoEncoderConfig(
         d_in=d_in, d_hidden=d_hidden, dict_mult=d_hidden // d_in
     )
@@ -157,3 +161,5 @@ def test_benchmark_sae_vis_runner(
 
     save_path = "./gpt2_feature_centric_vis_test.html"
     save_feature_centric_vis(sae_vis_data, save_path)  # type: ignore
+
+    # ! open gpt2_feature_centric_vis_test.html

@@ -171,3 +171,5 @@ callum_instructions.md
 april-fools
 *large.html
 requirements.txt
+tests/fixtures/cache_benchmark/
+tests/fixtures/cache_unit/

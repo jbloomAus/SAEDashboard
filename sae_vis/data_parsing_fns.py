@@ -310,8 +310,7 @@ def parse_prompt_data(
     component in the vis.
     """
 
-    # temporary solution for device:
-    device = tokens.device
+    device = sae_vis_data.cfg.device
 
     if feature_idx is None:
         feature_idx = list(sae_vis_data.feature_data_dict.keys())

@@ -5,6 +5,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from jaxtyping import Float, Int
+from safetensors import safe_open
+from safetensors.torch import save_file
 from torch import Tensor
 from tqdm.auto import tqdm
 
@@ -16,12 +18,9 @@ from sae_vis.transformer_lens_wrapper import (
 )
 from sae_vis.utils_fns import (
     RollingCorrCoef,
-    get_device,
 )
 
 Arr = np.ndarray
-
-device = get_device()
 
 
 @torch.inference_mode()
@@ -29,7 +28,7 @@ def get_feature_data(
     encoder: AutoEncoder,
     encoder_B: AutoEncoder | None,
     model: TransformerLensWrapper,
-    tokens: Int[Tensor, "batch seq"],
+    token_minibatches: list[Int[Tensor, "batch seq"]],
     feature_indices: list[int],
     cfg: SaeVisConfig,
     progress: list[tqdm] | None = None,
@@ -52,8 +51,9 @@ def get_feature_data(
         model: TransformerLensWrapper
             The model we'll be using to get the feature activations. It's a wrapping of the base TransformerLens model.
 
-        tokens: Int[Tensor, "batch seq"]
-            The tokens we'll be using to get the feature activations.
+        token_minibatches: list[Int[Tensor, "batch seq"]]
+            The tokens we're analyzing. These are split into minibatches, which are then used to get the model's
+            activations.
 
         feature_indices: Union[int, list[int]]
             The features we're actually computing. These might just be a subset of the model's full features.
@@ -99,22 +99,31 @@ def get_feature_data(
     feature_out_dir = encoder.W_dec[feature_indices]  # [feats d_autoencoder]
     feature_resid_dir = to_resid_dir(feature_out_dir, model)  # [feats d_model]
 
-    # Get tokens into minibatches, for the fwd pass
-    token_minibatches = (
-        (tokens,)
-        if cfg.minibatch_size_tokens is None
-        else tokens.split(cfg.minibatch_size_tokens)
-    )
-    token_minibatches = [tok.to(device) for tok in token_minibatches]
-
     time_logs["(1) Initialization"] = time.time() - t0
 
     # ! Compute & concatenate together all feature activations & post-activation function values
 
-    for minibatch in token_minibatches:
+    for i, minibatch in enumerate(token_minibatches):
         # Fwd pass, get model activations
         t0 = time.time()
-        residual, model_acts = model.forward(minibatch, return_logits=False)
+
+        if cfg.cache_dir is not None:
+            # check if the activations are already cached
+            cache_path = (
+                cfg.cache_dir / f"model_activations_and_residuals_{i}.safetensors"
+            )
+
+            if cache_path.exists():
+                with safe_open(cache_path, framework="pt", device=cfg.device) as f:  # type: ignore
+                    model_acts = f.get_tensor("activations")
+                    residual = f.get_tensor("residual")
+            else:
+                residual, model_acts = model.forward(minibatch, return_logits=False)
+                tensors = {"activations": model_acts, "residual": residual}
+                # could also save tokens to avoid needing to provide them above.
+                save_file(tensors, cache_path)
+
+        # residual, model_acts = model.forward(minibatch, return_logits=False)
         time_logs["(2) Forward passes to gather model activations"] += time.time() - t0
 
         # Compute feature activations from this

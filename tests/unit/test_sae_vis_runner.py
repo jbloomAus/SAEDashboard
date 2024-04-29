@@ -15,6 +15,11 @@ ROOT_DIR = Path(__file__).parent.parent.parent
 N_FEATURES = 32
 
 
+@pytest.fixture()
+def cache_path() -> Path:
+    return Path("tests/fixtures/cache_unit")
+
+
 @pytest.fixture(
     params=[
         {
@@ -34,8 +39,8 @@ N_FEATURES = 32
     ],
     ids=["default", "neuronpedia"],
 )
-def cfg(request: pytest.FixtureRequest) -> SaeVisConfig:
-    cfg = SaeVisConfig(**request.param)
+def cfg(request: pytest.FixtureRequest, cache_path: Path) -> SaeVisConfig:
+    cfg = SaeVisConfig(**request.param, cache_dir=cache_path)
     if "neuronpedia" in request.node.name:
         cfg.feature_centric_layout.seq_cfg = SequencesConfig(
             stack_mode="stack-all",
@@ -132,7 +137,7 @@ def test_SaeVisData_save_json_snapshot(
     sae_vis_data: SaeVisData,
     tmp_path: Path,
 ):
-    save_path = "./feature_data.json"
+    save_path = tmp_path / "feature_data.json"
 
     sae_vis_data.save_json(save_path)
 

@@ -34,10 +34,12 @@ from sae_vis.utils_fns import (
     FeatureStatistics,
 )
 
-
 class SaeVisRunner:
     def __init__(self, cfg: SaeVisConfig) -> None:
         self.cfg = cfg
+
+        if self.cfg.cache_dir is not None:
+            self.cfg.cache_dir.mkdir(parents=True, exist_ok=True)
 
     @torch.inference_mode()
     def run(
@@ -52,6 +54,8 @@ class SaeVisRunner:
 
         # Create objects to store all the data we'll get from `_get_feature_data`
         sae_vis_data = SaeVisData(cfg=self.cfg)
+        model.to(self.cfg.device)
+        encoder = encoder.to(self.cfg.device)
         time_logs = defaultdict(float)
 
         tokens = self.subset_tokens(tokens)
@@ -59,6 +63,14 @@ class SaeVisRunner:
         feature_batches = self.get_feature_batches(features_list)
         progress = self.get_progress_bar(tokens, feature_batches, features_list)
         model_wrapper = TransformerLensWrapper(model, self.cfg.hook_point)
+
+        # Get tokens into minibatches, for the fwd pass
+        token_minibatches = (
+            (tokens,)
+            if self.cfg.minibatch_size_tokens is None
+            else tokens.split(self.cfg.minibatch_size_tokens)
+        )
+        token_minibatches = [tok.to(self.cfg.device) for tok in token_minibatches]
 
         # For each batch of features: get new data and update global data storage objects
         # TODO: We should write out json files with the results as this runs rather than storing everything in memory
@@ -77,7 +89,7 @@ class SaeVisRunner:
                 encoder=encoder,
                 encoder_B=encoder_B,
                 model=model_wrapper,
-                tokens=tokens,
+                token_minibatches=token_minibatches,
                 feature_indices=features,
                 cfg=self.cfg,
                 progress=progress,
