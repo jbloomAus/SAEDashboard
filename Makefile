@@ -14,3 +14,10 @@ check-all:
 	make format
 	make lint
 	make test
+
+profile-memory-unit:
+	poetry run pytest --memray tests/unit
+
+profile-speed-unit:
+	poetry run py.test tests/unit --profile-svg -k "test_SaeVisData_create_results_look_reasonable[Default]"
+	open prof/combined.svg

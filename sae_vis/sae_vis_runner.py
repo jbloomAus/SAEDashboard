@@ -13,7 +13,7 @@ from torch import Tensor
 from tqdm.auto import tqdm
 from transformer_lens import HookedTransformer
 
-from sae_vis.autoencoder import AutoEncoder
+from sae_vis.autoencoder import AutoEncoder, DTYPES
 from sae_vis.components import (
     ActsHistogramData,
     FeatureTablesData,
@@ -52,6 +52,12 @@ class SaeVisRunner:
     ) -> SaeVisData:
         # Apply random seed
         self.set_seeds()
+        
+        # set precision on encoders and model
+        encoder.to(DTYPES[self.cfg.dtype])
+        model.to(DTYPES[self.cfg.dtype])
+        if encoder_B is not None:
+            encoder_B.to(DTYPES[self.cfg.dtype])
 
         # Create objects to store all the data we'll get from `_get_feature_data`
         sae_vis_data = SaeVisData(cfg=self.cfg)
@@ -59,7 +65,6 @@ class SaeVisRunner:
         encoder = encoder.to(self.cfg.device)
         time_logs = defaultdict(float)
 
-        tokens = self.subset_tokens(tokens)
         features_list = self.handle_features(self.cfg.features, encoder)
         feature_batches = self.get_feature_batches(features_list)
         progress = self.get_progress_bar(tokens, feature_batches, features_list)
@@ -71,6 +76,12 @@ class SaeVisRunner:
             encoder=encoder,
             encoder_B=encoder_B,
             tokens=tokens,
+        )
+
+        sequence_data_generator = SequenceDataGenerator(
+            cfg = self.cfg,
+            tokens = tokens,
+            W_U = model.W_U,
         )
 
         # For each batch of features: get new data and update global data storage objects
@@ -156,15 +167,11 @@ class SaeVisRunner:
                 # ! Calculate all data for the right-hand visualisations, i.e. the sequences
 
                 # Add this feature's sequence data to the list
-                feature_data_dict[feat].sequence_data = SequenceDataGenerator(
-                    seq_cfg=layout.seq_cfg  # type: ignore
-                ).get_sequences_data(
-                    tokens=tokens,
+                feature_data_dict[feat].sequence_data = sequence_data_generator.get_sequences_data(
                     feat_acts=all_feat_acts[..., i],
                     feat_logits=logits[i],
                     resid_post=all_resid_post,
                     feature_resid_dir=feature_resid_dir[i],
-                    W_U=model.W_U,
                 )
                 # Update the 2nd progress bar (fwd passes & getting sequence data dominates the runtime of these computations)
                 if progress is not None:
@@ -205,17 +212,6 @@ class SaeVisRunner:
             torch.manual_seed(self.cfg.seed)
             np.random.seed(self.cfg.seed)
         return None
-
-    def subset_tokens(
-        self, tokens: Int[Tensor, "batch seq"]
-    ) -> Int[Tensor, "batch seq"]:
-        """
-        We should remove this soon. Not worth it.
-        """
-        if self.cfg.batch_size is None:
-            return tokens
-        else:
-            return tokens[: self.cfg.batch_size]
 
     def handle_features(
         self, features: Iterable[int] | None, encoder_wrapper: AutoEncoder

@@ -9,15 +9,29 @@ from sae_vis.components_config import SequencesConfig
 from sae_vis.data_writing_fns import save_feature_centric_vis
 from sae_vis.sae_vis_data import SaeVisConfig, SaeVisData
 from sae_vis.sae_vis_runner import SaeVisRunner
+from sae_vis.utils_fns import get_device
+
+from torch import Tensor
+from jaxtyping import Int
+
 
 ROOT_DIR = Path(__file__).parent.parent.parent
-
 N_FEATURES = 32
-
+# TEST_DEVICE = get_device()
+TEST_DEVICE = "cpu"
+TEST_DTYPE = "fp32"
 
 @pytest.fixture()
 def cache_path() -> Path:
     return Path("tests/fixtures/cache_unit")
+
+@pytest.fixture()
+def tokens(model) -> Int[Tensor, "batch seq"]:
+
+    return model.to_tokens([
+        "But what about second breakfast?" * 3,
+        "Nothing is cheesier than cheese." * 3,
+    ])
 
 
 @pytest.fixture(
@@ -27,12 +41,18 @@ def cache_path() -> Path:
             "features": list(range(N_FEATURES)),
             "minibatch_size_features": N_FEATURES,
             "minibatch_size_tokens": 2,
+            "perform_ablation_experiments": True,
+            "device": TEST_DEVICE,
+            "dtype": TEST_DTYPE,
         },
         {
             "hook_point": "blocks.2.hook_resid_pre",
             "features": list(range(N_FEATURES)),
             "minibatch_size_features": N_FEATURES,
             "minibatch_size_tokens": 2,
+            "perform_ablation_experiments": True,
+            "device": TEST_DEVICE,
+            "dtype": TEST_DTYPE,
             # this doesn't take an arg for the buffer so we use the name + an if statement
             # TODO: make this more elegant
         },
@@ -55,24 +75,19 @@ def cfg(request: pytest.FixtureRequest, cache_path: Path) -> SaeVisConfig:
 
 @pytest.fixture()
 def sae_vis_data(
-    cfg: SaeVisConfig, model: HookedTransformer, autoencoder: AutoEncoder
+    cfg: SaeVisConfig, model: HookedTransformer, autoencoder: AutoEncoder, tokens: Int[Tensor, "batch seq"]
 ) -> SaeVisData:
-    tokens = model.to_tokens(
-        [
-            "But what about second breakfast?" * 3,
-            "Nothing is cheesier than cheese." * 3,
-        ]
-    )
     data = SaeVisRunner(cfg).run(encoder=autoencoder, model=model, tokens=tokens)
     return data
 
 
 def test_SaeVisData_create_results_look_reasonable(
-    sae_vis_data: SaeVisData,
+    tokens: Int[Tensor, "batch seq"],
     model: HookedTransformer,
     autoencoder: AutoEncoder,
     cfg: SaeVisConfig,
 ):
+    sae_vis_data = SaeVisRunner(cfg).run(encoder=autoencoder, model=model, tokens=tokens)  
     assert sae_vis_data.encoder == autoencoder
     assert sae_vis_data.model == model
     assert sae_vis_data.cfg == cfg

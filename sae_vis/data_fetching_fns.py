@@ -10,7 +10,7 @@ from safetensors.torch import save_file
 from torch import Tensor
 from tqdm.auto import tqdm
 
-from sae_vis.autoencoder import AutoEncoder
+from sae_vis.autoencoder import AutoEncoder, DTYPES
 from sae_vis.sae_vis_data import SaeVisConfig
 from sae_vis.transformer_lens_wrapper import (
     TransformerLensWrapper,
@@ -144,10 +144,12 @@ class FeatureDataGenerator:
 
     @torch.inference_mode()
     def get_cached_activation_results(self, cache_path: Path):
-        with safe_open(cache_path, framework="pt", device=self.cfg.device) as f:  # type: ignore
+        with safe_open(cache_path, framework="pt", device=str(self.cfg.device)) as f:  # type: ignore
             model_acts = f.get_tensor("activations")
             residual = f.get_tensor("residual")
 
+        model_acts = model_acts.to(DTYPES[self.cfg.dtype])
+        residual = residual.to(DTYPES[self.cfg.dtype])
         return model_acts, residual
 
     @torch.inference_mode()

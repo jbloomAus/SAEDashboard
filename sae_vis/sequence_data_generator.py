@@ -10,9 +10,9 @@ from sae_vis.components import (
     SequenceGroupData,
     SequenceMultiGroupData,
 )
-from sae_vis.components_config import (
-    SequencesConfig,
-)
+
+from sae_vis.sae_vis_data import SaeVisConfig
+
 from sae_vis.utils_fns import (
     TopK,
     k_largest_indices,
@@ -23,18 +23,29 @@ Arr = np.ndarray
 
 
 class SequenceDataGenerator:
-    def __init__(self, seq_cfg: SequencesConfig) -> None:
-        self.seq_cfg = seq_cfg
+    def __init__(self, 
+                 cfg: SaeVisConfig,
+                 tokens: Int[Tensor, "batch seq"],
+                 W_U: Float[Tensor, "d_model d_vocab"],
+    ):
+                 
+        self.cfg = cfg
+        self.seq_cfg = self.cfg.feature_centric_layout.seq_cfg
+        assert self.seq_cfg is not None
+        self.tokens = tokens
+        self.W_U = W_U
+        
+        self.buffer, self.padded_buffer_width, self.seq_length = self.get_buffer_and_padding(tokens)
+        
 
     @torch.inference_mode()
     def get_sequences_data(
         self,
-        tokens: Int[Tensor, "batch seq"],
         feat_acts: Float[Tensor, "batch seq"],
         feat_logits: Float[Tensor, "d_vocab"],
         resid_post: Float[Tensor, "batch seq d_model"],
         feature_resid_dir: Float[Tensor, "d_model"],
-        W_U: Float[Tensor, "d_model d_vocab"],
+        
     ) -> SequenceMultiGroupData:
         """
         This function returns the data which is used to create the sequence visualizations (i.e. the right-hand column of
@@ -71,21 +82,20 @@ class SequenceDataGenerator:
         """
 
         # ! (1) Find the tokens from each group
-        buffer, padded_buffer_width, seq_length = self.get_buffer_and_padding(tokens)
-        indices_dict, indices_bold, n_bold = self.get_indices_dict(buffer, feat_acts)
+        indices_dict, indices_bold, n_bold = self.get_indices_dict(self.buffer, feat_acts)
 
         # ! (2) Get the buffer indices
         indices_buf = self.get_indices_buf(
             indices_bold=indices_bold,
-            seq_length=seq_length,
+            seq_length=self.seq_length,
             n_bold=n_bold,
-            padded_buffer_width=padded_buffer_width,
+            padded_buffer_width=self.padded_buffer_width,
         )
 
         # ! (3) Extract the token IDs, feature activations & residual stream values for those positions
         # Get the tokens which will be in our sequences
         token_ids = eindex(
-            tokens, indices_buf[:, 1:], "[n_bold seq 0] [n_bold seq 1]"
+            self.tokens, indices_buf[:, 1:], "[n_bold seq 0] [n_bold seq 1]"
         )  # shape [batch buf]
 
         # Now, we split into cases depending on whether we're computing the buffer or not. One kinda weird thing: we get
@@ -99,45 +109,55 @@ class SequenceDataGenerator:
             correct_tokens,
         ) = self.index_objects_for_ablation_experiments(
             token_ids=token_ids,
-            tokens=tokens,
+            tokens=self.tokens,
             feat_acts=feat_acts,
             resid_post=resid_post,
             indices_bold=indices_bold,
             indices_buf=indices_buf,
         )
+        
+        if self.cfg.perform_ablation_experiments:
 
-        # ! (4) Compute the logit effect if this feature is ablated
-        contribution_to_logprobs = self.direct_effect_feature_ablation_experiment(
-            feat_acts_pre_ablation=feat_acts_pre_ablation,
-            resid_post_pre_ablation=resid_post_pre_ablation,
-            feature_resid_dir=feature_resid_dir,
-            W_U=W_U,
-        )
+            # ! (4) Compute the logit effect if this feature is ablated
+            contribution_to_logprobs = self.direct_effect_feature_ablation_experiment(
+                feat_acts_pre_ablation=feat_acts_pre_ablation,
+                resid_post_pre_ablation=resid_post_pre_ablation,
+                feature_resid_dir=feature_resid_dir,
+            )
 
-        # ! (4A) Use this to compute the most affected tokens by this feature
-        # The TopK function can improve efficiency by masking the features which are zero
+            # ! (4A) Use this to compute the most affected tokens by this feature
+            # The TopK function can improve efficiency by masking the features which are zero
 
-        # ! (4B) Use this to compute the loss effect if this feature is ablated
-        # which is just the negative of the change in logprobs
-        (
-            top_contribution_to_logits,
-            bottom_contribution_to_logits,
-            loss_contribution,
-        ) = self.get_feature_ablation_statistics(
-            feat_acts_pre_ablation, contribution_to_logprobs, correct_tokens
-        )
+            # ! (4B) Use this to compute the loss effect if this feature is ablated
+            # which is just the negative of the change in logprobs
+            (
+                top_contribution_to_logits,
+                bottom_contribution_to_logits,
+                loss_contribution,
+            ) = self.get_feature_ablation_statistics(
+                feat_acts_pre_ablation, contribution_to_logprobs, correct_tokens
+            )
 
-        # ! (5) Store the results in a SequenceMultiGroupData object
-        # Now that we've indexed everything, construct the batch of SequenceData objects
-        sequence_multigroup_data = self.package_sequences_data(
-            token_ids,
-            feat_acts_coloring,
-            loss_contribution,
-            feat_logits,
-            top_contribution_to_logits,
-            bottom_contribution_to_logits,
-            indices_dict,
-        )
+            # ! (5) Store the results in a SequenceMultiGroupData object
+            # Now that we've indexed everything, construct the batch of SequenceData objects
+            sequence_multigroup_data = self.package_sequences_data(
+                token_ids = token_ids,
+                feat_acts_coloring = feat_acts_coloring,
+                loss_contribution = loss_contribution,
+                feat_logits = feat_logits,
+                top_contribution_to_logits = top_contribution_to_logits,
+                bottom_contribution_to_logits = bottom_contribution_to_logits,
+                indices_dict = indices_dict,
+            )
+        else:
+            # ! (5) Store the results in a SequenceMultiGroupData object
+            # Now that we've indexed everything, construct the batch of SequenceData objects
+            sequence_multigroup_data = self.package_sequences_data(
+                token_ids = token_ids,
+                feat_acts_coloring = feat_acts_coloring,
+                feat_logits = feat_logits,
+                indices_dict = indices_dict,
+            )
 
         return sequence_multigroup_data
 
@@ -312,13 +332,20 @@ class SequenceDataGenerator:
             loss_contribution,
         )
 
+    @torch.inference_mode()
     def direct_effect_feature_ablation_experiment(
         self,
         feat_acts_pre_ablation: Float[Tensor, "n_bold buf"],
         resid_post_pre_ablation: Float[Tensor, "n_bold d_model"],
         feature_resid_dir: Float[Tensor, "d_model"],
-        W_U: Float[Tensor, "d_model d_vocab"],
     ):
+        
+        # Utilizing in-place operations and reducing precision if feasible
+        # feat_acts_pre_ablation = feat_acts_pre_ablation.to(dtype=torch.float16)
+        # feature_resid_dir = feature_resid_dir.to(dtype=torch.float16)
+        # resid_post_pre_ablation = resid_post_pre_ablation.to(dtype=torch.float16)
+        # W_U = W_U.to(dtype=torch.float16)
+        
         # Get this feature's output vector, using an outer product over the feature activations for all tokens
         resid_post_feature_effect = (
             feat_acts_pre_ablation[..., None] * feature_resid_dir
@@ -326,46 +353,67 @@ class SequenceDataGenerator:
 
         # Do the ablations, and get difference in logprobs
         new_resid_post = resid_post_pre_ablation - resid_post_feature_effect
-        new_logits = (new_resid_post / new_resid_post.std(dim=-1, keepdim=True)) @ W_U
-        orig_logits = (
-            resid_post_pre_ablation / resid_post_pre_ablation.std(dim=-1, keepdim=True)
-        ) @ W_U
+        new_logits = (new_resid_post / new_resid_post.std(dim=-1, keepdim=True))  @ self.W_U
+        orig_logits = (resid_post_pre_ablation / resid_post_pre_ablation.std(dim=-1, keepdim=True)) @ self.W_U
         contribution_to_logprobs = orig_logits.log_softmax(
             dim=-1
         ) - new_logits.log_softmax(dim=-1)
 
-        return contribution_to_logprobs
+        del new_resid_post, resid_post_pre_ablation, new_logits, orig_logits
+
+        return contribution_to_logprobs#.to(dtype=torch.float32)
 
     def package_sequences_data(
         self,
         token_ids: Int[Tensor, "n_bold buf"],
         feat_acts_coloring: Float[Tensor, "n_bold buf"],
-        loss_contribution: Float[Tensor, "n_bold 1"],
         feat_logits: Float[Tensor, "d_vocab"],
-        top_contribution_to_logits: TopK,
-        bottom_contribution_to_logits: TopK,
         indices_dict: dict[str, Int[Tensor, "n_bold 2"]],
+        loss_contribution: Float[Tensor, "n_bold 1"] | None = None,
+        top_contribution_to_logits: TopK | None = None, 
+        bottom_contribution_to_logits: TopK | None = None,
     ):
         sequence_groups_data = []
         group_sizes_cumsum = np.cumsum(
             [0] + [len(indices) for indices in indices_dict.values()]
         ).tolist()
-        for group_idx, group_name in enumerate(indices_dict.keys()):
-            seq_data = [
-                SequenceData(
-                    token_ids=token_ids[i].tolist(),
-                    feat_acts=[round(f, 4) for f in feat_acts_coloring[i].tolist()],
-                    loss_contribution=loss_contribution[i].tolist(),
-                    token_logits=feat_logits[token_ids[i]].tolist(),
-                    top_token_ids=top_contribution_to_logits.indices[i].tolist(),
-                    top_logits=top_contribution_to_logits.values[i].tolist(),
-                    bottom_token_ids=bottom_contribution_to_logits.indices[i].tolist(),
-                    bottom_logits=bottom_contribution_to_logits.values[i].tolist(),
-                )
-                for i in range(
-                    group_sizes_cumsum[group_idx], group_sizes_cumsum[group_idx + 1]
-                )
-            ]
-            sequence_groups_data.append(SequenceGroupData(group_name, seq_data))
+        
+        
+        if self.cfg.perform_ablation_experiments:
+            assert isinstance(loss_contribution, torch.Tensor)
+            assert top_contribution_to_logits is not None 
+            assert bottom_contribution_to_logits is not None 
+            for group_idx, group_name in enumerate(indices_dict.keys()):
+                seq_data = [
+                    SequenceData(
+                        token_ids=token_ids[i].tolist(),
+                        feat_acts=[round(f, 4) for f in feat_acts_coloring[i].tolist()],
+                        loss_contribution=loss_contribution[i].tolist(),
+                        token_logits=feat_logits[token_ids[i]].tolist(),
+                        top_token_ids=top_contribution_to_logits.indices[i].tolist(),
+                        top_logits=top_contribution_to_logits.values[i].tolist(),
+                        bottom_token_ids=bottom_contribution_to_logits.indices[i].tolist(),
+                        bottom_logits=bottom_contribution_to_logits.values[i].tolist(),
+                    )
+                    for i in range(
+                        group_sizes_cumsum[group_idx], group_sizes_cumsum[group_idx + 1]
+                    )
+                ]
+                sequence_groups_data.append(SequenceGroupData(group_name, seq_data))
+
+        else:
+            for group_idx, group_name in enumerate(indices_dict.keys()):
+                seq_data = [
+                    SequenceData(
+                        token_ids=token_ids[i].tolist(),
+                        feat_acts=[round(f, 4) for f in feat_acts_coloring[i].tolist()],
+                        token_logits=feat_logits[token_ids[i]].tolist(),
+                    )
+                    for i in range(
+                        group_sizes_cumsum[group_idx], group_sizes_cumsum[group_idx + 1]
+                    )
+                ]
+                sequence_groups_data.append(SequenceGroupData(group_name, seq_data))
+
 
         return SequenceMultiGroupData(sequence_groups_data)

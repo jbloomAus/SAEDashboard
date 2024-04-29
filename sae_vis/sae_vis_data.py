@@ -34,10 +34,11 @@ class SaeVisConfig:
     # Data
     hook_point: str
     features: Iterable[int]
-    batch_size: int | None = None
     minibatch_size_features: int = 256
     minibatch_size_tokens: int = 64
+    perform_ablation_experiments: bool = False
     device: str = "cpu"
+    dtype: str = "fp32"
 
     # Vis
     feature_centric_layout: SaeVisLayoutConfig = field(
