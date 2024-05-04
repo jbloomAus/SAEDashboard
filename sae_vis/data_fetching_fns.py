@@ -10,7 +10,7 @@ from safetensors.torch import save_file
 from torch import Tensor
 from tqdm.auto import tqdm
 
-from sae_vis.autoencoder import AutoEncoder, DTYPES
+from sae_vis.autoencoder import DTYPES, AutoEncoder
 from sae_vis.sae_vis_data import SaeVisConfig
 from sae_vis.transformer_lens_wrapper import (
     TransformerLensWrapper,

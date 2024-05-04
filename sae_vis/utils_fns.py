@@ -394,9 +394,13 @@ class TopK:
 
         # Get an array of indices and values (with unimportant elements) which we'll index into using the topk object
         topk_shape = (*tensor_mask.shape, k)
-        topk_indices = torch.zeros(topk_shape, device=tensor.device,dtype=torch.long)#).long()  # shape [... k]
+        topk_indices = torch.zeros(
+            topk_shape, device=tensor.device, dtype=torch.long
+        )  # ).long()  # shape [... k]
         topk_indices[tensor_mask] = topk.indices
-        topk_values = torch.zeros(topk_shape, device=tensor.device, dtype=tensor.dtype)  # shape [... k]
+        topk_values = torch.zeros(
+            topk_shape, device=tensor.device, dtype=tensor.dtype
+        )  # shape [... k]
         topk_values[tensor_mask] = topk.values
 
         return utils.to_numpy(topk_values), utils.to_numpy(topk_indices)
@@ -529,9 +533,8 @@ class FeatureStatistics:
             frac_nonzero = (data.abs() > 1e-6).float().mean(dim=-1).tolist()
             quantiles_tensor = torch.tensor(quantiles, dtype=data.dtype).to(data.device)
             quantile_data = torch.quantile(
-                data.to(torch.float32), 
-                quantiles_tensor.to(torch.float32),
-                dim=-1).T.tolist()
+                data.to(torch.float32), quantiles_tensor.to(torch.float32), dim=-1
+            ).T.tolist()
 
         quantiles = [round(q, 6) for q in quantiles + [1.0]]
         quantile_data = [[round(q, 6) for q in qd] for qd in quantile_data]

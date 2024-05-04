@@ -10,9 +10,8 @@ from sae_vis.components import (
     SequenceGroupData,
     SequenceMultiGroupData,
 )
-
+from sae_vis.components_config import SequencesConfig
 from sae_vis.sae_vis_data import SaeVisConfig
-
 from sae_vis.utils_fns import (
     TopK,
     k_largest_indices,
@@ -23,20 +22,24 @@ Arr = np.ndarray
 
 
 class SequenceDataGenerator:
-    def __init__(self, 
-                 cfg: SaeVisConfig,
-                 tokens: Int[Tensor, "batch seq"],
-                 W_U: Float[Tensor, "d_model d_vocab"],
+    cfg: SaeVisConfig
+    seq_cfg: SequencesConfig
+
+    def __init__(
+        self,
+        cfg: SaeVisConfig,
+        tokens: Int[Tensor, "batch seq"],
+        W_U: Float[Tensor, "d_model d_vocab"],
     ):
-                 
         self.cfg = cfg
+        assert self.cfg.feature_centric_layout.seq_cfg is not None
         self.seq_cfg = self.cfg.feature_centric_layout.seq_cfg
-        assert self.seq_cfg is not None
         self.tokens = tokens
         self.W_U = W_U
-        
-        self.buffer, self.padded_buffer_width, self.seq_length = self.get_buffer_and_padding(tokens)
-        
+
+        self.buffer, self.padded_buffer_width, self.seq_length = (
+            self.get_buffer_and_padding(tokens)
+        )
 
     @torch.inference_mode()
     def get_sequences_data(
@@ -45,7 +48,6 @@ class SequenceDataGenerator:
         feat_logits: Float[Tensor, "d_vocab"],
         resid_post: Float[Tensor, "batch seq d_model"],
         feature_resid_dir: Float[Tensor, "d_model"],
-        
     ) -> SequenceMultiGroupData:
         """
         This function returns the data which is used to create the sequence visualizations (i.e. the right-hand column of
@@ -82,7 +84,9 @@ class SequenceDataGenerator:
         """
 
         # ! (1) Find the tokens from each group
-        indices_dict, indices_bold, n_bold = self.get_indices_dict(self.buffer, feat_acts)
+        indices_dict, indices_bold, n_bold = self.get_indices_dict(
+            self.buffer, feat_acts
+        )
 
         # ! (2) Get the buffer indices
         indices_buf = self.get_indices_buf(
@@ -115,9 +119,8 @@ class SequenceDataGenerator:
             indices_bold=indices_bold,
             indices_buf=indices_buf,
         )
-        
-        if self.cfg.perform_ablation_experiments:
 
+        if self.cfg.perform_ablation_experiments:
             # ! (4) Compute the logit effect if this feature is ablated
             contribution_to_logprobs = self.direct_effect_feature_ablation_experiment(
                 feat_acts_pre_ablation=feat_acts_pre_ablation,
@@ -141,22 +144,22 @@ class SequenceDataGenerator:
             # ! (5) Store the results in a SequenceMultiGroupData object
             # Now that we've indexed everything, construct the batch of SequenceData objects
             sequence_multigroup_data = self.package_sequences_data(
-                token_ids = token_ids,
-                feat_acts_coloring = feat_acts_coloring,
-                loss_contribution = loss_contribution,
-                feat_logits = feat_logits,
-                top_contribution_to_logits = top_contribution_to_logits,
-                bottom_contribution_to_logits = bottom_contribution_to_logits,
-                indices_dict = indices_dict,
+                token_ids=token_ids,
+                feat_acts_coloring=feat_acts_coloring,
+                loss_contribution=loss_contribution,
+                feat_logits=feat_logits,
+                top_contribution_to_logits=top_contribution_to_logits,
+                bottom_contribution_to_logits=bottom_contribution_to_logits,
+                indices_dict=indices_dict,
             )
         else:
             # ! (5) Store the results in a SequenceMultiGroupData object
             # Now that we've indexed everything, construct the batch of SequenceData objects
             sequence_multigroup_data = self.package_sequences_data(
-                token_ids = token_ids,
-                feat_acts_coloring = feat_acts_coloring,
-                feat_logits = feat_logits,
-                indices_dict = indices_dict,
+                token_ids=token_ids,
+                feat_acts_coloring=feat_acts_coloring,
+                feat_logits=feat_logits,
+                indices_dict=indices_dict,
             )
 
         return sequence_multigroup_data
@@ -339,13 +342,12 @@ class SequenceDataGenerator:
         resid_post_pre_ablation: Float[Tensor, "n_bold d_model"],
         feature_resid_dir: Float[Tensor, "d_model"],
     ):
-        
         # Utilizing in-place operations and reducing precision if feasible
         # feat_acts_pre_ablation = feat_acts_pre_ablation.to(dtype=torch.float16)
         # feature_resid_dir = feature_resid_dir.to(dtype=torch.float16)
         # resid_post_pre_ablation = resid_post_pre_ablation.to(dtype=torch.float16)
         # W_U = W_U.to(dtype=torch.float16)
-        
+
         # Get this feature's output vector, using an outer product over the feature activations for all tokens
         resid_post_feature_effect = (
             feat_acts_pre_ablation[..., None] * feature_resid_dir
@@ -353,15 +355,19 @@ class SequenceDataGenerator:
 
         # Do the ablations, and get difference in logprobs
         new_resid_post = resid_post_pre_ablation - resid_post_feature_effect
-        new_logits = (new_resid_post / new_resid_post.std(dim=-1, keepdim=True))  @ self.W_U
-        orig_logits = (resid_post_pre_ablation / resid_post_pre_ablation.std(dim=-1, keepdim=True)) @ self.W_U
+        new_logits = (
+            new_resid_post / new_resid_post.std(dim=-1, keepdim=True)
+        ) @ self.W_U
+        orig_logits = (
+            resid_post_pre_ablation / resid_post_pre_ablation.std(dim=-1, keepdim=True)
+        ) @ self.W_U
         contribution_to_logprobs = orig_logits.log_softmax(
             dim=-1
         ) - new_logits.log_softmax(dim=-1)
 
         del new_resid_post, resid_post_pre_ablation, new_logits, orig_logits
 
-        return contribution_to_logprobs#.to(dtype=torch.float32)
+        return contribution_to_logprobs  # .to(dtype=torch.float32)
 
     def package_sequences_data(
         self,
@@ -370,19 +376,18 @@ class SequenceDataGenerator:
         feat_logits: Float[Tensor, "d_vocab"],
         indices_dict: dict[str, Int[Tensor, "n_bold 2"]],
         loss_contribution: Float[Tensor, "n_bold 1"] | None = None,
-        top_contribution_to_logits: TopK | None = None, 
+        top_contribution_to_logits: TopK | None = None,
         bottom_contribution_to_logits: TopK | None = None,
     ):
         sequence_groups_data = []
         group_sizes_cumsum = np.cumsum(
             [0] + [len(indices) for indices in indices_dict.values()]
         ).tolist()
-        
-        
+
         if self.cfg.perform_ablation_experiments:
             assert isinstance(loss_contribution, torch.Tensor)
-            assert top_contribution_to_logits is not None 
-            assert bottom_contribution_to_logits is not None 
+            assert top_contribution_to_logits is not None
+            assert bottom_contribution_to_logits is not None
             for group_idx, group_name in enumerate(indices_dict.keys()):
                 seq_data = [
                     SequenceData(
@@ -392,7 +397,9 @@ class SequenceDataGenerator:
                         token_logits=feat_logits[token_ids[i]].tolist(),
                         top_token_ids=top_contribution_to_logits.indices[i].tolist(),
                         top_logits=top_contribution_to_logits.values[i].tolist(),
-                        bottom_token_ids=bottom_contribution_to_logits.indices[i].tolist(),
+                        bottom_token_ids=bottom_contribution_to_logits.indices[
+                            i
+                        ].tolist(),
                         bottom_logits=bottom_contribution_to_logits.values[i].tolist(),
                     )
                     for i in range(
@@ -414,6 +421,5 @@ class SequenceDataGenerator:
                     )
                 ]
                 sequence_groups_data.append(SequenceGroupData(group_name, seq_data))
-
 
         return SequenceMultiGroupData(sequence_groups_data)

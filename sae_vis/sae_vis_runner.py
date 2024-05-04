@@ -13,7 +13,7 @@ from torch import Tensor
 from tqdm.auto import tqdm
 from transformer_lens import HookedTransformer
 
-from sae_vis.autoencoder import AutoEncoder, DTYPES
+from sae_vis.autoencoder import DTYPES, AutoEncoder
 from sae_vis.components import (
     ActsHistogramData,
     FeatureTablesData,
@@ -52,7 +52,7 @@ class SaeVisRunner:
     ) -> SaeVisData:
         # Apply random seed
         self.set_seeds()
-        
+
         # set precision on encoders and model
         encoder.to(DTYPES[self.cfg.dtype])
         model.to(DTYPES[self.cfg.dtype])
@@ -79,9 +79,9 @@ class SaeVisRunner:
         )
 
         sequence_data_generator = SequenceDataGenerator(
-            cfg = self.cfg,
-            tokens = tokens,
-            W_U = model.W_U,
+            cfg=self.cfg,
+            tokens=tokens,
+            W_U=model.W_U,
         )
 
         # For each batch of features: get new data and update global data storage objects
@@ -167,7 +167,9 @@ class SaeVisRunner:
                 # ! Calculate all data for the right-hand visualisations, i.e. the sequences
 
                 # Add this feature's sequence data to the list
-                feature_data_dict[feat].sequence_data = sequence_data_generator.get_sequences_data(
+                feature_data_dict[
+                    feat
+                ].sequence_data = sequence_data_generator.get_sequences_data(
                     feat_acts=all_feat_acts[..., i],
                     feat_logits=logits[i],
                     resid_post=all_resid_post,
