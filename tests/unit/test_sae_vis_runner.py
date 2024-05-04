@@ -26,16 +26,6 @@ def cache_path() -> Path:
     return Path("tests/fixtures/cache_unit")
 
 
-@pytest.fixture()
-def tokens(model: HookedTransformer) -> Int[Tensor, "batch seq"]:
-    return model.to_tokens(
-        [
-            "But what about second breakfast?" * 3,
-            "Nothing is cheesier than cheese." * 3,
-        ]
-    )
-
-
 @pytest.fixture(
     params=[
         {

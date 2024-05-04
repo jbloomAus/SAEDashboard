@@ -1,5 +1,7 @@
 import pytest
 import torch
+from jaxtyping import Int
+from torch import Tensor
 from transformer_lens import HookedTransformer
 
 from sae_vis.autoencoder import AutoEncoder, AutoEncoderConfig
@@ -10,6 +12,16 @@ def model() -> HookedTransformer:
     model = HookedTransformer.from_pretrained("tiny-stories-1M", device="cpu")
     model.eval()
     return model
+
+
+@pytest.fixture()
+def tokens(model: HookedTransformer) -> Int[Tensor, "batch seq"]:
+    return model.to_tokens(
+        [
+            "But what about second breakfast?" * 3,
+            "Nothing is cheesier than cheese." * 3,
+        ]
+    )
 
 
 @pytest.fixture

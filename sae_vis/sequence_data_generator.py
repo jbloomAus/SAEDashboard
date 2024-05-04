@@ -366,7 +366,8 @@ class SequenceDataGenerator:
             new_resid_post / (new_resid_post.std(dim=-1, keepdim=True) + 1e-6)
         ) @ self.W_U
         orig_logits = (
-            resid_post_pre_ablation / resid_post_pre_ablation.std(dim=-1, keepdim=True)
+            resid_post_pre_ablation
+            / (resid_post_pre_ablation.std(dim=-1, keepdim=True) + 1e-6)
         ) @ self.W_U
         contribution_to_logprobs = orig_logits.log_softmax(
             dim=-1
