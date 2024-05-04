@@ -1,7 +1,7 @@
 import math
 import random
 from collections import defaultdict
-from typing import Iterable
+from typing import Iterable, cast
 
 import einops
 import numpy as np
@@ -54,8 +54,8 @@ class SaeVisRunner:
         self.set_seeds()
 
         # set precision on encoders and model
-        encoder.to(DTYPES[self.cfg.dtype])
-        model.to(DTYPES[self.cfg.dtype])
+        encoder = encoder.to(DTYPES[self.cfg.dtype])
+        model = cast(HookedTransformer, model.to(DTYPES[self.cfg.dtype]))
         if encoder_B is not None:
             encoder_B.to(DTYPES[self.cfg.dtype])
 
@@ -86,7 +86,6 @@ class SaeVisRunner:
 
         # For each batch of features: get new data and update global data storage objects
         # TODO: We should write out json files with the results as this runs rather than storing everything in memory
-        # in memory.
         for features in feature_batches:
             # model and sae activations calculations.
 

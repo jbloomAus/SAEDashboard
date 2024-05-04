@@ -4,7 +4,6 @@ from pathlib import Path
 import pytest
 import torch
 from huggingface_hub import hf_hub_download
-from memray import Tracker
 from sae_lens.training.activations_store import ActivationsStore
 from sae_lens.training.session_loader import LMSparseAutoencoderSessionloader
 from sae_lens.training.sparse_autoencoder import SparseAutoencoder
@@ -34,8 +33,7 @@ TEST_FEATURES = list(range(128))
 
 @pytest.fixture
 def model() -> HookedTransformer:
-    model = HookedTransformer.from_pretrained("gpt2-small")
-    model.to(DEVICE)
+    model = HookedTransformer.from_pretrained("gpt2-small", device=DEVICE)
     return model
 
 
@@ -55,8 +53,9 @@ def sae():
         repo_id="jbloom/GPT2-Small-SAEs-Reformatted",
         filename=f"{hook_point}/sparsity.safetensors",
     )
-    gpt2_sae = SparseAutoencoder.load_from_pretrained(os.path.dirname(sae_path))
-    gpt2_sae.to(DEVICE)
+    gpt2_sae = SparseAutoencoder.load_from_pretrained(
+        os.path.dirname(sae_path), device=DEVICE
+    )
 
     return gpt2_sae
 
@@ -121,6 +120,8 @@ def cfg(sae: SparseAutoencoder, cache_path: Path) -> SaeVisConfig:
         verbose=True,
         feature_centric_layout=layout,
         cache_dir=cache_path,
+        device=DEVICE,
+        perform_ablation_experiments=True,
     )
 
     return feature_vis_config_gpt
@@ -150,10 +151,10 @@ def test_benchmark_sae_vis_runner(
     autoencoder = AutoEncoder(encoder_cfg).to(device)
     autoencoder.load_state_dict(sae.state_dict(), strict=False)
 
-    with Tracker("memory_profile.bin"):
-        sae_vis_data = SaeVisRunner(cfg).run(
-            encoder=autoencoder, model=model, tokens=tokens
-        )
+    # with Tracker("memory_profile.bin"):
+    sae_vis_data = SaeVisRunner(cfg).run(
+        encoder=autoencoder, model=model, tokens=tokens
+    )
 
     # to view the flamegraph, run the following:
     # ! memray flamegraph memory_profile.bin --output flamegraph.html

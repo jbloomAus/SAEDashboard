@@ -348,6 +348,13 @@ class SequenceDataGenerator:
         # resid_post_pre_ablation = resid_post_pre_ablation.to(dtype=torch.float16)
         # W_U = W_U.to(dtype=torch.float16)
 
+        # if everything is zero, return zeros
+        if not feat_acts_pre_ablation.any():
+            return torch.zeros(
+                (*feat_acts_pre_ablation.shape, self.W_U.shape[1]),
+                device=feat_acts_pre_ablation.device,
+            )
+
         # Get this feature's output vector, using an outer product over the feature activations for all tokens
         resid_post_feature_effect = (
             feat_acts_pre_ablation[..., None] * feature_resid_dir
@@ -356,7 +363,7 @@ class SequenceDataGenerator:
         # Do the ablations, and get difference in logprobs
         new_resid_post = resid_post_pre_ablation - resid_post_feature_effect
         new_logits = (
-            new_resid_post / new_resid_post.std(dim=-1, keepdim=True)
+            new_resid_post / (new_resid_post.std(dim=-1, keepdim=True) + 1e-6)
         ) @ self.W_U
         orig_logits = (
             resid_post_pre_ablation / resid_post_pre_ablation.std(dim=-1, keepdim=True)
