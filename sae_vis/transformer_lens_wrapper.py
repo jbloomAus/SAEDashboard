@@ -33,7 +33,9 @@ class TransformerLensWrapper(nn.Module):
 
         # Get the layer (so we can do the early stopping in our forward pass)
         layer_match = re.match(r"blocks\.(\d+)\.", hook_point)
-        assert layer_match, f"Error: expecting hook_point to be 'blocks.{{layer}}.{{...}}', but got {hook_point!r}"
+        assert (
+            layer_match
+        ), f"Error: expecting hook_point to be 'blocks.{{layer}}.{{...}}', but got {hook_point!r}"
         self.hook_layer = int(layer_match.group(1))
 
         # Get the hook names for the residual stream (final) and residual stream (immediately after hook_point)
@@ -49,14 +51,14 @@ class TransformerLensWrapper(nn.Module):
         self,
         tokens: Tensor,
         return_logits: Literal[True],
-    ) -> tuple[Tensor, Tensor, Tensor]: ...
+    ) -> tuple[Tensor, Tensor]: ...
 
     @overload
     def forward(
         self,
         tokens: Tensor,
         return_logits: Literal[False],
-    ) -> tuple[Tensor, Tensor]: ...
+    ) -> tuple[Tensor]: ...
 
     def forward(
         self,
@@ -76,6 +78,7 @@ class TransformerLensWrapper(nn.Module):
         # If return_logits is False, then we compute the last residual stream value but not the logits
         output: Tensor = self.model.run_with_hooks(
             tokens,
+            stop_at_layer=self.hook_layer + 1,
             # stop_at_layer = (None if return_logits else self.hook_layer),
             fwd_hooks=[
                 (self.hook_point, self.hook_fn_store_act),
@@ -85,16 +88,16 @@ class TransformerLensWrapper(nn.Module):
 
         # The hook functions work by storing data in model's hook context, so we pop them back out
         activation: Tensor = self.model.hook_dict[self.hook_point].ctx.pop("activation")
-        if self.hook_point_resid_final == self.hook_point:
-            residual: Tensor = activation
-        else:
-            residual: Tensor = self.model.hook_dict[
-                self.hook_point_resid_final
-            ].ctx.pop("activation")
+        # if self.hook_point_resid_final == self.hook_point:
+        #     residual: Tensor = activation
+        # else:
+        #     residual: Tensor = self.model.hook_dict[
+        #         self.hook_point_resid_final
+        #     ].ctx.pop("activation")
 
         if return_logits:
-            return output, residual, activation
-        return residual, activation
+            return output, activation
+        return activation
 
     def hook_fn_store_act(self, activation: torch.Tensor, hook: HookPoint):
         hook.ctx["activation"] = activation

@@ -135,26 +135,30 @@ class SaeVisRunner:
                 )
 
                 # Get logits histogram data (no title)
-                feature_data_dict[
-                    feat
-                ].logits_histogram_data = LogitsHistogramData.from_data(
-                    data=logit_vector,
-                    n_bins=layout.logits_hist_cfg.n_bins,  # type: ignore
-                    tickmode="5 ticks",
-                    title=None,
+                feature_data_dict[feat].logits_histogram_data = (
+                    LogitsHistogramData.from_data(
+                        data=logit_vector.to(
+                            torch.float32
+                        ),  # need this otherwise fails on MPS
+                        n_bins=layout.logits_hist_cfg.n_bins,  # type: ignore
+                        tickmode="5 ticks",
+                        title=None,
+                    )
                 )
 
                 # Get data for feature activations histogram (including the title!)
                 feat_acts = all_feat_acts[..., i]
                 nonzero_feat_acts = feat_acts[feat_acts > 0]
                 frac_nonzero = nonzero_feat_acts.numel() / feat_acts.numel()
-                feature_data_dict[
-                    feat
-                ].acts_histogram_data = ActsHistogramData.from_data(
-                    data=nonzero_feat_acts,
-                    n_bins=layout.act_hist_cfg.n_bins,  # type: ignore
-                    tickmode="5 ticks",
-                    title=f"ACTIVATIONS<br>DENSITY = {frac_nonzero:.3%}",
+                feature_data_dict[feat].acts_histogram_data = (
+                    ActsHistogramData.from_data(
+                        data=nonzero_feat_acts.to(
+                            torch.float32
+                        ),  # need this otherwise fails on MPS
+                        n_bins=layout.act_hist_cfg.n_bins,  # type: ignore
+                        tickmode="5 ticks",
+                        title=f"ACTIVATIONS<br>DENSITY = {frac_nonzero:.3%}",
+                    )
                 )
 
                 # Create a MiddlePlotsData object from this, and add it to the dict
@@ -166,13 +170,13 @@ class SaeVisRunner:
                 # ! Calculate all data for the right-hand visualisations, i.e. the sequences
 
                 # Add this feature's sequence data to the list
-                feature_data_dict[
-                    feat
-                ].sequence_data = sequence_data_generator.get_sequences_data(
-                    feat_acts=all_feat_acts[..., i],
-                    feat_logits=logits[i],
-                    resid_post=all_resid_post,
-                    feature_resid_dir=feature_resid_dir[i],
+                feature_data_dict[feat].sequence_data = (
+                    sequence_data_generator.get_sequences_data(
+                        feat_acts=all_feat_acts[..., i],
+                        feat_logits=logits[i],
+                        resid_post=all_resid_post,
+                        feature_resid_dir=feature_resid_dir[i],
+                    )
                 )
                 # Update the 2nd progress bar (fwd passes & getting sequence data dominates the runtime of these computations)
                 if progress is not None:

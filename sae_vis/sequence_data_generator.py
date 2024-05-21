@@ -109,7 +109,7 @@ class SequenceDataGenerator:
         (
             feat_acts_pre_ablation,
             feat_acts_coloring,
-            resid_post_pre_ablation,
+           #  resid_post_pre_ablation,
             correct_tokens,
         ) = self.index_objects_for_ablation_experiments(
             token_ids=token_ids,
@@ -278,9 +278,9 @@ class SequenceDataGenerator:
             )
             feat_acts_pre_ablation = feat_acts_buf[:, :-1]
             feat_acts_coloring = feat_acts_buf[:, 1:]
-            resid_post_pre_ablation = eindex(
-                resid_post, indices_buf[:, :-1], "[n_bold buf 0] [n_bold buf 1] d_model"
-            )
+            # resid_post_pre_ablation = eindex(
+            #     resid_post, indices_buf[:, :-1], "[n_bold buf 0] [n_bold buf 1] d_model"
+            # )
             # The tokens we'll use to index correct logits are the same as the ones which will be in our sequence
             correct_tokens = token_ids
         else:
@@ -288,9 +288,9 @@ class SequenceDataGenerator:
                 feat_acts, indices_bold, "[n_bold 0] [n_bold 1]"
             ).unsqueeze(1)
             feat_acts_coloring = feat_acts_pre_ablation
-            resid_post_pre_ablation = eindex(
-                resid_post, indices_bold, "[n_bold 0] [n_bold 1] d_model"
-            ).unsqueeze(1)
+            # resid_post_pre_ablation = eindex(
+            #     resid_post, indices_bold, "[n_bold 0] [n_bold 1] d_model"
+            # ).unsqueeze(1)
             # The tokens we'll use to index correct logits are the ones after bold
             indices_bold_next = torch.stack(
                 [indices_bold[:, 0], indices_bold[:, 1] + 1], dim=-1
@@ -302,7 +302,7 @@ class SequenceDataGenerator:
         return (
             feat_acts_pre_ablation,
             feat_acts_coloring,
-            resid_post_pre_ablation,
+            # resid_post_pre_ablation,
             correct_tokens,
         )
 

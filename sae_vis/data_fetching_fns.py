@@ -74,7 +74,7 @@ class FeatureDataGenerator:
         # ! Compute & concatenate together all feature activations & post-activation function values
 
         for i, minibatch in enumerate(self.token_minibatches):
-            model_acts, residual = self.get_model_acts(i, minibatch)
+            model_acts = self.get_model_acts(i, minibatch)
 
             # Compute feature activations from this
             feature_acts = self.encoder.get_feature_acts_subset(
@@ -91,16 +91,16 @@ class FeatureDataGenerator:
 
             # Add these to the lists (we'll eventually concat)
             all_feat_acts.append(feature_acts)
-            all_resid_post.append(residual)
+            # all_resid_post.append(residual)
 
             # Update the 1st progress bar (fwd passes & getting sequence data dominates the runtime of these computations)
             if progress is not None:
                 progress[0].update(1)
 
         all_feat_acts = torch.cat(all_feat_acts, dim=0)
-        all_resid_post = torch.cat(
-            all_resid_post, dim=0
-        )  # TODO: Check if this actually changes on each iteration and if so how to wasting effort.
+        # all_resid_post = torch.cat(
+        #     all_resid_post, dim=0
+        # )  # TODO: Check if this actually changes on each iteration and if so how to wasting effort.
 
         return (
             all_feat_acts,
@@ -125,32 +125,32 @@ class FeatureDataGenerator:
             # check if the activations are already cached
             cache_path = (
                 self.cfg.cache_dir
-                / f"model_activations_and_residuals_{minibatch_index}.safetensors"
+                / f"model_activations_{minibatch_index}.safetensors"
             )
             if cache_path.exists():
-                model, residual = self.get_cached_activation_results(cache_path)
+                model = self.get_cached_activation_results(cache_path)
             else:
                 # generate and store the results
-                residual, model = self.model.forward(
+                model = self.model.forward(
                     minibatch_tokens, return_logits=False
                 )
-                tensors = {"activations": model, "residual": residual}
+                tensors = {"activations": model}
                 # could also save tokens to avoid needing to provide them above.
                 save_file(tensors, cache_path)
         else:
-            residual, model = self.model.forward(minibatch_tokens, return_logits=False)
+            model = self.model.forward(minibatch_tokens, return_logits=False)
 
-        return model, residual
+        return model
 
     @torch.inference_mode()
     def get_cached_activation_results(self, cache_path: Path):
         with safe_open(cache_path, framework="pt", device=str(self.cfg.device)) as f:  # type: ignore
             model_acts = f.get_tensor("activations")
-            residual = f.get_tensor("residual")
+            # residual = f.get_tensor("residual")
 
         model_acts = model_acts.to(DTYPES[self.cfg.dtype])
-        residual = residual.to(DTYPES[self.cfg.dtype])
-        return model_acts, residual
+        # residual = residual.to(DTYPES[self.cfg.dtype])
+        return model_acts # , residual
 
     @torch.inference_mode()
     def compute_feat_acts(
