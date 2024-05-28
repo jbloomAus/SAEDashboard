@@ -1,3 +1,10 @@
+# SAEDashboard
+
+This code is a detached fork of [SAEVis](https://github.com/callummcdougall/sae_vis/tree/main) and is a work in progress. Please bare with us while we develop it further. Note that this package may become a subpackage of SAE Lens. 
+
+
+# OLD README
+
 This codebase was designed to replicate Anthropic's sparse autoencoder visualisations, which you can see [here](https://transformer-circuits.pub/2023/monosemantic-features/vis/a1.html). The codebase provides 2 different views: a **feature-centric view** (which is like the one in the link, i.e. we look at one particular feature and see things like which tokens fire strongest on that feature) and a **prompt-centric view** (where we look at once particular prompt and see which features fire strongest on that prompt according to a variety of different metrics).
 
 Install with `pip install sae-vis`. Link to PyPI page [here](https://pypi.org/project/sae-vis/).
