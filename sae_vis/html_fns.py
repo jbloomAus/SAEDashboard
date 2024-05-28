@@ -5,10 +5,7 @@ from typing import Any
 
 from matplotlib import colors
 
-from sae_vis.data_config_classes import (
-    Column,
-    SaeVisLayoutConfig,
-)
+from sae_vis.components_config import Column
 from sae_vis.utils_fns import (
     apply_indent,
     deep_union,
@@ -122,7 +119,8 @@ class HTML:
 
     def get_html(
         self,
-        layout: SaeVisLayoutConfig,
+        layout_columns: dict[int | tuple[int, int], Column],
+        layout_height: int,
         filename: str | Path,
         first_key: str,
         # dropdown_names: list[str], # TODO - not implemented yet, I'm guessing best way is to dump this in like START_KEY
@@ -236,18 +234,18 @@ function defineData() {{
 
             if isinstance(col_idx, int):
                 # Deal with case (1) here, as well as the general case
-                column = layout.columns[min(len(layout.columns) - 1, col_idx)]
+                column = layout_columns[min(len(layout_columns) - 1, col_idx)]
                 column_id = f"column-{col_idx}"
             elif isinstance(col_idx, tuple):
                 # Deal with case (2) here
-                column = layout.columns[col_idx[0]]
+                column = layout_columns[col_idx[0]]
                 column_id = "column-" + "-".join(map(str, col_idx))
             else:
                 raise TypeError(
                     f"Expected col_idx to be int or tuple, but got {col_idx}"
                 )
             html_str += "\n\n" + grid_column(
-                html_str_column, column=column, layout=layout, id=column_id
+                html_str_column, column=column, height=layout_height, id=column_id
             )
 
         # # Remove empty style attributes
@@ -285,7 +283,8 @@ function defineData() {{
 def grid_column(
     html_contents: str,
     column: Column,
-    layout: SaeVisLayoutConfig,
+    height: int | None,
+    # layout: SaeVisLayoutConfig,
     id: str | None = None,
     indent: str = " " * 4,
 ) -> str:
@@ -295,8 +294,7 @@ def grid_column(
     Args:
         html_contents:  The string we're wrapping
         column:         The `Column` object which contains important data about the column, e.g. width
-        layout:         The `SaeVisLayoutConfig` object which contains important data about the full layout (not specific
-                        to a single column), e.g. height
+        height:         The height of the column (this is only used if the column has a fixed height)
         id:             The id of the `grid-column` element (this will usually be `column-0`, `column-1`, etc.)
 
     We pass the `Column` object to this function, because it contains important data about the column, such as its
@@ -308,11 +306,9 @@ def grid_column(
 
     # Set styles for this column
     style_str = ""
-    if (column.width is not None) or (layout.height is not None):
+    if (column.width is not None) or (height is not None):
         width_str = f"width: {column.width}px; " if column.width is not None else ""
-        height_str = (
-            f"max-height: {layout.height}px; " if layout.height is not None else ""
-        )
+        height_str = f"max-height: {height}px; " if height is not None else ""
         style_str = f"style='{width_str}{height_str}'"
 
     # Set ID for this column

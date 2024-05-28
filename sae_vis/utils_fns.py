@@ -1,5 +1,4 @@
-# %%
-
+import random
 import re
 from dataclasses import dataclass, field
 from typing import (
@@ -101,9 +100,8 @@ def sample_unique_indices(
 
     This is more efficient than using `torch.permutation`, because we don't need to shuffle everything.
     """
-    weights = torch.ones(large_number)  # Equal weights for all indices
-    sampled_indices = torch.multinomial(weights, small_number, replacement=False)
-    return sampled_indices
+    sampled_indices = random.sample(range(large_number), small_number)
+    return torch.Tensor(sampled_indices).to(torch.int64)
 
 
 def random_range_indices(
@@ -138,6 +136,7 @@ def random_range_indices(
     indices = torch.stack(torch.where(mask), dim=-1)
 
     # If we have more indices than we need, randomly select k of them
+
     if len(indices) > k:
         indices = indices[sample_unique_indices(len(indices), k)]
 
@@ -395,9 +394,13 @@ class TopK:
 
         # Get an array of indices and values (with unimportant elements) which we'll index into using the topk object
         topk_shape = (*tensor_mask.shape, k)
-        topk_indices = torch.zeros(topk_shape).to(tensor.device).long()  # shape [... k]
+        topk_indices = torch.zeros(
+            topk_shape, device=tensor.device, dtype=torch.long
+        )  # ).long()  # shape [... k]
         topk_indices[tensor_mask] = topk.indices
-        topk_values = torch.zeros(topk_shape).to(tensor.device)  # shape [... k]
+        topk_values = torch.zeros(
+            topk_shape, device=tensor.device, dtype=tensor.dtype
+        )  # shape [... k]
         topk_values[tensor_mask] = topk.values
 
         return utils.to_numpy(topk_values), utils.to_numpy(topk_indices)
@@ -445,8 +448,6 @@ def pad_with_zeros(
     else:
         return [0.0] * (n - len(x)) + x
 
-
-# %%
 
 # This defines the number of decimal places we'll use. It's assumed to refer to values in the range [0, 1] rather than
 # pct, e.g. precision of 5 would be 99.497% = 0.99497. In other words, decimal_places = precision - 2.
@@ -531,7 +532,9 @@ class FeatureStatistics:
             _max = data.max(dim=-1).values.tolist()
             frac_nonzero = (data.abs() > 1e-6).float().mean(dim=-1).tolist()
             quantiles_tensor = torch.tensor(quantiles, dtype=data.dtype).to(data.device)
-            quantile_data = torch.quantile(data, quantiles_tensor, dim=-1).T.tolist()
+            quantile_data = torch.quantile(
+                data.to(torch.float32), quantiles_tensor.to(torch.float32), dim=-1
+            ).T.tolist()
 
         quantiles = [round(q, 6) for q in quantiles + [1.0]]
         quantile_data = [[round(q, 6) for q in qd] for qd in quantile_data]
@@ -661,9 +664,6 @@ if MAIN:
         print(f"Value: {v:.3f}, Precision: {p}, Quantile: {q:.{p-2}%}")
 
 
-# %%
-
-
 def split_string(
     input_string: str,
     str1: str,
@@ -697,9 +697,6 @@ if MAIN:
     print(split_string(input_string, str1, str2))
 
 
-# %%
-
-
 def apply_indent(
     text: str,
     prefix: str,
@@ -722,9 +719,6 @@ def apply_indent(
         text_indented = text_indented[len(prefix) :]
 
     return text_indented
-
-
-# %%
 
 
 def deep_union(
@@ -809,8 +803,6 @@ if MAIN:
         {"x": [1, 2]},
         {"x": [3, 4]},
     ) == {"x": [1, 2, 3, 4]}
-
-# %%
 
 
 # class RollingStats:
@@ -1090,9 +1082,6 @@ class HistogramData:
             tick_vals=tick_vals,
             title=title,
         )
-
-
-# %%
 
 
 def max_or_1(mylist: Sequence[float | int], abs: bool = False) -> float | int:
