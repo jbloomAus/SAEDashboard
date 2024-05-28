@@ -56,7 +56,7 @@ class TransformerLensWrapper(nn.Module):
         self,
         tokens: Tensor,
         return_logits: Literal[False],
-    ) -> tuple[Tensor]: ...
+    ) -> Tensor: ...
 
     def forward(
         self,

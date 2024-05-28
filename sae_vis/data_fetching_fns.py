@@ -115,7 +115,7 @@ class FeatureDataGenerator:
     @torch.inference_mode()
     def get_model_acts(
         self, minibatch_index: int, minibatch_tokens: Int[Tensor, "batch seq"]
-    ):
+    ) -> torch.Tensor:
         """
         A function that gets the model activations and residuals for a given minibatch of tokens.
         Handles the existence of a caching directory and whether or not activations are already cached.
@@ -127,20 +127,20 @@ class FeatureDataGenerator:
                 self.cfg.cache_dir / f"model_activations_{minibatch_index}.safetensors"
             )
             if cache_path.exists():
-                model = self.get_cached_activation_results(cache_path)
+                model_acts = self.get_cached_activation_results(cache_path)
             else:
                 # generate and store the results
-                model = self.model.forward(minibatch_tokens, return_logits=False)
-                tensors = {"activations": model}
+                model_acts = self.model.forward(minibatch_tokens, return_logits=False)
+                tensors = {"activations": model_acts}
                 # could also save tokens to avoid needing to provide them above.
                 save_file(tensors, cache_path)
         else:
-            model = self.model.forward(minibatch_tokens, return_logits=False)
+            model_acts = self.model.forward(minibatch_tokens, return_logits=False)
 
-        return model
+        return model_acts
 
     @torch.inference_mode()
-    def get_cached_activation_results(self, cache_path: Path):
+    def get_cached_activation_results(self, cache_path: Path) -> torch.Tensor:
         with safe_open(cache_path, framework="pt", device=str(self.cfg.device)) as f:  # type: ignore
             model_acts = f.get_tensor("activations")
             # residual = f.get_tensor("residual")

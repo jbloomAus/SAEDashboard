@@ -107,10 +107,10 @@ class SequenceDataGenerator:
         # we need [:, 1:] for coloring and [:, :-1] for ablation, but when we're not we only need [:, bold] for both. So
         # we split on cases here.
         (
-            feat_acts_pre_ablation,
+            _,
             feat_acts_coloring,
             #  resid_post_pre_ablation,
-            correct_tokens,
+            _,
         ) = self.index_objects_for_ablation_experiments(
             token_ids=token_ids,
             tokens=self.tokens,
@@ -121,37 +121,40 @@ class SequenceDataGenerator:
         )
 
         if self.cfg.perform_ablation_experiments:
-            # ! (4) Compute the logit effect if this feature is ablated
-            contribution_to_logprobs = self.direct_effect_feature_ablation_experiment(
-                feat_acts_pre_ablation=feat_acts_pre_ablation,
-                resid_post_pre_ablation=resid_post_pre_ablation,
-                feature_resid_dir=feature_resid_dir,
+            raise NotImplementedError(
+                "We are not supporting ablation experiments for now."
             )
+            # # ! (4) Compute the logit effect if this feature is ablated
+            # contribution_to_logprobs = self.direct_effect_feature_ablation_experiment(
+            #     feat_acts_pre_ablation=feat_acts_pre_ablation,
+            #     resid_post_pre_ablation=resid_post_pre_ablation,
+            #     feature_resid_dir=feature_resid_dir,
+            # )
 
-            # ! (4A) Use this to compute the most affected tokens by this feature
-            # The TopK function can improve efficiency by masking the features which are zero
+            # # ! (4A) Use this to compute the most affected tokens by this feature
+            # # The TopK function can improve efficiency by masking the features which are zero
 
-            # ! (4B) Use this to compute the loss effect if this feature is ablated
-            # which is just the negative of the change in logprobs
-            (
-                top_contribution_to_logits,
-                bottom_contribution_to_logits,
-                loss_contribution,
-            ) = self.get_feature_ablation_statistics(
-                feat_acts_pre_ablation, contribution_to_logprobs, correct_tokens
-            )
+            # # ! (4B) Use this to compute the loss effect if this feature is ablated
+            # # which is just the negative of the change in logprobs
+            # (
+            #     top_contribution_to_logits,
+            #     bottom_contribution_to_logits,
+            #     loss_contribution,
+            # ) = self.get_feature_ablation_statistics(
+            #     feat_acts_pre_ablation, contribution_to_logprobs, correct_tokens
+            # )
 
-            # ! (5) Store the results in a SequenceMultiGroupData object
-            # Now that we've indexed everything, construct the batch of SequenceData objects
-            sequence_multigroup_data = self.package_sequences_data(
-                token_ids=token_ids,
-                feat_acts_coloring=feat_acts_coloring,
-                loss_contribution=loss_contribution,
-                feat_logits=feat_logits,
-                top_contribution_to_logits=top_contribution_to_logits,
-                bottom_contribution_to_logits=bottom_contribution_to_logits,
-                indices_dict=indices_dict,
-            )
+            # # ! (5) Store the results in a SequenceMultiGroupData object
+            # # Now that we've indexed everything, construct the batch of SequenceData objects
+            # sequence_multigroup_data = self.package_sequences_data(
+            #     token_ids=token_ids,
+            #     feat_acts_coloring=feat_acts_coloring,
+            #     loss_contribution=loss_contribution,
+            #     feat_logits=feat_logits,
+            #     top_contribution_to_logits=top_contribution_to_logits,
+            #     bottom_contribution_to_logits=bottom_contribution_to_logits,
+            #     indices_dict=indices_dict,
+            # )
         else:
             # ! (5) Store the results in a SequenceMultiGroupData object
             # Now that we've indexed everything, construct the batch of SequenceData objects

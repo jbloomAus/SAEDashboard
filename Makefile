@@ -10,7 +10,7 @@ lint:
 test:
 	poetry run pytest tests/unit
 
-check-all:
+check-ci:
 	make format
 	make lint
 	make test

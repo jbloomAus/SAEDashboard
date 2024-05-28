@@ -91,7 +91,7 @@ class SaeVisRunner:
 
             (
                 all_feat_acts,
-                all_resid_post,
+                _,  # all resid post. no longer used.
                 feature_resid_dir,
                 feature_out_dir,
                 corrcoef_neurons,
@@ -175,7 +175,7 @@ class SaeVisRunner:
                 ].sequence_data = sequence_data_generator.get_sequences_data(
                     feat_acts=all_feat_acts[..., i],
                     feat_logits=logits[i],
-                    resid_post=all_resid_post,
+                    resid_post=torch.tensor([]),  # no longer used
                     feature_resid_dir=feature_resid_dir[i],
                 )
                 # Update the 2nd progress bar (fwd passes & getting sequence data dominates the runtime of these computations)
