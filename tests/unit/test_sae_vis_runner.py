@@ -33,7 +33,7 @@ def cache_path() -> Path:
             "features": list(range(N_FEATURES)),
             "minibatch_size_features": N_FEATURES,
             "minibatch_size_tokens": 2,
-            "perform_ablation_experiments": True,
+            "perform_ablation_experiments": False,
             "device": TEST_DEVICE,
             "dtype": TEST_DTYPE,
         },
@@ -42,7 +42,7 @@ def cache_path() -> Path:
             "features": list(range(N_FEATURES)),
             "minibatch_size_features": N_FEATURES,
             "minibatch_size_tokens": 2,
-            "perform_ablation_experiments": True,
+            "perform_ablation_experiments": False,
             "device": TEST_DEVICE,
             "dtype": TEST_DTYPE,
             # this doesn't take an arg for the buffer so we use the name + an if statement
@@ -114,6 +114,7 @@ def test_SaeVisData_create_and_save_feature_centric_vis(
     sae_vis_data: SaeVisData,
     tmp_path: Path,
 ):
+    # tmp_path = Path(".") # when you want to manually inspect it.
     save_path = tmp_path / "feature_centric_vis.html"
     save_feature_centric_vis(sae_vis_data=sae_vis_data, filename=save_path)
     assert (save_path).exists()
