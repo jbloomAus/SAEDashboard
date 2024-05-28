@@ -421,6 +421,14 @@ class SequenceData:
             neg_ids = deepcopy(self.bottom_token_ids)
             pos_val = deepcopy(self.top_logits)
             neg_val = deepcopy(self.bottom_logits)
+            
+        # EXPERIMENT: let's just hardcode everything except feature acts to be 0's for now. 
+        loss_contribution = [0.0 for _ in range(self.seq_len)]
+        pos_ids = [[] for _ in range(self.seq_len)]
+        neg_ids = [[] for _ in range(self.seq_len)]
+        pos_val = [[] for _ in range(self.seq_len)]
+        neg_val = [[] for _ in range(self.seq_len)]
+        ### END EXPERIMENT
 
         # Get values for converting into colors later
         bg_denom = max_feat_act or max_or_1(self.feat_acts)
@@ -442,6 +450,10 @@ class SequenceData:
             neg_ids = [[]] + neg_ids
             pos_val = [[]] + pos_val
             neg_val = [[]] + neg_val
+            
+            
+        print( (len(pos_ids) == len(neg_ids) == len(pos_val) == len(neg_val) == len(self.token_ids)))
+            
         assert (
             len(pos_ids)
             == len(neg_ids)
