@@ -33,9 +33,7 @@ class TransformerLensWrapper(nn.Module):
 
         # Get the layer (so we can do the early stopping in our forward pass)
         layer_match = re.match(r"blocks\.(\d+)\.", hook_point)
-        assert (
-            layer_match
-        ), f"Error: expecting hook_point to be 'blocks.{{layer}}.{{...}}', but got {hook_point!r}"
+        assert layer_match, f"Error: expecting hook_point to be 'blocks.{{layer}}.{{...}}', but got {hook_point!r}"
         self.hook_layer = int(layer_match.group(1))
 
         # Get the hook names for the residual stream (final) and residual stream (immediately after hook_point)

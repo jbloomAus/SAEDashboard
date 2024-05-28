@@ -109,7 +109,7 @@ class SequenceDataGenerator:
         (
             feat_acts_pre_ablation,
             feat_acts_coloring,
-           #  resid_post_pre_ablation,
+            #  resid_post_pre_ablation,
             correct_tokens,
         ) = self.index_objects_for_ablation_experiments(
             token_ids=token_ids,

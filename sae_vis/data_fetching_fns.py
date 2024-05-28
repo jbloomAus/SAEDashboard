@@ -124,16 +124,13 @@ class FeatureDataGenerator:
         if self.cfg.cache_dir is not None:
             # check if the activations are already cached
             cache_path = (
-                self.cfg.cache_dir
-                / f"model_activations_{minibatch_index}.safetensors"
+                self.cfg.cache_dir / f"model_activations_{minibatch_index}.safetensors"
             )
             if cache_path.exists():
                 model = self.get_cached_activation_results(cache_path)
             else:
                 # generate and store the results
-                model = self.model.forward(
-                    minibatch_tokens, return_logits=False
-                )
+                model = self.model.forward(minibatch_tokens, return_logits=False)
                 tensors = {"activations": model}
                 # could also save tokens to avoid needing to provide them above.
                 save_file(tensors, cache_path)
@@ -150,7 +147,7 @@ class FeatureDataGenerator:
 
         model_acts = model_acts.to(DTYPES[self.cfg.dtype])
         # residual = residual.to(DTYPES[self.cfg.dtype])
-        return model_acts # , residual
+        return model_acts  # , residual
 
     @torch.inference_mode()
     def compute_feat_acts(
