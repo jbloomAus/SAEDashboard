@@ -19,7 +19,7 @@ from sae_vis.components import (
     FeatureTablesData,
     LogitsHistogramData,
 )
-from sae_vis.data_fetching_fns import FeatureDataGenerator
+from sae_vis.feature_data_generator import FeatureDataGenerator
 from sae_vis.data_parsing_fns import (
     get_features_table_data,
     get_logits_table_data,
