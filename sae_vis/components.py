@@ -451,14 +451,6 @@ class SequenceData:
             pos_val = [[]] + pos_val
             neg_val = [[]] + neg_val
 
-        print(
-            len(pos_ids)
-            == len(neg_ids)
-            == len(pos_val)
-            == len(neg_val)
-            == len(self.token_ids)
-        )
-
         assert (
             len(pos_ids)
             == len(neg_ids)
