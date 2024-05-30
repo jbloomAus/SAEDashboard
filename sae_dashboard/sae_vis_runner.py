@@ -9,28 +9,29 @@ import torch
 from jaxtyping import Int
 from rich import print as rprint
 from rich.table import Table
+from sae_lens import SAE
+from sae_lens.config import DTYPE_MAP as DTYPES
 from torch import Tensor
 from tqdm.auto import tqdm
 from transformer_lens import HookedTransformer
 
-from sae_vis.autoencoder import DTYPES, AutoEncoder
-from sae_vis.components import (
+from sae_dashboard.components import (
     ActsHistogramData,
     FeatureTablesData,
     LogitsHistogramData,
 )
-from sae_vis.feature_data_generator import FeatureDataGenerator
-from sae_vis.data_parsing_fns import (
+from sae_dashboard.data_parsing_fns import (
     get_features_table_data,
     get_logits_table_data,
 )
-from sae_vis.feature_data import FeatureData
-from sae_vis.sae_vis_data import SaeVisConfig, SaeVisData
-from sae_vis.sequence_data_generator import (
+from sae_dashboard.feature_data import FeatureData
+from sae_dashboard.feature_data_generator import FeatureDataGenerator
+from sae_dashboard.sae_vis_data import SaeVisConfig, SaeVisData
+from sae_dashboard.sequence_data_generator import (
     SequenceDataGenerator,
 )
-from sae_vis.transformer_lens_wrapper import TransformerLensWrapper
-from sae_vis.utils_fns import (
+from sae_dashboard.transformer_lens_wrapper import TransformerLensWrapper
+from sae_dashboard.utils_fns import (
     FeatureStatistics,
 )
 
@@ -45,13 +46,16 @@ class SaeVisRunner:
     @torch.inference_mode()
     def run(
         self,
-        encoder: AutoEncoder,
+        encoder: SAE,
         model: HookedTransformer,
         tokens: Int[Tensor, "batch seq"],
-        encoder_B: AutoEncoder | None = None,
+        encoder_B: SAE | None = None,
     ) -> SaeVisData:
         # Apply random seed
         self.set_seeds()
+
+        # add extra method to SAE which is not yet provided by SAE Lens.
+        encoder = self.mock_feature_acts_subset_for_now(encoder)
 
         # set precision on encoders and model
         encoder = encoder.to(DTYPES[self.cfg.dtype])
@@ -219,10 +223,10 @@ class SaeVisRunner:
         return None
 
     def handle_features(
-        self, features: Iterable[int] | None, encoder_wrapper: AutoEncoder
+        self, features: Iterable[int] | None, encoder_wrapper: SAE
     ) -> list[int]:
         if features is None:
-            return list(range(encoder_wrapper.cfg.d_hidden))
+            return list(range(encoder_wrapper.cfg.d_sae))
         else:
             return list(features)
 
@@ -260,3 +264,14 @@ class SaeVisRunner:
             progress = None
 
         return progress
+
+    def mock_feature_acts_subset_for_now(self, sae: SAE):
+        def sae_lens_get_feature_acts_subset(x: torch.Tensor, feature_idx):  # type: ignore
+            """
+            Get a subset of the feature activations for a dataset.
+            """
+            return sae.encode(x)[..., feature_idx]
+
+        sae.get_feature_acts_subset = sae_lens_get_feature_acts_subset  # type: ignore
+
+        return sae

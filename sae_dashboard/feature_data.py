@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Callable, Literal
 
-from sae_vis.components import (
+from sae_dashboard.components import (
     ActsHistogramData,
     FeatureTablesData,
     GenericData,
@@ -10,7 +10,7 @@ from sae_vis.components import (
     SequenceData,
     SequenceMultiGroupData,
 )
-from sae_vis.components_config import (
+from sae_dashboard.components_config import (
     ActsHistogramConfig,
     FeatureTablesConfig,
     GenericComponentConfig,
@@ -19,8 +19,8 @@ from sae_vis.components_config import (
     PromptConfig,
     SequencesConfig,
 )
-from sae_vis.html_fns import HTML
-from sae_vis.layout import SaeVisLayoutConfig
+from sae_dashboard.html_fns import HTML
+from sae_dashboard.layout import SaeVisLayoutConfig
 
 
 @dataclass

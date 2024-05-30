@@ -8,7 +8,11 @@ from torch import Tensor
 from transformer_lens import HookedTransformer, utils
 from transformer_lens.hook_points import HookPoint
 
-DTYPES = {"fp32": torch.float32, "fp16": torch.float16, "bf16": torch.bfloat16}
+DTYPES = {
+    "float32": torch.float32,
+    "float16": torch.float16,
+    "bfloat16": torch.bfloat16,
+}
 
 
 # # ==============================================================

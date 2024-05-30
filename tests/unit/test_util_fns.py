@@ -1,6 +1,6 @@
 import torch
 
-from sae_vis.utils_fns import RollingCorrCoef, TopK, sample_unique_indices
+from sae_dashboard.utils_fns import RollingCorrCoef, TopK, sample_unique_indices
 
 
 def test_sample_unique_indices():

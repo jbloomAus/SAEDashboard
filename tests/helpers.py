@@ -1,6 +1,6 @@
 from typing import Any
 
-from sae_vis.sae_vis_data import SaeVisConfig
+from sae_dashboard.sae_vis_data import SaeVisConfig
 
 
 def round_floats_deep(obj: Any, ndigits: int = 3) -> Any:

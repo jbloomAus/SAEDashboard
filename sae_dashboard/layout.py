@@ -4,7 +4,7 @@ from dataclasses_json import dataclass_json
 from rich import print as rprint
 from rich.tree import Tree
 
-from sae_vis.components_config import (
+from sae_dashboard.components_config import (
     ActsHistogramConfig,
     BaseComponentConfig,
     Column,

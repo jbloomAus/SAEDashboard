@@ -1,7 +1,7 @@
 import torch
 from transformer_lens import HookedTransformer
 
-from sae_vis.sequence_data_generator import SequenceDataGenerator
+from sae_dashboard.sequence_data_generator import SequenceDataGenerator
 from tests.helpers import build_sae_vis_cfg
 
 

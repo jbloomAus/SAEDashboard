@@ -5,7 +5,7 @@ format:
 lint:
 	poetry run ruff check .
 	poetry run ruff format --check .
-	poetry run pyright sae_vis
+	poetry run pyright sae_dashboard
 
 test:
 	poetry run pytest tests/unit

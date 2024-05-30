@@ -5,18 +5,19 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from jaxtyping import Float, Int
+from sae_lens import SAE
+from sae_lens.config import DTYPE_MAP as DTYPES
 from safetensors import safe_open
 from safetensors.torch import save_file
 from torch import Tensor
 from tqdm.auto import tqdm
 
-from sae_vis.autoencoder import DTYPES, AutoEncoder
-from sae_vis.sae_vis_data import SaeVisConfig
-from sae_vis.transformer_lens_wrapper import (
+from sae_dashboard.sae_vis_data import SaeVisConfig
+from sae_dashboard.transformer_lens_wrapper import (
     TransformerLensWrapper,
     to_resid_dir,
 )
-from sae_vis.utils_fns import (
+from sae_dashboard.utils_fns import (
     RollingCorrCoef,
 )
 
@@ -29,8 +30,8 @@ class FeatureDataGenerator:
         cfg: SaeVisConfig,
         tokens: Int[Tensor, "batch seq"],
         model: TransformerLensWrapper,
-        encoder: AutoEncoder,
-        encoder_B: AutoEncoder | None = None,
+        encoder: SAE,
+        encoder_B: SAE | None = None,
     ):
         self.cfg = cfg
         self.model = model
@@ -154,7 +155,7 @@ class FeatureDataGenerator:
         self,
         model_acts: Float[Tensor, "batch seq d_in"],
         feature_idx: list[int],
-        encoder: AutoEncoder,
+        encoder: SAE,
     ) -> Float[Tensor, "batch seq feats"]:
         """
         This function computes the feature activations, given a bunch of model data. It also updates the rolling correlation
@@ -191,7 +192,7 @@ class FeatureDataGenerator:
         corrcoef_neurons: RollingCorrCoef | None,
         corrcoef_encoder: RollingCorrCoef | None,
         corrcoef_encoder_B: RollingCorrCoef | None,
-        encoder_B: AutoEncoder | None = None,
+        encoder_B: SAE | None = None,
     ) -> None:
         """
 

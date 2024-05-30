@@ -6,7 +6,7 @@ from typing import Any, Callable
 import numpy as np
 from dataclasses_json import dataclass_json
 
-from sae_vis.components_config import (
+from sae_dashboard.components_config import (
     ActsHistogramConfig,
     FeatureTablesConfig,
     LogitsHistogramConfig,
@@ -14,12 +14,12 @@ from sae_vis.components_config import (
     PromptConfig,
     SequencesConfig,
 )
-from sae_vis.html_fns import (
+from sae_dashboard.html_fns import (
     HTML,
     bgColorMap,
     uColorMap,
 )
-from sae_vis.utils_fns import (
+from sae_dashboard.utils_fns import (
     HistogramData,
     max_or_1,
     to_str_tokens,

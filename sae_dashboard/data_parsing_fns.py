@@ -3,17 +3,17 @@ import numpy as np
 import torch
 from eindex import eindex
 from jaxtyping import Float, Int
+from sae_lens import SAE
 from torch import Tensor
 from transformer_lens import HookedTransformer, utils
 
-from sae_vis.autoencoder import AutoEncoder
-from sae_vis.components import (
+from sae_dashboard.components import (
     LogitsTableData,
     SequenceData,
 )
-from sae_vis.sae_vis_data import SaeVisData
-from sae_vis.transformer_lens_wrapper import TransformerLensWrapper, to_resid_dir
-from sae_vis.utils_fns import (
+from sae_dashboard.sae_vis_data import SaeVisData
+from sae_dashboard.transformer_lens_wrapper import TransformerLensWrapper, to_resid_dir
+from sae_dashboard.utils_fns import (
     RollingCorrCoef,
     TopK,
 )
@@ -387,7 +387,7 @@ def get_prompt_data(
     # ! Boring setup code
     feature_idx = list(sae_vis_data.feature_data_dict.keys())
     encoder = sae_vis_data.encoder
-    assert isinstance(encoder, AutoEncoder)
+    assert isinstance(encoder, SAE)
     model = sae_vis_data.model
     assert isinstance(model, HookedTransformer)
     cfg = sae_vis_data.cfg

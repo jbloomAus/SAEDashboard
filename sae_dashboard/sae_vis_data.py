@@ -6,12 +6,12 @@ from typing import Any, Iterable
 from dataclasses_json import dataclass_json
 from rich import print as rprint
 from rich.table import Table
+from sae_lens import SAE
 from transformer_lens import HookedTransformer
 
-from sae_vis.autoencoder import AutoEncoder
-from sae_vis.feature_data import FeatureData
-from sae_vis.layout import SaeVisLayoutConfig
-from sae_vis.utils_fns import (
+from sae_dashboard.feature_data import FeatureData
+from sae_dashboard.layout import SaeVisLayoutConfig
+from sae_dashboard.utils_fns import (
     FeatureStatistics,
 )
 
@@ -38,7 +38,7 @@ class SaeVisConfig:
     minibatch_size_tokens: int = 64
     perform_ablation_experiments: bool = False
     device: str = "cpu"
-    dtype: str = "fp32"
+    dtype: str = "float32"
 
     # Vis
     feature_centric_layout: SaeVisLayoutConfig = field(
@@ -139,8 +139,8 @@ class SaeVisData:
     feature_stats: FeatureStatistics = field(default_factory=FeatureStatistics)
 
     model: HookedTransformer | None = None
-    encoder: AutoEncoder | None = None
-    encoder_B: AutoEncoder | None = None
+    encoder: SAE | None = None
+    encoder_B: SAE | None = None
 
     def update(self, other: "SaeVisData") -> None:
         """
@@ -162,7 +162,7 @@ class SaeVisData:
     #     cfg: SaeVisConfig,
     #     encoder_B: AutoEncoder | None = None,
     # ) -> "SaeVisData":
-    #     from sae_vis.data_fetching_fns import get_feature_data
+    #     from sae_dashboard.data_fetching_fns import get_feature_data
 
     #     # If encoder isn't an AutoEncoder, we wrap it in one
     #     if not isinstance(encoder, AutoEncoder):
@@ -215,8 +215,8 @@ class SaeVisData:
         filename: str | Path,
         cfg: SaeVisConfig,
         model: HookedTransformer,
-        encoder: AutoEncoder,
-        encoder_B: AutoEncoder,
+        encoder: SAE,
+        encoder_B: SAE,
     ) -> "SaeVisData":
         """
         Loads an SaeVisData instance from JSON file. The config, model & encoder arguments must be user-supplied.

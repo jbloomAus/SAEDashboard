@@ -3,22 +3,22 @@ from pathlib import Path
 
 import pytest
 from jaxtyping import Int
+from sae_lens import SAE
 from syrupy import SnapshotAssertion
 from torch import Tensor
 from transformer_lens import HookedTransformer
 
-from sae_vis.autoencoder import AutoEncoder
-from sae_vis.components_config import SequencesConfig
-from sae_vis.data_writing_fns import save_feature_centric_vis
-from sae_vis.sae_vis_data import SaeVisConfig, SaeVisData
-from sae_vis.sae_vis_runner import SaeVisRunner
+from sae_dashboard.components_config import SequencesConfig
+from sae_dashboard.data_writing_fns import save_feature_centric_vis
+from sae_dashboard.sae_vis_data import SaeVisConfig, SaeVisData
+from sae_dashboard.sae_vis_runner import SaeVisRunner
 from tests.helpers import round_floats_deep
 
 ROOT_DIR = Path(__file__).parent.parent.parent
 N_FEATURES = 32
 # TEST_DEVICE = get_device()
 TEST_DEVICE = "cpu"
-TEST_DTYPE = "fp32"
+TEST_DTYPE = "float32"
 
 
 @pytest.fixture()
@@ -69,7 +69,7 @@ def cfg(request: pytest.FixtureRequest, cache_path: Path) -> SaeVisConfig:
 def sae_vis_data(
     cfg: SaeVisConfig,
     model: HookedTransformer,
-    autoencoder: AutoEncoder,
+    autoencoder: SAE,
     tokens: Int[Tensor, "batch seq"],
 ) -> SaeVisData:
     data = SaeVisRunner(cfg).run(encoder=autoencoder, model=model, tokens=tokens)
@@ -79,7 +79,7 @@ def sae_vis_data(
 def test_SaeVisData_create_results_look_reasonable(
     tokens: Int[Tensor, "batch seq"],
     model: HookedTransformer,
-    autoencoder: AutoEncoder,
+    autoencoder: SAE,
     cfg: SaeVisConfig,
 ):
     sae_vis_data = SaeVisRunner(cfg).run(
@@ -122,21 +122,21 @@ def test_SaeVisData_create_and_save_feature_centric_vis(
         html_contents = f.read()
 
     # all the CSS should be in the HTML
-    css_files = (ROOT_DIR / "sae_vis" / "css").glob("*.css")
+    css_files = (ROOT_DIR / "sae_dashboard" / "css").glob("*.css")
     assert len(list(css_files)) > 0
     for css_file in css_files:
         with open(css_file) as f:
             assert f.read() in html_contents
 
     # all the JS should be in the HTML
-    js_files = (ROOT_DIR / "sae_vis" / "js").glob("*.js")
+    js_files = (ROOT_DIR / "sae_dashboard" / "js").glob("*.js")
     assert len(list(js_files)) > 0
     for js_file in js_files:
         with open(js_file) as f:
             assert f.read() in html_contents
 
     # all the HTML templates should be in the HTML
-    html_files = (ROOT_DIR / "sae_vis" / "html").glob("*.html")
+    html_files = (ROOT_DIR / "sae_dashboard" / "html").glob("*.html")
     assert len(list(html_files)) > 0
     for html_file in html_files:
         with open(html_file) as f:

@@ -5,14 +5,14 @@ from eindex import eindex
 from jaxtyping import Float, Int
 from torch import Tensor
 
-from sae_vis.components import (
+from sae_dashboard.components import (
     SequenceData,
     SequenceGroupData,
     SequenceMultiGroupData,
 )
-from sae_vis.components_config import SequencesConfig
-from sae_vis.sae_vis_data import SaeVisConfig
-from sae_vis.utils_fns import (
+from sae_dashboard.components_config import SequencesConfig
+from sae_dashboard.sae_vis_data import SaeVisConfig
+from sae_dashboard.utils_fns import (
     TopK,
     k_largest_indices,
     random_range_indices,
