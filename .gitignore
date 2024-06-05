@@ -173,3 +173,6 @@ april-fools
 requirements.txt
 tests/fixtures/cache_benchmark/
 tests/fixtures/cache_unit/
+
+neuronpedia_outputs/
+cached_activations/

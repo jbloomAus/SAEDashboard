@@ -19,6 +19,7 @@ rich = "^13.7.1"
 matplotlib = "^3.8.4"
 safetensors = "^0.4.3"
 sae-lens = "^3.1.1"
+typer = "^0.12.3"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.3.7"
@@ -31,24 +32,9 @@ syrupy = "^4.6.1"
 
 [tool.isort]
 profile = "black"
-src_paths = ["sae_vis", "tests"]
-
-[tool.ruff]
-exclude = ["sae_vis/css", "sae_vis/js", "sae_vis/html"]
-
-[tool.ruff.lint]
-ignore = ["E203", "E501", "E731", "F722", "E741", "F821", "F403", "ARG002"]
-extend-select = ["UP", "TID", "I", "F", "E", "ARG"]
-
-[tool.ruff.lint.flake8-tidy-imports.banned-api]
-"typing.Union".msg = "Use `|` instead"
-"typing.Optional".msg = "Use `| None` instead"
-"typing.Dict".msg = "Use `dict` instead"
-"typing.List".msg = "Use `list` instead"
+src_paths = ["sae_lens", "tests"]
 
 [tool.pyright]
-include = ["sae_vis"]
-exclude = ["sae_vis/css", "sae_vis/js", "sae_vis/html", "dist"]
 typeCheckingMode = "strict"
 reportMissingTypeStubs = "none"
 reportUnknownMemberType = "none"
@@ -59,9 +45,7 @@ reportUnnecessaryIsInstance = "none"
 reportUnnecessaryComparison = "none"
 reportConstantRedefinition = "none"
 reportUnknownLambdaType = "none"
-reportUnknownParameterType = "none"
 reportPrivateUsage = "none"
-reportPrivateImportUsage = "none"
 
 [build-system]
 requires = ["poetry-core"]
