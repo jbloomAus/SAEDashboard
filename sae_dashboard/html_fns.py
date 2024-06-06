@@ -4,12 +4,8 @@ from pathlib import Path
 from typing import Any
 
 from matplotlib import colors
-
 from sae_dashboard.components_config import Column
-from sae_dashboard.utils_fns import (
-    apply_indent,
-    deep_union,
-)
+from sae_dashboard.utils_fns import apply_indent, deep_union
 
 BG_COLOR_MAP = colors.LinearSegmentedColormap.from_list(
     "bg_color_map", ["white", "darkorange"]
@@ -54,7 +50,7 @@ class HTML:
     Contains HTML strings & JavaScript data to populate them.
 
     Args:
-        html_data: 
+        html_data:
             Keys are the columns we'll be storing that HTML in; values are the HTML strings. When we `__add__` 2 objects
             together, we concat these across columns. When we use `get_html`, again we'll concat across columns
             (wrapping each column's contents in a `grid-item` div), and wrap everything in a `grid-container`.
@@ -69,7 +65,7 @@ class HTML:
                             (data to generate the sequence groups, which will be fed into `tokenScript.js` as
                             `DATA.tokenData`)
                         featureTablesData
-                            (data to generate the feature tables, which will be fed into `featureTablesScript.js` as 
+                            (data to generate the feature tables, which will be fed into `featureTablesScript.js` as
                             `DATA.featureTablesData`)
                         ...
                     '1'
@@ -254,7 +250,7 @@ function defineData() {{
         # Create the full HTML string: wrap everything in `grid-container`, and also create object for holding dropdowns
         full_html_str = f"""
 <div id='dropdown-container'></div>
-        
+
 <div class='grid-container'>
     {apply_indent(html_str, " " * 4)}
 </div>

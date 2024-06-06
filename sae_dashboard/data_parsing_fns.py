@@ -3,20 +3,13 @@ import numpy as np
 import torch
 from eindex import eindex
 from jaxtyping import Float, Int
+from sae_dashboard.components import LogitsTableData, SequenceData
+from sae_dashboard.sae_vis_data import SaeVisData
+from sae_dashboard.transformer_lens_wrapper import TransformerLensWrapper, to_resid_dir
+from sae_dashboard.utils_fns import RollingCorrCoef, TopK
 from sae_lens import SAE
 from torch import Tensor
 from transformer_lens import HookedTransformer, utils
-
-from sae_dashboard.components import (
-    LogitsTableData,
-    SequenceData,
-)
-from sae_dashboard.sae_vis_data import SaeVisData
-from sae_dashboard.transformer_lens_wrapper import TransformerLensWrapper, to_resid_dir
-from sae_dashboard.utils_fns import (
-    RollingCorrCoef,
-    TopK,
-)
 
 Arr = np.ndarray
 

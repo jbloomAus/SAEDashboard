@@ -5,21 +5,15 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from jaxtyping import Float, Int
+from sae_dashboard.sae_vis_data import SaeVisConfig
+from sae_dashboard.transformer_lens_wrapper import TransformerLensWrapper, to_resid_dir
+from sae_dashboard.utils_fns import RollingCorrCoef
 from sae_lens import SAE
 from sae_lens.config import DTYPE_MAP as DTYPES
 from safetensors import safe_open
 from safetensors.torch import save_file
 from torch import Tensor
 from tqdm.auto import tqdm
-
-from sae_dashboard.sae_vis_data import SaeVisConfig
-from sae_dashboard.transformer_lens_wrapper import (
-    TransformerLensWrapper,
-    to_resid_dir,
-)
-from sae_dashboard.utils_fns import (
-    RollingCorrCoef,
-)
 
 Arr = np.ndarray
 

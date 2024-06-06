@@ -3,7 +3,6 @@ from dataclasses import asdict, dataclass, field
 from dataclasses_json import dataclass_json
 from rich import print as rprint
 from rich.tree import Tree
-
 from sae_dashboard.components_config import (
     ActsHistogramConfig,
     BaseComponentConfig,
@@ -15,7 +14,7 @@ from sae_dashboard.components_config import (
     SequencesConfig,
 )
 
-KEY_LAYOUT_VIS = """Key: 
+KEY_LAYOUT_VIS = """Key:
   the tree shows which components will be displayed in each column (from left to right)
   arguments are [b #00aa00]green[/]
   arguments changed from their default are [b dark_orange]orange[/], with default in brackets

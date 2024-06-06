@@ -6,12 +6,6 @@ from typing import Any, Dict, List, Optional, Union
 import numpy as np
 import torch
 from matplotlib import colors
-from sae_lens.sae import SAE
-from sae_lens.toolkit.pretrained_saes import load_sparsity
-from sae_lens.training.activations_store import ActivationsStore
-from tqdm import tqdm
-from transformer_lens import HookedTransformer
-
 from sae_dashboard.components_config import (
     ActsHistogramConfig,
     Column,
@@ -23,6 +17,11 @@ from sae_dashboard.components_config import (
 from sae_dashboard.layout import SaeVisLayoutConfig
 from sae_dashboard.sae_vis_data import SaeVisConfig
 from sae_dashboard.sae_vis_runner import SaeVisRunner
+from sae_lens.sae import SAE
+from sae_lens.toolkit.pretrained_saes import load_sparsity
+from sae_lens.training.activations_store import ActivationsStore
+from tqdm import tqdm
+from transformer_lens import HookedTransformer
 
 # set TOKENIZERS_PARALLELISM to false to avoid warnings
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -62,7 +61,6 @@ class NpEncoder(json.JSONEncoder):
 
 
 class NeuronpediaRunner:
-
     def __init__(
         self,
         sae_id: str,
@@ -82,7 +80,6 @@ class NeuronpediaRunner:
         top_acts_group_size: int = 20,
         quantile_group_size: int = 5,
     ):
-
         self.device = "cpu"
         self.n_devices = 1
         if torch.backends.mps.is_available():
@@ -178,7 +175,8 @@ class NeuronpediaRunner:
         # Reshape
         return np.reshape(str_tokens, tokens.shape).tolist()
 
-    def run(self):
+    # TODO: make this function simpler
+    def run(self):  # noqa: C901
         self.n_features = self.sae.cfg.d_sae
         assert self.n_features is not None
 

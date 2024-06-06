@@ -1,11 +1,14 @@
 format:
-	poetry run ruff format .
-	poetry run ruff check --fix-only .
+	poetry run black .
+	poetry run isort .
 
 lint:
-	poetry run ruff check .
-	poetry run ruff format --check .
-	poetry run pyright sae_dashboard
+	poetry run flake8 .
+	poetry run black --check .
+	poetry run isort --check-only --diff .
+
+check-type:
+	poetry run pyright .
 
 test:
 	poetry run pytest tests/unit

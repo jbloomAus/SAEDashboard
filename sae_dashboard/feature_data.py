@@ -149,16 +149,15 @@ class FeatureData:
         html_obj = HTML()
 
         # Verify that we only have a single column
-        assert (
-            layout.columns.keys() == {0}
-        ), f"prompt_centric_layout should only have 1 column, instead found cols {layout.columns.keys()}"
+        assert layout.columns.keys() == {
+            0
+        }, f"prompt_centric_layout should only have 1 column, instead found cols {layout.columns.keys()}"
         assert (
             layout.prompt_cfg is not None
         ), "prompt_centric_cfg should include a PromptConfig, but found None"
         if layout.seq_cfg is not None:
-            assert (
-                (layout.seq_cfg.n_quantiles == 0)
-                or (layout.seq_cfg.stack_mode == "stack-all")
+            assert (layout.seq_cfg.n_quantiles == 0) or (
+                layout.seq_cfg.stack_mode == "stack-all"
             ), "prompt_centric_layout should have stack_mode='stack-all' if n_quantiles > 0, so that it fits in 1 col"
 
         # Get the maximum color over both the prompt and the sequences

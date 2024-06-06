@@ -5,7 +5,6 @@ from typing import Any, Callable
 
 import numpy as np
 from dataclasses_json import dataclass_json
-
 from sae_dashboard.components_config import (
     ActsHistogramConfig,
     FeatureTablesConfig,
@@ -14,11 +13,7 @@ from sae_dashboard.components_config import (
     PromptConfig,
     SequencesConfig,
 )
-from sae_dashboard.html_fns import (
-    HTML,
-    bgColorMap,
-    uColorMap,
-)
+from sae_dashboard.html_fns import HTML, bgColorMap, uColorMap
 from sae_dashboard.utils_fns import (
     HistogramData,
     max_or_1,
@@ -97,8 +92,12 @@ class FeatureTablesData:
         if len(self.neuron_alignment_indices) > 0:
             assert len(self.neuron_alignment_indices) >= cfg.n_rows, "Not enough rows!"
             data["neuronAlignment"] = [
-                {"index": I, "value": f"{V:+.3f}", "percentageL1": f"{L:.1%}"}
-                for I, V, L in zip(
+                {
+                    "index": index,
+                    "value": f"{value:+.3f}",
+                    "percentageL1": f"{percent_l1:.1%}",
+                }
+                for index, value, percent_l1 in zip(
                     self.neuron_alignment_indices,
                     self.neuron_alignment_values,
                     self.neuron_alignment_l1,
@@ -113,8 +112,12 @@ class FeatureTablesData:
             if len(getattr(self, f"{name}_indices")) > 0:
                 # assert len(getattr(self, f"{name}_indices")) >= cfg.n_rows, "Not enough rows!"
                 data[js_name] = [
-                    {"index": I, "value": f"{P:+.3f}", "percentageL1": f"{C:+.3f}"}
-                    for I, P, C in zip(
+                    {
+                        "index": index,
+                        "value": f"{value:+.3f}",
+                        "percentageL1": f"{percent_L1:+.3f}",
+                    }
+                    for index, value, percent_L1 in zip(
                         getattr(self, f"{name}_indices")[: cfg.n_rows],
                         getattr(self, f"{name}_pearson")[: cfg.n_rows],
                         getattr(self, f"{name}_cossim")[: cfg.n_rows],

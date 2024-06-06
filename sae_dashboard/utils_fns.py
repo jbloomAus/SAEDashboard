@@ -1,16 +1,7 @@
 import random
 import re
 from dataclasses import dataclass, field
-from typing import (
-    Any,
-    Callable,
-    Iterable,
-    Literal,
-    Sequence,
-    Type,
-    TypeVar,
-    overload,
-)
+from typing import Any, Callable, Iterable, Literal, Sequence, Type, TypeVar, overload
 
 import einops
 import numpy as np
