@@ -355,7 +355,7 @@ class TopK:
     def numel(self) -> int:
         return self.values.size
 
-    def topk(
+    def topk(  # type: ignore
         self,
         tensor: Float[Tensor, "... d"],
         tensor_mask: Bool[Tensor, "..."] | None = None,

@@ -8,7 +8,7 @@ from sae_dashboard.data_writing_fns import save_feature_centric_vis
 from sae_dashboard.sae_vis_data import SaeVisConfig, SaeVisData
 from sae_dashboard.sae_vis_runner import SaeVisRunner
 from sae_lens import SAE
-from syrupy import SnapshotAssertion
+from syrupy.assertion import SnapshotAssertion
 from torch import Tensor
 from transformer_lens import HookedTransformer
 

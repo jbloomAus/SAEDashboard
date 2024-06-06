@@ -1,5 +1,6 @@
 import json
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
@@ -60,37 +61,44 @@ class NpEncoder(json.JSONEncoder):
         return super(NpEncoder, self).default(o)
 
 
+@dataclass
+class NeuronpediaRunnerConfig:
+
+    sae_id: str
+    sae_path: str
+    outputs_dir: str
+    sparsity_threshold: int = DEFAULT_SPARSITY_THRESHOLD
+    # ACTIVATION STORE PARAMETERS
+    # token pars
+    n_batches_to_sample_from: int = 2**12
+    n_prompts_to_select: int = 4096 * 6
+    # batching
+    n_features_at_a_time: int = 128
+    start_batch: int = 0
+    end_batch: Optional[int] = None
+    # quantiles
+    n_quantiles: int = 5
+    top_acts_group_size: int = 20
+    quantile_group_size: int = 5
+
+    device: str = "cpu"
+    n_devices: int = 1
+
+
 class NeuronpediaRunner:
     def __init__(
         self,
-        sae_id: str,
-        sae_path: str,
-        outputs_dir: str,
-        sparsity_threshold: int = DEFAULT_SPARSITY_THRESHOLD,
-        # ACTIVATION STORE PARAMETERS
-        # token pars
-        n_batches_to_sample_from: int = 2**12,
-        n_prompts_to_select: int = 4096 * 6,
-        # batching
-        n_features_at_a_time: int = 128,
-        start_batch_inclusive: int = 0,
-        end_batch_inclusive: Optional[int] = None,
-        # quantiles
-        n_quantiles: int = 5,
-        top_acts_group_size: int = 20,
-        quantile_group_size: int = 5,
+        cfg: NeuronpediaRunnerConfig,
     ):
-        self.device = "cpu"
-        self.n_devices = 1
+        self.cfg = cfg
+
         if torch.backends.mps.is_available():
             self.device = "mps"
         elif torch.cuda.is_available():
             self.device = "cuda"
             self.n_devices = torch.cuda.device_count()
 
-        self.sae_path = sae_path
-
-        self.sae = SAE.load_from_pretrained(self.sae_path, device=self.device)
+        self.sae = SAE.load_from_pretrained(self.cfg.sae_path, device=self.device)
         self.sae.fold_W_dec_norm()
 
         self.model_id = self.sae.cfg.model_name
@@ -108,21 +116,9 @@ class NeuronpediaRunner:
             n_batches_in_buffer=16,
         )
 
-        self.sae_id = sae_id
-
-        self.sparsity_threshold = sparsity_threshold
-        self.n_features_at_a_time = n_features_at_a_time
-        self.n_batches_to_sample_from = n_batches_to_sample_from
-        self.n_prompts_to_select = n_prompts_to_select
-        self.start_batch = start_batch_inclusive
-        self.end_batch = end_batch_inclusive
-        self.n_quantiles = n_quantiles
-        self.top_acts_group_size = top_acts_group_size
-        self.quantile_group_size = quantile_group_size
-
-        if not os.path.exists(outputs_dir):
-            os.makedirs(outputs_dir)
-        self.outputs_dir = outputs_dir
+        if not os.path.exists(cfg.outputs_dir):
+            os.makedirs(cfg.outputs_dir)
+        self.outputs_dir = cfg.outputs_dir
 
     def get_tokens(
         self,
@@ -182,25 +178,27 @@ class NeuronpediaRunner:
 
         # if we have feature sparsity, then use it to only generate outputs for non-dead features
         self.target_feature_indexes: list[int] = []
-        sparsity = load_sparsity(self.sae_path)
+        sparsity = load_sparsity(self.cfg.sae_path)
         # convert sparsity to logged sparsity if it's not
         # TODO: standardize the sparsity file format
         if len(sparsity) > 0 and sparsity[0] >= 0:
             sparsity = torch.log10(sparsity + 1e-10)
         sparsity = sparsity.to(self.device)
         self.target_feature_indexes = (
-            (sparsity > self.sparsity_threshold).nonzero(as_tuple=True)[0].tolist()
+            (sparsity > self.cfg.sparsity_threshold).nonzero(as_tuple=True)[0].tolist()
         )
 
         # divide into batches
         feature_idx = torch.tensor(self.target_feature_indexes)
-        n_subarrays = np.ceil(len(feature_idx) / self.n_features_at_a_time).astype(int)
+        n_subarrays = np.ceil(len(feature_idx) / self.cfg.n_features_at_a_time).astype(
+            int
+        )
         feature_idx = np.array_split(feature_idx, n_subarrays)
         feature_idx = [x.tolist() for x in feature_idx]
 
-        if self.start_batch > len(feature_idx) + 1:
+        if self.cfg.start_batch > len(feature_idx) + 1:
             print(
-                f"Start batch {self.start_batch} is greater than number of batches + 1 {len(feature_idx)}, exiting"
+                f"Start batch {self.cfg.start_batch} is greater than number of batches + 1 {len(feature_idx)}, exiting"
             )
             exit()
 
@@ -210,15 +208,15 @@ class NeuronpediaRunner:
             {
                 "model_id": self.model_id,
                 "layer": str(self.layer),
-                "sae_id": self.sae_id,
-                "log_sparsity": self.sparsity_threshold,
+                "sae_id": self.cfg.sae_id,
+                "log_sparsity": self.cfg.sparsity_threshold,
                 "skipped_indexes": list(skipped_indexes),
             }
         )
         with open(f"{self.outputs_dir}/skipped_indexes.json", "w") as f:
             f.write(skipped_indexes_json)
 
-        tokens_file = f"{self.outputs_dir}/tokens_{self.n_batches_to_sample_from}_{self.n_prompts_to_select}.pt"
+        tokens_file = f"{self.outputs_dir}/tokens_{self.cfg.n_batches_to_sample_from}_{self.cfg.n_prompts_to_select}.pt"
         if os.path.isfile(tokens_file):
             print("Tokens exist, loading them.")
             tokens = torch.load(tokens_file)
@@ -226,8 +224,8 @@ class NeuronpediaRunner:
             print("Tokens don't exist, making them.")
             tokens = self.get_tokens(
                 self.activations_store,
-                self.n_batches_to_sample_from,
-                self.n_prompts_to_select,
+                self.cfg.n_batches_to_sample_from,
+                self.cfg.n_prompts_to_select,
             )
             torch.save(
                 tokens,
@@ -253,10 +251,13 @@ class NeuronpediaRunner:
             for features_to_process in tqdm(feature_idx):
                 feature_batch_count = feature_batch_count + 1
 
-                if feature_batch_count < self.start_batch:
+                if feature_batch_count < self.cfg.start_batch:
                     # print(f"Skipping batch - it's after start_batch: {feature_batch_count}")
                     continue
-                if self.end_batch is not None and feature_batch_count > self.end_batch:
+                if (
+                    self.cfg.end_batch is not None
+                    and feature_batch_count > self.cfg.end_batch
+                ):
                     # print(f"Skipping batch - it's after end_batch: {feature_batch_count}")
                     continue
 
@@ -276,9 +277,9 @@ class NeuronpediaRunner:
                                 stack_mode="stack-all",
                                 buffer=None,  # type: ignore
                                 compute_buffer=True,
-                                n_quantiles=self.n_quantiles,
-                                top_acts_group_size=self.top_acts_group_size,
-                                quantile_group_size=self.quantile_group_size,
+                                n_quantiles=self.cfg.n_quantiles,
+                                top_acts_group_size=self.cfg.top_acts_group_size,
+                                quantile_group_size=self.cfg.quantile_group_size,
                             ),
                             ActsHistogramConfig(),
                             LogitsHistogramConfig(),
@@ -299,7 +300,7 @@ class NeuronpediaRunner:
                     perform_ablation_experiments=False,
                     # dtype="fp16",
                     cache_dir=Path(
-                        f"./cached_activations/{self.model_id}_{self.sae_id}_{self.sae.cfg.hook_name}"
+                        f"./cached_activations/{self.model_id}_{self.cfg.sae_id}_{self.sae.cfg.hook_name}"
                     ),
                 )
 
@@ -386,7 +387,7 @@ class NeuronpediaRunner:
                     )
 
                     feature_output["num_tokens_for_dashboard"] = (
-                        self.n_prompts_to_select
+                        self.cfg.n_prompts_to_select
                     )
 
                     activations = []
@@ -476,10 +477,10 @@ class NeuronpediaRunner:
                 to_write = {
                     "model_id": self.model_id,
                     "layer": str(self.layer),
-                    "sae_id": self.sae_id,
+                    "sae_id": self.cfg.sae_id,
                     "features": features_outputs,
-                    "n_batches_to_sample_from": self.n_batches_to_sample_from,
-                    "n_prompts_to_select": self.n_prompts_to_select,
+                    "n_batches_to_sample_from": self.cfg.n_batches_to_sample_from,
+                    "n_prompts_to_select": self.cfg.n_prompts_to_select,
                 }
                 json_object = json.dumps(to_write, cls=NpEncoder)
 

@@ -16,6 +16,7 @@ test:
 check-ci:
 	make format
 	make lint
+	make check-type
 	make test
 
 profile-memory-unit:

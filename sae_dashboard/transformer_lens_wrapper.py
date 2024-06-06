@@ -64,7 +64,7 @@ class TransformerLensWrapper(nn.Module):
         return_logits: Literal[False],
     ) -> Tensor: ...
 
-    def forward(
+    def forward(  # type: ignore
         self,
         tokens: Int[Tensor, "batch seq"],
         return_logits: bool = True,
@@ -107,7 +107,7 @@ class TransformerLensWrapper(nn.Module):
         hook.ctx["activation"] = activation
 
     @property
-    def tokenizer(self):
+    def tokenizer(self):  # type: ignore
         return self.model.tokenizer
 
     @property

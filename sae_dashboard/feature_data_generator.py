@@ -48,10 +48,10 @@ class FeatureDataGenerator:
         return token_minibatches
 
     @torch.inference_mode()
-    def get_feature_data(
+    def get_feature_data(  # type: ignore
         self,
         feature_indices: list[int],
-        progress: list[tqdm] | None = None,
+        progress: list[tqdm] | None = None,  # type: ignore
     ):  # type: ignore
         # Create lists to store the feature activations & final values of the residual stream
         all_resid_post = []
