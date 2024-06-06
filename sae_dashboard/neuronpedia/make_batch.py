@@ -1,6 +1,9 @@
 import sys
 
-from neuronpedia_runner import NeuronpediaRunner, NeuronpediaRunnerConfig
+from sae_dashboard.neuronpedia.neuronpedia_runner import (
+    NeuronpediaRunner,
+    NeuronpediaRunnerConfig,
+)
 
 # we use another python script to launch this using subprocess to work around OOM issues - this ensures every batch gets the whole system available memory
 # better fix is to investigate and fix the memory issues
