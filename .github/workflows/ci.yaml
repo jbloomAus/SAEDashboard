@@ -50,13 +50,13 @@ jobs:
           if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
           run: poetry install --no-interaction
         - name: check linting
-          run: poetry run ruff check
+          run: poetry run flake8 .
         - name: check formatting
-          run: poetry run ruff format --check
+          run: poetry run black --check .
         - name: check types
-          run: poetry run pyright
+          run: poetry run pyright .
         - name: test
-          run: poetry run pytest tests/unit # only want unit tests to run
+          run: poetry run pytest --cov=sae_dashboard --cov-report=term-missing tests/unit
         - name: build
           run: poetry build
 
