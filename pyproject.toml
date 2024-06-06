@@ -18,8 +18,8 @@ eindex-callum = "^0.1.0"
 rich = "^13.7.1"
 matplotlib = "^3.8.4"
 safetensors = "^0.4.3"
-sae-lens = "^3.1.1"
 typer = "^0.12.3"
+sae-lens = "^3.2.2"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.3.7"
