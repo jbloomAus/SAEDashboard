@@ -11,7 +11,7 @@ check-type:
 	poetry run pyright .
 
 test:
-	poetry run pytest tests/unit
+	poetry run pytest --cov=sae_dashboard --cov-report=term-missing tests/unit
 
 check-ci:
 	make format
