@@ -112,7 +112,7 @@ class NeuronpediaRunner:
             model=self.model,
             sae=self.sae,
             # TODO: these are new parameters, double check them
-            streaming=False,
+            streaming=True,
             store_batch_size_prompts=8,
             n_batches_in_buffer=16,
         )
