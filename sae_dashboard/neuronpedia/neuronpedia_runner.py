@@ -92,6 +92,7 @@ class NeuronpediaRunner:
     ):
         self.cfg = cfg
 
+        self.n_devices = 1
         if torch.backends.mps.is_available():
             self.device = "mps"
         elif torch.cuda.is_available():
