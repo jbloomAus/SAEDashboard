@@ -101,7 +101,7 @@ Enter value""",
     n_context_tokens: Annotated[
         int,
         typer.Option(
-            min=1,
+            min=0,
             help="[Activation Text Generation] Override the context tokens length.",
             prompt="""
 [Activation Text Generation] Override the context tokens length? (0 = Default)
