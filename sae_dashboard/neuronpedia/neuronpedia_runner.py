@@ -72,6 +72,7 @@ class NeuronpediaRunnerConfig:
     # token pars
     n_batches_to_sample_from: int = 2**12
     n_prompts_to_select: int = 4096 * 6
+    n_context_tokens: int | None = None
     # batching
     n_features_at_a_time: int = 128
     start_batch: int = 0
@@ -116,6 +117,10 @@ class NeuronpediaRunner:
             store_batch_size_prompts=8,
             n_batches_in_buffer=16,
         )
+        # override the number of context tokens if we specified one
+        # this is useful because sometimes the default context tokens is too large for us to quickly generate
+        if self.cfg.n_context_tokens is not None:
+            self.activations_store.context_size = self.cfg.n_context_tokens
 
         if not os.path.exists(cfg.outputs_dir):
             os.makedirs(cfg.outputs_dir)
@@ -299,7 +304,7 @@ class NeuronpediaRunner:
                     device=self.device,
                     feature_centric_layout=layout,
                     perform_ablation_experiments=False,
-                    # dtype="fp16",
+                    # dtype="bfloat16",
                     cache_dir=Path(
                         f"./cached_activations/{self.model_id}_{self.cfg.sae_id}_{self.sae.cfg.hook_name}"
                     ),

@@ -14,9 +14,10 @@ OUTPUTS_DIR = sys.argv[3]
 SPARSITY_THRESHOLD = int(sys.argv[4])
 N_BATCHES_SAMPLE = int(sys.argv[5])
 N_PROMPTS_SELECT = int(sys.argv[6])
-FEATURES_AT_A_TIME = int(sys.argv[7])
-START_BATCH_INCLUSIVE = int(sys.argv[8])
-END_BATCH_INCLUSIVE = int(sys.argv[9])
+N_CONTEXT_TOKENS = int(sys.argv[7])
+FEATURES_AT_A_TIME = int(sys.argv[8])
+START_BATCH_INCLUSIVE = int(sys.argv[9])
+END_BATCH_INCLUSIVE = int(sys.argv[10])
 
 cfg = NeuronpediaRunnerConfig(
     sae_id=SAE_ID,
@@ -25,6 +26,7 @@ cfg = NeuronpediaRunnerConfig(
     sparsity_threshold=SPARSITY_THRESHOLD,
     n_batches_to_sample_from=N_BATCHES_SAMPLE,
     n_prompts_to_select=N_PROMPTS_SELECT,
+    n_context_tokens=N_CONTEXT_TOKENS if N_CONTEXT_TOKENS != 0 else N_CONTEXT_TOKENS,
     n_features_at_a_time=FEATURES_AT_A_TIME,
     start_batch=START_BATCH_INCLUSIVE,
     end_batch=END_BATCH_INCLUSIVE,

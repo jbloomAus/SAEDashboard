@@ -98,6 +98,16 @@ Enter value""",
         ),
     ] = 4096
     * 6,
+    n_context_tokens: Annotated[
+        int,
+        typer.Option(
+            min=1,
+            help="[Activation Text Generation] Override the context tokens length.",
+            prompt="""
+[Activation Text Generation] Override the context tokens length? (0 = Default)
+Enter value""",
+        ),
+    ] = 0,
     resume_from_batch: Annotated[
         int,
         typer.Option(
@@ -181,6 +191,11 @@ Enter 1 to start from the beginning. Existing batch files will not be overwritte
                     f"[red]Error: n_prompts_to_select in {run_settings_path.as_posix()} doesn't match the current n_prompts_to_select:\n{run_settings['n_prompts_to_select']} vs {n_prompts_to_select}"
                 )
                 raise typer.Abort()
+            if run_settings["n_context_tokens"] != n_context_tokens:
+                print(
+                    f"[red]Error: n_context_tokens in {run_settings_path.as_posix()} doesn't match the current n_context_tokens:\n{run_settings['n_context_tokens']} vs {n_context_tokens}"
+                )
+                raise typer.Abort()
             if run_settings["feat_per_batch"] != feat_per_batch:
                 print(
                     f"[red]Error: feat_per_batch in {run_settings_path.as_posix()} doesn't match the current feat_per_batch:\n{run_settings['feat_per_batch']} vs {feat_per_batch}"
@@ -195,6 +210,7 @@ Enter 1 to start from the beginning. Existing batch files will not be overwritte
             "log_sparsity": log_sparsity,
             "n_batches_to_sample": n_batches_to_sample,
             "n_prompts_to_select": n_prompts_to_select,
+            "n_context_tokens": n_context_tokens,
             "feat_per_batch": feat_per_batch,
         }
         with open(run_settings_path, "w") as f:
@@ -248,6 +264,7 @@ Enter 1 to start from the beginning. Existing batch files will not be overwritte
 [white]Dataset: [green]{sparse_autoencoder.cfg.dataset_path}
 [white]Batches to Sample From: [green]{n_batches_to_sample}
 [white]Prompts to Select From: [green]{n_prompts_to_select}
+[white]Context Token Length: [green]{n_context_tokens if n_context_tokens != 0 else 0}
 """,
                 title="Activation Text Settings",
             )
@@ -281,6 +298,7 @@ Enter 1 to start from the beginning. Existing batch files will not be overwritte
             str(log_sparsity),
             str(n_batches_to_sample),
             str(n_prompts_to_select),
+            str(n_context_tokens),
             str(feat_per_batch),
             str(i),
             str(i),
@@ -307,6 +325,7 @@ Enter 1 to start from the beginning. Existing batch files will not be overwritte
                 str(log_sparsity),
                 str(n_batches_to_sample),
                 str(n_prompts_to_select),
+                str(n_context_tokens),
                 str(feat_per_batch),
                 str(i),
                 str(i),
