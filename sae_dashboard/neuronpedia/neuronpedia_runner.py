@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import torch
+import wandb
 from matplotlib import colors
 from sae_dashboard.components_config import (
     ActsHistogramConfig,
@@ -16,7 +17,7 @@ from sae_dashboard.components_config import (
     SequencesConfig,
 )
 from sae_dashboard.layout import SaeVisLayoutConfig
-from sae_dashboard.sae_vis_data import SaeVisConfig
+from sae_dashboard.sae_vis_data import SaeVisConfig, SaeVisData
 from sae_dashboard.sae_vis_runner import SaeVisRunner
 from sae_lens.sae import SAE
 from sae_lens.toolkit.pretrained_saes import load_sparsity
@@ -84,6 +85,7 @@ class NeuronpediaRunnerConfig:
 
     device: str = "cpu"
     n_devices: int = 1
+    use_wandb: bool = False
 
 
 class NeuronpediaRunner:
@@ -126,7 +128,9 @@ class NeuronpediaRunner:
             os.makedirs(cfg.outputs_dir)
         self.outputs_dir = cfg.outputs_dir
 
-    def get_tokens(
+        self.vocab_dict = self.get_vocab_dict()
+
+    def generate_tokens(
         self,
         activations_store: ActivationsStore,
         n_batches_to_sample_from: int = 4096 * 6,
@@ -177,10 +181,7 @@ class NeuronpediaRunner:
         # Reshape
         return np.reshape(str_tokens, tokens.shape).tolist()
 
-    # TODO: make this function simpler
-    def run(self):  # noqa: C901
-        self.n_features = self.sae.cfg.d_sae
-        assert self.n_features is not None
+    def get_alive_features(self) -> list[int]:
 
         # if we have feature sparsity, then use it to only generate outputs for non-dead features
         self.target_feature_indexes: list[int] = []
@@ -190,9 +191,12 @@ class NeuronpediaRunner:
         if len(sparsity) > 0 and sparsity[0] >= 0:
             sparsity = torch.log10(sparsity + 1e-10)
         sparsity = sparsity.to(self.device)
-        self.target_feature_indexes = (
+        target_feature_indexes = (
             (sparsity > self.cfg.sparsity_threshold).nonzero(as_tuple=True)[0].tolist()
         )
+        return target_feature_indexes
+
+    def get_feature_batches(self):
 
         # divide into batches
         feature_idx = torch.tensor(self.target_feature_indexes)
@@ -202,12 +206,9 @@ class NeuronpediaRunner:
         feature_idx = np.array_split(feature_idx, n_subarrays)
         feature_idx = [x.tolist() for x in feature_idx]
 
-        if self.cfg.start_batch > len(feature_idx) + 1:
-            print(
-                f"Start batch {self.cfg.start_batch} is greater than number of batches + 1 {len(feature_idx)}, exiting"
-            )
-            exit()
+        return feature_idx
 
+    def record_skipped_features(self):
         # write dead into file so we can create them as dead in Neuronpedia
         skipped_indexes = set(range(self.n_features)) - set(self.target_feature_indexes)
         skipped_indexes_json = json.dumps(
@@ -222,13 +223,15 @@ class NeuronpediaRunner:
         with open(f"{self.outputs_dir}/skipped_indexes.json", "w") as f:
             f.write(skipped_indexes_json)
 
+    def get_tokens(self):
+
         tokens_file = f"{self.outputs_dir}/tokens_{self.cfg.n_batches_to_sample_from}_{self.cfg.n_prompts_to_select}.pt"
         if os.path.isfile(tokens_file):
             print("Tokens exist, loading them.")
             tokens = torch.load(tokens_file)
         else:
             print("Tokens don't exist, making them.")
-            tokens = self.get_tokens(
+            tokens = self.generate_tokens(
                 self.activations_store,
                 self.cfg.n_batches_to_sample_from,
                 self.cfg.n_prompts_to_select,
@@ -238,6 +241,9 @@ class NeuronpediaRunner:
                 tokens_file,
             )
 
+        return tokens
+
+    def get_vocab_dict(self) -> Dict[int, str]:
         # get vocab
         vocab_dict = self.model.tokenizer.vocab  # type: ignore
         new_vocab_dict = {}
@@ -251,6 +257,33 @@ class NeuronpediaRunner:
         # pad with blank tokens to the actual vocab size
         for i in range(len(vocab_dict), self.model.cfg.d_vocab):
             vocab_dict[i] = OUT_OF_RANGE_TOKEN
+        return vocab_dict
+
+    # TODO: make this function simpler
+    def run(self):
+
+        wandb_cfg = self.cfg.__dict__
+        wandb_cfg["sae_cfg"] = self.sae.cfg.to_dict()
+        if self.cfg.use_wandb:
+            wandb.init(
+                project="sae-dashboard-generation",
+                config=wandb_cfg,
+            )
+
+        self.n_features = self.sae.cfg.d_sae
+        assert self.n_features is not None
+
+        self.target_feature_indexes = self.get_alive_features()
+
+        feature_idx = self.get_feature_batches()
+        if self.cfg.start_batch > len(feature_idx) + 1:
+            print(
+                f"Start batch {self.cfg.start_batch} is greater than number of batches + 1 {len(feature_idx)}, exiting"
+            )
+            exit()
+
+        self.record_skipped_features()
+        tokens = self.get_tokens()
 
         with torch.no_grad():
             feature_batch_count = 0
@@ -315,181 +348,7 @@ class NeuronpediaRunner:
                     model=self.model,
                     tokens=tokens,
                 )
-
-                features_outputs = []
-                for _, feat_index in enumerate(feature_data.feature_data_dict.keys()):
-                    feature = feature_data.feature_data_dict[feat_index]
-
-                    feature_output = {}
-                    feature_output["featureIndex"] = feat_index
-
-                    top10_logits = self.round_list(feature.logits_table_data.top_logits)
-                    bottom10_logits = self.round_list(
-                        feature.logits_table_data.bottom_logits
-                    )
-
-                    if feature.feature_tables_data:
-                        feature_output["neuron_alignment_indices"] = (
-                            feature.feature_tables_data.neuron_alignment_indices
-                        )
-                        feature_output["neuron_alignment_values"] = self.round_list(
-                            feature.feature_tables_data.neuron_alignment_values
-                        )
-                        feature_output["neuron_alignment_l1"] = self.round_list(
-                            feature.feature_tables_data.neuron_alignment_l1
-                        )
-                        feature_output["correlated_neurons_indices"] = (
-                            feature.feature_tables_data.correlated_neurons_indices
-                        )
-                        feature_output["correlated_neurons_l1"] = self.round_list(
-                            feature.feature_tables_data.correlated_neurons_cossim
-                        )
-                        feature_output["correlated_neurons_pearson"] = self.round_list(
-                            feature.feature_tables_data.correlated_neurons_pearson
-                        )
-                        feature_output["correlated_features_indices"] = (
-                            feature.feature_tables_data.correlated_features_indices
-                        )
-                        feature_output["correlated_features_l1"] = self.round_list(
-                            feature.feature_tables_data.correlated_features_cossim
-                        )
-                        feature_output["correlated_features_pearson"] = self.round_list(
-                            feature.feature_tables_data.correlated_features_pearson
-                        )
-
-                    feature_output["neg_str"] = self.to_str_tokens_safe(
-                        vocab_dict, feature.logits_table_data.bottom_token_ids
-                    )
-                    feature_output["neg_values"] = bottom10_logits
-                    feature_output["pos_str"] = self.to_str_tokens_safe(
-                        vocab_dict, feature.logits_table_data.top_token_ids
-                    )
-                    feature_output["pos_values"] = top10_logits
-
-                    feature_output["frac_nonzero"] = (
-                        float(
-                            feature.acts_histogram_data.title.split(" = ")[1].split(
-                                "%"
-                            )[0]
-                        )
-                        / 100
-                        if feature.acts_histogram_data.title is not None
-                        else 0
-                    )
-
-                    freq_hist_data = feature.acts_histogram_data
-                    freq_bar_values = self.round_list(freq_hist_data.bar_values)
-                    feature_output["freq_hist_data_bar_values"] = freq_bar_values
-                    feature_output["freq_hist_data_bar_heights"] = self.round_list(
-                        freq_hist_data.bar_heights
-                    )
-
-                    logits_hist_data = feature.logits_histogram_data
-                    feature_output["logits_hist_data_bar_heights"] = self.round_list(
-                        logits_hist_data.bar_heights
-                    )
-                    feature_output["logits_hist_data_bar_values"] = self.round_list(
-                        logits_hist_data.bar_values
-                    )
-
-                    feature_output["num_tokens_for_dashboard"] = (
-                        self.cfg.n_prompts_to_select
-                    )
-
-                    activations = []
-                    sdbs = feature.sequence_data
-                    for sgd in sdbs.seq_group_data:
-                        binMin = 0
-                        binMax = 0
-                        binContains = 0
-                        if "TOP ACTIVATIONS" in sgd.title:
-                            binMin = -1
-                            try:
-                                binMax = float(sgd.title.split(" = ")[-1])
-                            except ValueError:
-                                print(f"Error parsing top acts: {sgd.title}")
-                                binMax = 99
-                            binContains = -1
-                        elif "INTERVAL" in sgd.title:
-                            try:
-                                split = sgd.title.split("<br>")
-                                firstSplit = split[0].split(" ")
-                                binMin = float(firstSplit[1])
-                                binMax = float(firstSplit[-1])
-                                secondSplit = split[1].split(" ")
-                                binContains = float(secondSplit[-1].rstrip("%")) / 100
-                            except ValueError:
-                                print(f"Error parsing interval: {sgd.title}")
-                        for sd in sgd.seq_data:
-                            if (
-                                sd.top_token_ids is not None
-                                and sd.bottom_token_ids is not None
-                                and sd.top_logits is not None
-                                and sd.bottom_logits is not None
-                            ):
-                                activation = {}
-                                activation["binMin"] = binMin
-                                activation["binMax"] = binMax
-                                activation["binContains"] = binContains
-                                strs = []
-                                posContribs = []
-                                negContribs = []
-                                for i in range(len(sd.token_ids)):
-                                    strs.append(
-                                        self.to_str_tokens_safe(
-                                            vocab_dict, sd.token_ids[i]
-                                        )
-                                    )
-                                    posContrib = {}
-                                    if len(sd.top_token_ids) == len(sd.token_ids):
-                                        posTokens = [
-                                            self.to_str_tokens_safe(vocab_dict, j)
-                                            for j in sd.top_token_ids[i]
-                                        ]
-                                        if len(posTokens) > 0:
-                                            posContrib["t"] = posTokens
-                                            posContrib["v"] = self.round_list(
-                                                sd.top_logits[i]
-                                            )
-                                        posContribs.append(posContrib)
-                                    negContrib = {}
-                                    if len(sd.bottom_token_ids) == len(sd.token_ids):
-                                        negTokens = [
-                                            self.to_str_tokens_safe(vocab_dict, j)  # type: ignore
-                                            for j in sd.bottom_token_ids[i]
-                                        ]
-                                        if len(negTokens) > 0:
-                                            negContrib["t"] = negTokens
-                                            negContrib["v"] = self.round_list(
-                                                sd.bottom_logits[i]
-                                            )
-                                        negContribs.append(negContrib)
-
-                                activation["logitContributions"] = json.dumps(
-                                    {"pos": posContribs, "neg": negContribs}
-                                )
-                                activation["tokens"] = strs
-                                activation["values"] = self.round_list(sd.feat_acts)
-                                activation["maxValue"] = max(activation["values"])
-                                activation["lossValues"] = self.round_list(
-                                    sd.loss_contribution
-                                )
-
-                                activations.append(activation)
-                    feature_output["activations"] = activations
-
-                    features_outputs.append(feature_output)
-
-                to_write = {
-                    "model_id": self.model_id,
-                    "layer": str(self.layer),
-                    "sae_id": self.cfg.sae_id,
-                    "features": features_outputs,
-                    "n_batches_to_sample_from": self.cfg.n_batches_to_sample_from,
-                    "n_prompts_to_select": self.cfg.n_prompts_to_select,
-                }
-                json_object = json.dumps(to_write, cls=NpEncoder)
-
+                json_object = self.convert_feature_data_to_np_json(feature_data)
                 with open(
                     output_file,
                     "w",
@@ -497,5 +356,174 @@ class NeuronpediaRunner:
                     f.write(json_object)
 
                 logline = f"\n========== Completed Batch #{feature_batch_count} output: {output_file} ==========\n"
+                wandb.log({"batch": feature_batch_count})
+
+        wandb.finish()
 
         return
+
+    def convert_feature_data_to_np_json(self, feature_data: SaeVisData):
+
+        features_outputs = []
+        for _, feat_index in enumerate(feature_data.feature_data_dict.keys()):
+            feature = feature_data.feature_data_dict[feat_index]
+
+            feature_output = {}
+            feature_output["featureIndex"] = feat_index
+
+            top10_logits = self.round_list(feature.logits_table_data.top_logits)
+            bottom10_logits = self.round_list(feature.logits_table_data.bottom_logits)
+
+            if feature.feature_tables_data:
+                feature_output["neuron_alignment_indices"] = (
+                    feature.feature_tables_data.neuron_alignment_indices
+                )
+                feature_output["neuron_alignment_values"] = self.round_list(
+                    feature.feature_tables_data.neuron_alignment_values
+                )
+                feature_output["neuron_alignment_l1"] = self.round_list(
+                    feature.feature_tables_data.neuron_alignment_l1
+                )
+                feature_output["correlated_neurons_indices"] = (
+                    feature.feature_tables_data.correlated_neurons_indices
+                )
+                feature_output["correlated_neurons_l1"] = self.round_list(
+                    feature.feature_tables_data.correlated_neurons_cossim
+                )
+                feature_output["correlated_neurons_pearson"] = self.round_list(
+                    feature.feature_tables_data.correlated_neurons_pearson
+                )
+                feature_output["correlated_features_indices"] = (
+                    feature.feature_tables_data.correlated_features_indices
+                )
+                feature_output["correlated_features_l1"] = self.round_list(
+                    feature.feature_tables_data.correlated_features_cossim
+                )
+                feature_output["correlated_features_pearson"] = self.round_list(
+                    feature.feature_tables_data.correlated_features_pearson
+                )
+
+            feature_output["neg_str"] = self.to_str_tokens_safe(
+                self.vocab_dict, feature.logits_table_data.bottom_token_ids
+            )
+            feature_output["neg_values"] = bottom10_logits
+            feature_output["pos_str"] = self.to_str_tokens_safe(
+                self.vocab_dict, feature.logits_table_data.top_token_ids
+            )
+            feature_output["pos_values"] = top10_logits
+
+            feature_output["frac_nonzero"] = (
+                float(feature.acts_histogram_data.title.split(" = ")[1].split("%")[0])
+                / 100
+                if feature.acts_histogram_data.title is not None
+                else 0
+            )
+
+            freq_hist_data = feature.acts_histogram_data
+            freq_bar_values = self.round_list(freq_hist_data.bar_values)
+            feature_output["freq_hist_data_bar_values"] = freq_bar_values
+            feature_output["freq_hist_data_bar_heights"] = self.round_list(
+                freq_hist_data.bar_heights
+            )
+
+            logits_hist_data = feature.logits_histogram_data
+            feature_output["logits_hist_data_bar_heights"] = self.round_list(
+                logits_hist_data.bar_heights
+            )
+            feature_output["logits_hist_data_bar_values"] = self.round_list(
+                logits_hist_data.bar_values
+            )
+
+            feature_output["num_tokens_for_dashboard"] = self.cfg.n_prompts_to_select
+
+            activations = []
+            sdbs = feature.sequence_data
+            for sgd in sdbs.seq_group_data:
+                binMin = 0
+                binMax = 0
+                binContains = 0
+                if "TOP ACTIVATIONS" in sgd.title:
+                    binMin = -1
+                    try:
+                        binMax = float(sgd.title.split(" = ")[-1])
+                    except ValueError:
+                        print(f"Error parsing top acts: {sgd.title}")
+                        binMax = 99
+                    binContains = -1
+                elif "INTERVAL" in sgd.title:
+                    try:
+                        split = sgd.title.split("<br>")
+                        firstSplit = split[0].split(" ")
+                        binMin = float(firstSplit[1])
+                        binMax = float(firstSplit[-1])
+                        secondSplit = split[1].split(" ")
+                        binContains = float(secondSplit[-1].rstrip("%")) / 100
+                    except ValueError:
+                        print(f"Error parsing interval: {sgd.title}")
+                for sd in sgd.seq_data:
+                    if (
+                        sd.top_token_ids is not None
+                        and sd.bottom_token_ids is not None
+                        and sd.top_logits is not None
+                        and sd.bottom_logits is not None
+                    ):
+                        activation = {}
+                        activation["binMin"] = binMin
+                        activation["binMax"] = binMax
+                        activation["binContains"] = binContains
+                        strs = []
+                        posContribs = []
+                        negContribs = []
+                        for i in range(len(sd.token_ids)):
+                            strs.append(
+                                self.to_str_tokens_safe(
+                                    self.vocab_dict, sd.token_ids[i]
+                                )
+                            )
+                            posContrib = {}
+                            if len(sd.top_token_ids) == len(sd.token_ids):
+                                posTokens = [
+                                    self.to_str_tokens_safe(self.vocab_dict, j)
+                                    for j in sd.top_token_ids[i]
+                                ]
+                                if len(posTokens) > 0:
+                                    posContrib["t"] = posTokens
+                                    posContrib["v"] = self.round_list(sd.top_logits[i])
+                                posContribs.append(posContrib)
+                            negContrib = {}
+                            if len(sd.bottom_token_ids) == len(sd.token_ids):
+                                negTokens = [
+                                    self.to_str_tokens_safe(self.vocab_dict, j)  # type: ignore
+                                    for j in sd.bottom_token_ids[i]
+                                ]
+                                if len(negTokens) > 0:
+                                    negContrib["t"] = negTokens
+                                    negContrib["v"] = self.round_list(
+                                        sd.bottom_logits[i]
+                                    )
+                                negContribs.append(negContrib)
+
+                        activation["logitContributions"] = json.dumps(
+                            {"pos": posContribs, "neg": negContribs}
+                        )
+                        activation["tokens"] = strs
+                        activation["values"] = self.round_list(sd.feat_acts)
+                        activation["maxValue"] = max(activation["values"])
+                        activation["lossValues"] = self.round_list(sd.loss_contribution)
+
+                        activations.append(activation)
+            feature_output["activations"] = activations
+
+            features_outputs.append(feature_output)
+
+        to_write = {
+            "model_id": self.model_id,
+            "layer": str(self.layer),
+            "sae_id": self.cfg.sae_id,
+            "features": features_outputs,
+            "n_batches_to_sample_from": self.cfg.n_batches_to_sample_from,
+            "n_prompts_to_select": self.cfg.n_prompts_to_select,
+        }
+        json_object = json.dumps(to_write, cls=NpEncoder)
+
+        return json_object
