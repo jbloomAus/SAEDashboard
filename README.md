@@ -1,7 +1,6 @@
 # SAEDashboard
 
-This code is a detached fork of [SAEVis](https://github.com/callummcdougall/sae_vis/tree/main) and is a work in progress. Please bare with us while we develop it further. Note that this package may become a subpackage of SAE Lens. 
-
+This code is a detached fork of [SAEVis](https://github.com/callummcdougall/sae_vis/tree/main) and is a work in progress. Please bare with us while we develop it further. 
 
 # OLD README
 
