@@ -2,6 +2,13 @@
 
 
 
+## v0.2.0 (2024-06-10)
+
+### Feature
+
+* feat: experimental release 2 ([`e264f97`](https://github.com/jbloomAus/SAEDashboard/commit/e264f97d90299f6ade294db8ed03aed9cd7491ee))
+
+
 ## v0.1.0 (2024-06-10)
 
 ### Feature
