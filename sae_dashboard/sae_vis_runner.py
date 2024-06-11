@@ -9,6 +9,12 @@ import torch
 from jaxtyping import Int
 from rich import print as rprint
 from rich.table import Table
+from sae_lens import SAE
+from sae_lens.config import DTYPE_MAP as DTYPES
+from torch import Tensor
+from tqdm.auto import tqdm
+from transformer_lens import HookedTransformer
+
 from sae_dashboard.components import (
     ActsHistogramData,
     FeatureTablesData,
@@ -24,11 +30,6 @@ from sae_dashboard.sae_vis_data import SaeVisConfig, SaeVisData
 from sae_dashboard.sequence_data_generator import SequenceDataGenerator
 from sae_dashboard.transformer_lens_wrapper import TransformerLensWrapper
 from sae_dashboard.utils_fns import FeatureStatistics
-from sae_lens import SAE
-from sae_lens.config import DTYPE_MAP as DTYPES
-from torch import Tensor
-from tqdm.auto import tqdm
-from transformer_lens import HookedTransformer
 
 
 class SaeVisRunner:
@@ -55,6 +56,7 @@ class SaeVisRunner:
 
         # set precision on encoders and model
         encoder = encoder.to(DTYPES[self.cfg.dtype])
+        encoder.dtype = DTYPES[self.cfg.dtype]
         model = cast(HookedTransformer, model.to(DTYPES[self.cfg.dtype]))
         if encoder_B is not None:
             encoder_B.to(DTYPES[self.cfg.dtype])

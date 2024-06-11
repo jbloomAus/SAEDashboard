@@ -3,15 +3,15 @@ from pathlib import Path
 
 import pytest
 from jaxtyping import Int
-from sae_dashboard.components_config import SequencesConfig
-from sae_dashboard.data_writing_fns import save_feature_centric_vis
-from sae_dashboard.sae_vis_data import SaeVisConfig, SaeVisData
-from sae_dashboard.sae_vis_runner import SaeVisRunner
 from sae_lens import SAE
 from syrupy.assertion import SnapshotAssertion
 from torch import Tensor
 from transformer_lens import HookedTransformer
 
+from sae_dashboard.components_config import SequencesConfig
+from sae_dashboard.data_writing_fns import save_feature_centric_vis
+from sae_dashboard.sae_vis_data import SaeVisConfig, SaeVisData
+from sae_dashboard.sae_vis_runner import SaeVisRunner
 from tests.helpers import round_floats_deep
 
 ROOT_DIR = Path(__file__).parent.parent.parent
@@ -107,6 +107,26 @@ def test_SaeVisData_create_results_look_reasonable(
         assert bounds[0] <= bounds[1]
         assert prec > 0
     # each feature should get its own key
+    assert set(sae_vis_data.feature_data_dict.keys()) == set(range(N_FEATURES))
+
+
+def test_SaeVisData_run_works_with_float16(
+    tokens: Int[Tensor, "batch seq"],
+    model: HookedTransformer,
+    autoencoder: SAE,
+    cfg: SaeVisConfig,
+):
+    cfg.dtype = "float16"
+    sae_vis_data = SaeVisRunner(cfg).run(
+        encoder=autoencoder, model=model, tokens=tokens
+    )
+    assert sae_vis_data.encoder == autoencoder
+    assert sae_vis_data.model == model
+    assert sae_vis_data.cfg == cfg
+    assert len(sae_vis_data.feature_stats.max) == N_FEATURES
+    assert len(sae_vis_data.feature_stats.frac_nonzero) == N_FEATURES
+    assert len(sae_vis_data.feature_stats.quantile_data) == N_FEATURES
+    assert len(sae_vis_data.feature_stats.quantiles) > 1000
     assert set(sae_vis_data.feature_data_dict.keys()) == set(range(N_FEATURES))
 
 
