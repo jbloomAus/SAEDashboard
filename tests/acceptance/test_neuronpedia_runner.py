@@ -1,10 +1,11 @@
 import os
 
+from sae_lens.toolkit.pretrained_saes import download_sae_from_hf
+
 from sae_dashboard.neuronpedia.neuronpedia_runner import (
     NeuronpediaRunner,
     NeuronpediaRunnerConfig,
 )
-from sae_lens.toolkit.pretrained_saes import download_sae_from_hf
 
 
 # pytest -s tests/benchmark/test_neuronpedia_runner.py::test_benchmark_neuronpedia_runner

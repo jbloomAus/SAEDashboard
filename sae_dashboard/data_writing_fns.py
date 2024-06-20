@@ -2,11 +2,12 @@ import itertools
 from copy import deepcopy
 from pathlib import Path
 
+from tqdm.auto import tqdm
+
 from sae_dashboard.data_parsing_fns import get_prompt_data
 from sae_dashboard.html_fns import HTML
 from sae_dashboard.sae_vis_data import SaeVisData
 from sae_dashboard.utils_fns import get_decode_html_safe_fn
-from tqdm.auto import tqdm
 
 METRIC_TITLES = {
     "act_size": "Activation Size",

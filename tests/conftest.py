@@ -39,9 +39,10 @@ def autoencoder() -> SAE:
         activation_fn_str="relu",
         finetuning_scaling_factor=False,
         hook_head_index=None,
-        normalize_activations=False,
+        normalize_activations="none",
         device="cpu",
         sae_lens_training_version=None,
+        dataset_trust_remote_code=True,
     )
 
     autoencoder = SAE(cfg)

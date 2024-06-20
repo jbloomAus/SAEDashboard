@@ -19,7 +19,7 @@ rich = "^13.7.1"
 matplotlib = "^3.8.4"
 safetensors = "^0.4.3"
 typer = "^0.12.3"
-sae-lens = "^3.2.2"
+sae-lens = "^3.5.0"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.3.7"
@@ -35,7 +35,7 @@ black = "^24.4.2"
 
 [tool.isort]
 profile = "black"
-src_paths = ["sae_lens", "tests"]
+src_paths = ["sae_dashboard", "tests"]
 
 [tool.pyright]
 typeCheckingMode = "strict"

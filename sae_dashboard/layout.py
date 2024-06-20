@@ -3,6 +3,7 @@ from dataclasses import asdict, dataclass, field
 from dataclasses_json import dataclass_json
 from rich import print as rprint
 from rich.tree import Tree
+
 from sae_dashboard.components_config import (
     ActsHistogramConfig,
     BaseComponentConfig,

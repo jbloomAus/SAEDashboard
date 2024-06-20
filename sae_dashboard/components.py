@@ -5,6 +5,7 @@ from typing import Any, Callable
 
 import numpy as np
 from dataclasses_json import dataclass_json
+
 from sae_dashboard.components_config import (
     ActsHistogramConfig,
     FeatureTablesConfig,
