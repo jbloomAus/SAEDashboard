@@ -35,7 +35,8 @@ from sae_dashboard.utils_fns import FeatureStatistics
 class SaeVisRunner:
     def __init__(self, cfg: SaeVisConfig) -> None:
         self.cfg = cfg
-        self.device = DTYPES[self.cfg.dtype]
+        self.device = self.cfg.device
+        self.dtype = DTYPES[self.cfg.dtype]
         if self.cfg.cache_dir is not None:
             self.cfg.cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -102,7 +103,7 @@ class SaeVisRunner:
 
             # Get the logits of all features (i.e. the directions this feature writes to the logit output)
             logits = einops.einsum(
-                feature_resid_dir.to(model.W_U.dtype),
+                feature_resid_dir.to(device= model.W_U.device, dtype =model.W_U.dtype),
                 model.W_U,
                 "feats d_model, d_model d_vocab -> feats d_vocab",
             ).to(self.device)
