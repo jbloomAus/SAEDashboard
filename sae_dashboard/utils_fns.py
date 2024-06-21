@@ -857,6 +857,8 @@ class RollingCorrCoef:
         self,
         indices: list[int] | None = None,
         with_self: bool = False,
+        dtype: torch.dtype = torch.float32,
+        device: torch.device = torch.device("cpu"),
     ) -> None:
         """
         Args:
@@ -872,6 +874,8 @@ class RollingCorrCoef:
         self.Y = None
         self.indices = indices
         self.with_self = with_self
+        self.dtype = dtype
+        self.device = device
 
     def update(self, x: Float[Tensor, "X N"], y: Float[Tensor, "Y N"]) -> None:
         # Get values of x and y, and check for consistency with each other & with previous values
@@ -894,14 +898,17 @@ class RollingCorrCoef:
         self.X = X
         self.Y = Y
 
+        x = x.to(dtype=self.dtype, device=self.device)
+        y = y.to(dtype=self.dtype, device=self.device)
+
         # If this is the first update step, then we need to initialise the sums
         if self.n == 0:
-            self.x_sum = torch.zeros(X, device=x.device)
-            self.xy_sum = torch.zeros(X, Y, device=x.device)
-            self.x2_sum = torch.zeros(X, device=x.device)
+            self.x_sum = torch.zeros(X, device=x.device, dtype=self.dtype)
+            self.xy_sum = torch.zeros(X, Y, device=x.device, dtype=self.dtype)
+            self.x2_sum = torch.zeros(X, device=x.device, dtype=self.dtype)
             if not self.with_self:
-                self.y_sum = torch.zeros(Y, device=y.device)
-                self.y2_sum = torch.zeros(Y, device=y.device)
+                self.y_sum = torch.zeros(Y, device=y.device, dtype=self.dtype)
+                self.y2_sum = torch.zeros(Y, device=y.device, dtype=self.dtype)
 
         # Next, update the sums
         self.n += x.shape[-1]

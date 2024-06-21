@@ -3,6 +3,8 @@ import numpy as np
 import torch
 from eindex import eindex
 from jaxtyping import Float, Int
+from torch import Tensor
+
 from sae_dashboard.components import (
     SequenceData,
     SequenceGroupData,
@@ -11,7 +13,6 @@ from sae_dashboard.components import (
 from sae_dashboard.components_config import SequencesConfig
 from sae_dashboard.sae_vis_data import SaeVisConfig
 from sae_dashboard.utils_fns import TopK, k_largest_indices, random_range_indices
-from torch import Tensor
 
 Arr = np.ndarray
 
@@ -189,7 +190,7 @@ class SequenceDataGenerator:
         # Get the top-activating tokens
         indices = k_largest_indices(
             feat_acts, k=self.seq_cfg.top_acts_group_size, buffer=buffer
-        )
+        ).cpu()
         indices_dict = {f"TOP ACTIVATIONS<br>MAX = {feat_acts.max():.3f}": indices}
 
         # Get all possible indices. Note, we need to be able to look 1 back (feature activation on prev token is needed for
@@ -209,7 +210,7 @@ class SequenceDataGenerator:
                 )
                 indices_dict[
                     f"INTERVAL {lower:.3f} - {upper:.3f}<br>CONTAINS {pct:.3%}"
-                ] = indices
+                ] = indices.cpu()
 
         # Concat all the indices together (in the next steps we do all groups at once). Shape of this object is [n_bold 2],
         # i.e. the [i, :]-th element are the batch and sequence dimensions for the i-th bold token.
@@ -389,6 +390,10 @@ class SequenceDataGenerator:
         group_sizes_cumsum = np.cumsum(
             [0] + [len(indices) for indices in indices_dict.values()]
         ).tolist()
+
+        feat_logits = feat_logits.cpu()
+        feat_acts_coloring = feat_acts_coloring.cpu()
+        token_ids = token_ids.cpu()
 
         if self.cfg.perform_ablation_experiments:
             assert isinstance(loss_contribution, torch.Tensor)

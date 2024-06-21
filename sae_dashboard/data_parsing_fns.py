@@ -3,13 +3,14 @@ import numpy as np
 import torch
 from eindex import eindex
 from jaxtyping import Float, Int
+from sae_lens import SAE
+from torch import Tensor
+from transformer_lens import HookedTransformer, utils
+
 from sae_dashboard.components import LogitsTableData, SequenceData
 from sae_dashboard.sae_vis_data import SaeVisData
 from sae_dashboard.transformer_lens_wrapper import TransformerLensWrapper, to_resid_dir
 from sae_dashboard.utils_fns import RollingCorrCoef, TopK
-from sae_lens import SAE
-from torch import Tensor
-from transformer_lens import HookedTransformer, utils
 
 Arr = np.ndarray
 
@@ -79,7 +80,7 @@ def add_neuron_alignment_data(
     feature_tables_data: dict[str, list[list[int]] | list[list[float]]],
     n_rows: int,
 ):
-    top3_neurons_aligned = TopK(tensor=feature_out_dir, k=n_rows, largest=True)
+    top3_neurons_aligned = TopK(tensor=feature_out_dir.float(), k=n_rows, largest=True)
     feature_out_l1_norm = feature_out_dir.abs().sum(dim=-1, keepdim=True)
     pct_of_l1: Arr = np.absolute(top3_neurons_aligned.values) / utils.to_numpy(
         feature_out_l1_norm
@@ -122,8 +123,8 @@ def add_encoder_B_feature_correlations(
 
 def get_logits_table_data(logit_vector: Float[Tensor, "d_vocab"], n_rows: int):
     # Get logits table data
-    top_logits = TopK(logit_vector, k=n_rows, largest=True)
-    bottom_logits = TopK(logit_vector, k=n_rows, largest=False)
+    top_logits = TopK(logit_vector.float(), k=n_rows, largest=True)
+    bottom_logits = TopK(logit_vector.float(), k=n_rows, largest=False)
 
     top_logit_values = top_logits.values.tolist()
     top_token_ids = top_logits.indices.tolist()

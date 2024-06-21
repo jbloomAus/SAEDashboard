@@ -6,11 +6,12 @@ from typing import Any, Iterable
 from dataclasses_json import dataclass_json
 from rich import print as rprint
 from rich.table import Table
+from sae_lens import SAE
+from transformer_lens import HookedTransformer
+
 from sae_dashboard.feature_data import FeatureData
 from sae_dashboard.layout import SaeVisLayoutConfig
 from sae_dashboard.utils_fns import FeatureStatistics
-from sae_lens import SAE
-from transformer_lens import HookedTransformer
 
 SAE_CONFIG_DICT = dict(
     hook_point="The hook point to use for the SAE",

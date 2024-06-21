@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from matplotlib import colors
+
 from sae_dashboard.components_config import Column
 from sae_dashboard.utils_fns import apply_indent, deep_union
 

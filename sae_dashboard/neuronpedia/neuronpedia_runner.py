@@ -8,6 +8,12 @@ import numpy as np
 import torch
 import wandb
 from matplotlib import colors
+from sae_lens.sae import SAE
+from sae_lens.toolkit.pretrained_saes import load_sparsity
+from sae_lens.training.activations_store import ActivationsStore
+from tqdm import tqdm
+from transformer_lens import HookedTransformer
+
 from sae_dashboard.components_config import (
     ActsHistogramConfig,
     Column,
@@ -19,11 +25,6 @@ from sae_dashboard.components_config import (
 from sae_dashboard.layout import SaeVisLayoutConfig
 from sae_dashboard.sae_vis_data import SaeVisConfig, SaeVisData
 from sae_dashboard.sae_vis_runner import SaeVisRunner
-from sae_lens.sae import SAE
-from sae_lens.toolkit.pretrained_saes import load_sparsity
-from sae_lens.training.activations_store import ActivationsStore
-from tqdm import tqdm
-from transformer_lens import HookedTransformer
 
 # set TOKENIZERS_PARALLELISM to false to avoid warnings
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -69,22 +70,27 @@ class NeuronpediaRunnerConfig:
     sae_path: str
     outputs_dir: str
     sparsity_threshold: int = DEFAULT_SPARSITY_THRESHOLD
+
     # ACTIVATION STORE PARAMETERS
     # token pars
     n_batches_to_sample_from: int = 2**12
     n_prompts_to_select: int = 4096 * 6
     n_context_tokens: int | None = None
+
     # batching
     n_features_at_a_time: int = 128
     start_batch: int = 0
     end_batch: Optional[int] = None
+
     # quantiles
     n_quantiles: int = 5
     top_acts_group_size: int = 20
     quantile_group_size: int = 5
 
-    device: str = "cpu"
-    n_devices: int = 1
+    sae_device: str = "cpu"
+    activation_store_device: str = "cpu"
+    model_device: str = "cpu"
+    model_n_devices: int = 1
     use_wandb: bool = False
 
 
@@ -95,22 +101,22 @@ class NeuronpediaRunner:
     ):
         self.cfg = cfg
 
-        self.n_devices = 1
-        if torch.backends.mps.is_available():
-            self.device = "mps"
-        elif torch.cuda.is_available():
-            self.device = "cuda"
-            self.n_devices = torch.cuda.device_count()
-
-        self.sae = SAE.load_from_pretrained(self.cfg.sae_path, device=self.device)
+        # Initialize SAE
+        self.sae = SAE.load_from_pretrained(
+            path=self.cfg.sae_path, device=self.cfg.sae_device
+        )
         self.sae.fold_W_dec_norm()
 
+        # Initialize Model
         self.model_id = self.sae.cfg.model_name
         self.layer = self.sae.cfg.hook_layer
         self.model = HookedTransformer.from_pretrained(
-            self.model_id, device=self.device, n_devices=self.n_devices
+            model_name=self.model_id,
+            device=self.cfg.model_device,
+            n_devices=self.cfg.model_n_devices,
         )
 
+        # Initialize Activations Store
         self.activations_store = ActivationsStore.from_sae(
             model=self.model,
             sae=self.sae,
@@ -118,7 +124,9 @@ class NeuronpediaRunner:
             streaming=True,
             store_batch_size_prompts=8,
             n_batches_in_buffer=16,
+            device=self.cfg.activation_store_device,
         )
+
         # override the number of context tokens if we specified one
         # this is useful because sometimes the default context tokens is too large for us to quickly generate
         if self.cfg.n_context_tokens is not None:
@@ -190,7 +198,7 @@ class NeuronpediaRunner:
         # TODO: standardize the sparsity file format
         if len(sparsity) > 0 and sparsity[0] >= 0:
             sparsity = torch.log10(sparsity + 1e-10)
-        sparsity = sparsity.to(self.device)
+        # sparsity = sparsity.to(self.device)
         target_feature_indexes = (
             (sparsity > self.cfg.sparsity_threshold).nonzero(as_tuple=True)[0].tolist()
         )
@@ -284,6 +292,7 @@ class NeuronpediaRunner:
 
         self.record_skipped_features()
         tokens = self.get_tokens()
+        del self.activations_store
 
         with torch.no_grad():
             feature_batch_count = 0
@@ -334,7 +343,7 @@ class NeuronpediaRunner:
                     minibatch_size_features=128,
                     minibatch_size_tokens=64,
                     verbose=True,
-                    device=self.device,
+                    device=self.cfg.sae_device,
                     feature_centric_layout=layout,
                     perform_ablation_experiments=False,
                     # dtype="bfloat16",

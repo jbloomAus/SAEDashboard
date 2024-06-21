@@ -1,7 +1,7 @@
 import math
 import random
 from collections import defaultdict
-from typing import Iterable, cast
+from typing import Iterable
 
 import einops
 import numpy as np
@@ -9,6 +9,12 @@ import torch
 from jaxtyping import Int
 from rich import print as rprint
 from rich.table import Table
+from sae_lens import SAE
+from sae_lens.config import DTYPE_MAP as DTYPES
+from torch import Tensor
+from tqdm.auto import tqdm
+from transformer_lens import HookedTransformer
+
 from sae_dashboard.components import (
     ActsHistogramData,
     FeatureTablesData,
@@ -24,17 +30,13 @@ from sae_dashboard.sae_vis_data import SaeVisConfig, SaeVisData
 from sae_dashboard.sequence_data_generator import SequenceDataGenerator
 from sae_dashboard.transformer_lens_wrapper import TransformerLensWrapper
 from sae_dashboard.utils_fns import FeatureStatistics
-from sae_lens import SAE
-from sae_lens.config import DTYPE_MAP as DTYPES
-from torch import Tensor
-from tqdm.auto import tqdm
-from transformer_lens import HookedTransformer
 
 
 class SaeVisRunner:
     def __init__(self, cfg: SaeVisConfig) -> None:
         self.cfg = cfg
-
+        self.device = self.cfg.device
+        self.dtype = DTYPES[self.cfg.dtype]
         if self.cfg.cache_dir is not None:
             self.cfg.cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -54,15 +56,15 @@ class SaeVisRunner:
         encoder.fold_W_dec_norm()
 
         # set precision on encoders and model
-        encoder = encoder.to(DTYPES[self.cfg.dtype])
-        model = cast(HookedTransformer, model.to(DTYPES[self.cfg.dtype]))
-        if encoder_B is not None:
-            encoder_B.to(DTYPES[self.cfg.dtype])
+        # encoder = encoder.to(DTYPES[self.cfg.dtype])
+        # # model = cast(HookedTransformer, model.to(DTYPES[self.cfg.dtype]))
+        # if encoder_B is not None:
+        #     encoder_B.to(DTYPES[self.cfg.dtype])
 
         # Create objects to store all the data we'll get from `_get_feature_data`
         sae_vis_data = SaeVisData(cfg=self.cfg)
-        model.to(self.cfg.device)
-        encoder = encoder.to(self.cfg.device)
+        # model.to(self.cfg.device)
+        # encoder = encoder.to(self.cfg.device)
         time_logs = defaultdict(float)
 
         features_list = self.handle_features(self.cfg.features, encoder)
@@ -101,10 +103,10 @@ class SaeVisRunner:
 
             # Get the logits of all features (i.e. the directions this feature writes to the logit output)
             logits = einops.einsum(
-                feature_resid_dir,
+                feature_resid_dir.to(device=model.W_U.device, dtype=model.W_U.dtype),
                 model.W_U,
                 "feats d_model, d_model d_vocab -> feats d_vocab",
-            )
+            ).to(self.device)
 
             # ! Get stats (including quantiles, which will be useful for the prompt-centric visualisation)
             feature_stats = FeatureStatistics.create(
@@ -266,7 +268,9 @@ class SaeVisRunner:
             """
             Get a subset of the feature activations for a dataset.
             """
-            return sae.encode(x)[..., feature_idx]
+            original_device = x.device
+            feature_activations = sae.encode(x.to(device=sae.device, dtype=sae.dtype))
+            return feature_activations[..., feature_idx].to(original_device)
 
         sae.get_feature_acts_subset = sae_lens_get_feature_acts_subset  # type: ignore
 
