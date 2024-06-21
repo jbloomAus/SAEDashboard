@@ -103,7 +103,7 @@ class SaeVisRunner:
 
             # Get the logits of all features (i.e. the directions this feature writes to the logit output)
             logits = einops.einsum(
-                feature_resid_dir.to(device= model.W_U.device, dtype =model.W_U.dtype),
+                feature_resid_dir.to(device=model.W_U.device, dtype=model.W_U.dtype),
                 model.W_U,
                 "feats d_model, d_model d_vocab -> feats d_vocab",
             ).to(self.device)
