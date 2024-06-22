@@ -190,18 +190,24 @@ class NeuronpediaRunner:
         return np.reshape(str_tokens, tokens.shape).tolist()
 
     def get_alive_features(self) -> list[int]:
-
-        # if we have feature sparsity, then use it to only generate outputs for non-dead features
-        self.target_feature_indexes: list[int] = []
-        sparsity = load_sparsity(self.cfg.sae_path)
-        # convert sparsity to logged sparsity if it's not
-        # TODO: standardize the sparsity file format
-        if len(sparsity) > 0 and sparsity[0] >= 0:
-            sparsity = torch.log10(sparsity + 1e-10)
-        # sparsity = sparsity.to(self.device)
-        target_feature_indexes = (
-            (sparsity > self.cfg.sparsity_threshold).nonzero(as_tuple=True)[0].tolist()
-        )
+        # skip sparsity
+        if self.cfg.sparsity_threshold == 1:
+            print("Skipping sparsity because sparsity_threshold was set to 1")
+            target_feature_indexes = list(range(self.sae.cfg.d_sae))
+        else:
+            # if we have feature sparsity, then use it to only generate outputs for non-dead features
+            self.target_feature_indexes: list[int] = []
+            sparsity = load_sparsity(self.cfg.sae_path)
+            # convert sparsity to logged sparsity if it's not
+            # TODO: standardize the sparsity file format
+            if len(sparsity) > 0 and sparsity[0] >= 0:
+                sparsity = torch.log10(sparsity + 1e-10)
+            # sparsity = sparsity.to(self.device)
+            target_feature_indexes = (
+                (sparsity > self.cfg.sparsity_threshold)
+                .nonzero(as_tuple=True)[0]
+                .tolist()
+            )
         return target_feature_indexes
 
     def get_feature_batches(self):
