@@ -103,6 +103,27 @@ class NeuronpediaRunner:
     ):
         self.cfg = cfg
 
+        device_count = 1
+        # Set correct device, use multi-GPU if we have it
+        if torch.backends.mps.is_available():
+            self.cfg.sae_device = "mps"
+            self.cfg.model_device = "mps"
+            self.cfg.model_n_devices = 1
+        elif torch.cuda.is_available():
+            device_count = torch.cuda.device_count()
+            if device_count > 1:
+                self.cfg.sae_device = f"cuda:{device_count - 1}"
+                self.cfg.model_n_devices = device_count - 1
+            self.cfg.model_device = "cuda"
+        # Activation store device is always CPU
+        self.cfg.activation_store_device = "cpu"
+
+        print(f"Device Count: {device_count}")
+        print(f"SAE Device: {self.cfg.sae_device}")
+        print(f"Model Device: {self.cfg.model_device}")
+        print(f"Model Num Devices: {self.cfg.model_n_devices}")
+        print(f"Activation Store Device: {self.cfg.activation_store_device}")
+
         # Initialize SAE
         self.sae = SAE.load_from_pretrained(
             path=self.cfg.sae_path, device=self.cfg.sae_device
@@ -213,7 +234,6 @@ class NeuronpediaRunner:
             # TODO: standardize the sparsity file format
             if len(sparsity) > 0 and sparsity[0] >= 0:
                 sparsity = torch.log10(sparsity + 1e-10)
-            # sparsity = sparsity.to(self.device)
             target_feature_indexes = (
                 (sparsity > self.cfg.sparsity_threshold)
                 .nonzero(as_tuple=True)[0]
