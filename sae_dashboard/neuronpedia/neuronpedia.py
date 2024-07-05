@@ -18,6 +18,7 @@ from sae_lens.toolkit.pretrained_saes import load_sparsity
 from typing_extensions import Annotated
 
 from sae_dashboard.neuronpedia.neuronpedia_runner import (
+    DEFAULT_SPARSITY_THRESHOLD,
     NeuronpediaRunner,
     NeuronpediaRunnerConfig,
 )
@@ -69,7 +70,16 @@ Enter path""",
 What is your desired feature log sparsity threshold?
 Enter value from -10 to 0 [1 to skip]""",
         ),
-    ] = -6,
+    ] = DEFAULT_SPARSITY_THRESHOLD,
+    dtype: Annotated[
+        str | None,
+        typer.Option(
+            help="Override DType",
+            prompt="""
+Override DType type?
+[Enter to use SAE default]""",
+        ),
+    ] = None,
     feat_per_batch: Annotated[
         int,
         typer.Option(
@@ -171,6 +181,8 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
         device = "cuda"
     sparse_autoencoder = SAE.load_from_pretrained(sae_path_string, device=device)
     model_id = sparse_autoencoder.cfg.model_name
+    if dtype is None:
+        dtype = sparse_autoencoder.cfg.dtype
 
     # make the outputs subdirectory if it doesn't exist, ensure it's not a file
     outputs_subdir = f"{model_id}_{sae_id}_{sparse_autoencoder.cfg.hook_name}"
@@ -198,6 +210,11 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
             if run_settings["sae_id"] != sae_id:
                 print(
                     f"[red]Error: sae_id in {run_settings_path.as_posix()} doesn't match the current sae_id:\n{run_settings['sae_id']} vs {sae_id}"
+                )
+                raise typer.Abort()
+            if run_settings["dtype"] != dtype:
+                print(
+                    f"[red]Error: dtype in {run_settings_path.as_posix()} doesn't match the current dtype:\n{run_settings['dtype']} vs {dtype}"
                 )
                 raise typer.Abort()
             if run_settings["sae_path"] != sae_path_string:
@@ -232,6 +249,7 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
             "sae_id": sae_id,
             "sae_path": sae_path_string,
             "log_sparsity": log_sparsity,
+            "dtype": dtype,
             "n_batches_to_sample": n_batches_to_sample,
             "n_prompts_to_select": n_prompts_to_select,
             "n_context_tokens": n_context_tokens,
@@ -269,6 +287,7 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
 [white]SAE Path: [green]{sae_path.as_posix()}
 [white]Model ID: [green]{model_id}
 [white]Hook Point: [green]{sparse_autoencoder.cfg.hook_name}
+[white]DType: [green]{dtype}
 [white]Using Device: [green]{device}
 """,
                 title="SAE Info",
@@ -329,6 +348,7 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
     cfg = NeuronpediaRunnerConfig(
         sae_id=sae_id,
         sae_path=sae_path.absolute().as_posix(),
+        dtype=dtype,
         outputs_dir=outputs_dir.absolute().as_posix(),
         sparsity_threshold=log_sparsity,
         n_batches_to_sample_from=n_batches_to_sample,

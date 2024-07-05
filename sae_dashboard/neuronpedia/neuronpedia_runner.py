@@ -35,7 +35,7 @@ BG_COLOR_MAP = colors.LinearSegmentedColormap.from_list(
     "bg_color_map", ["white", "darkorange"]
 )
 
-DEFAULT_SPARSITY_THRESHOLD = -5
+DEFAULT_SPARSITY_THRESHOLD = -6
 
 # TODO: add more anomalies here
 HTML_ANOMALIES = {
@@ -87,6 +87,8 @@ class NeuronpediaRunnerConfig:
     top_acts_group_size: int = 20
     quantile_group_size: int = 5
 
+    dtype: str | None = None
+
     sae_device: str = "cpu"
     activation_store_device: str = "cpu"
     model_device: str = "cpu"
@@ -106,6 +108,9 @@ class NeuronpediaRunner:
             path=self.cfg.sae_path, device=self.cfg.sae_device
         )
         self.sae.fold_W_dec_norm()
+        # Default dtype to the SAE dtype unless we override
+        if self.cfg.dtype is None:
+            self.cfg.dtype = self.sae.cfg.dtype
 
         # Initialize Model
         self.model_id = self.sae.cfg.model_name
@@ -359,7 +364,7 @@ class NeuronpediaRunner:
                     device=self.cfg.sae_device,
                     feature_centric_layout=layout,
                     perform_ablation_experiments=False,
-                    # dtype="bfloat16",
+                    dtype=self.cfg.dtype if self.cfg.dtype else self.sae.cfg.dtype,
                     cache_dir=self.cached_activations_dir,
                 )
 
