@@ -36,6 +36,7 @@ BG_COLOR_MAP = colors.LinearSegmentedColormap.from_list(
 )
 
 DEFAULT_SPARSITY_THRESHOLD = -6
+DEFAULT_FALLBACK_DEVICE = "cpu"
 
 # TODO: add more anomalies here
 HTML_ANOMALIES = {
@@ -89,10 +90,10 @@ class NeuronpediaRunnerConfig:
 
     dtype: str | None = None
 
-    sae_device: str = "cpu"
-    activation_store_device: str = "cpu"
-    model_device: str = "cpu"
-    model_n_devices: int = 1
+    sae_device: str | None = None
+    activation_store_device: str | None = None
+    model_device: str | None = None
+    model_n_devices: int | None = None
     use_wandb: bool = False
 
 
@@ -103,20 +104,23 @@ class NeuronpediaRunner:
     ):
         self.cfg = cfg
 
+        # Get device defaults. But if we have overrides, then use those.
         device_count = 1
         # Set correct device, use multi-GPU if we have it
         if torch.backends.mps.is_available():
-            self.cfg.sae_device = "mps"
-            self.cfg.model_device = "mps"
-            self.cfg.model_n_devices = 1
+            self.cfg.sae_device = self.cfg.sae_device or "mps"
+            self.cfg.model_device = self.cfg.model_device or "mps"
+            self.cfg.model_n_devices = self.cfg.model_n_devices or 1
         elif torch.cuda.is_available():
             device_count = torch.cuda.device_count()
             if device_count > 1:
-                self.cfg.sae_device = f"cuda:{device_count - 1}"
-                self.cfg.model_n_devices = device_count - 1
-            self.cfg.model_device = "cuda"
+                self.cfg.sae_device = self.cfg.sae_device or f"cuda:{device_count - 1}"
+                self.cfg.model_n_devices = self.cfg.model_n_devices or (
+                    device_count - 1
+                )
+            self.cfg.model_device = self.cfg.model_device or "cuda"
         # Activation store device is always CPU
-        self.cfg.activation_store_device = "cpu"
+        self.cfg.activation_store_device = self.cfg.activation_store_device or "cpu"
 
         print(f"Device Count: {device_count}")
         print(f"SAE Device: {self.cfg.sae_device}")
@@ -126,7 +130,8 @@ class NeuronpediaRunner:
 
         # Initialize SAE
         self.sae = SAE.load_from_pretrained(
-            path=self.cfg.sae_path, device=self.cfg.sae_device
+            path=self.cfg.sae_path,
+            device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
         )
         self.sae.fold_W_dec_norm()
         # Default dtype to the SAE dtype unless we override
@@ -139,7 +144,7 @@ class NeuronpediaRunner:
         self.model = HookedTransformer.from_pretrained(
             model_name=self.model_id,
             device=self.cfg.model_device,
-            n_devices=self.cfg.model_n_devices,
+            n_devices=self.cfg.model_n_devices or 1,
         )
 
         # Initialize Activations Store
@@ -381,7 +386,7 @@ class NeuronpediaRunner:
                     minibatch_size_features=self.minibatch_size_features,
                     minibatch_size_tokens=self.minibatch_size_tokens,
                     verbose=True,
-                    device=self.cfg.sae_device,
+                    device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
                     feature_centric_layout=layout,
                     perform_ablation_experiments=False,
                     dtype=self.cfg.dtype if self.cfg.dtype else self.sae.cfg.dtype,
@@ -401,9 +406,11 @@ class NeuronpediaRunner:
                     f.write(json_object)
 
                 logline = f"\n========== Completed Batch #{feature_batch_count} output: {output_file} ==========\n"
-                wandb.log({"batch": feature_batch_count})
+                if self.cfg.use_wandb:
+                    wandb.log({"batch": feature_batch_count})
 
-        wandb.finish()
+        if self.cfg.use_wandb:
+            wandb.finish()
 
         return
 
