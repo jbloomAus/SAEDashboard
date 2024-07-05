@@ -70,6 +70,7 @@ class FeatureDataGenerator:
         # ! Compute & concatenate together all feature activations & post-activation function values
 
         for i, minibatch in enumerate(self.token_minibatches):
+            minibatch.to(self.cfg.device)
             model_acts = self.get_model_acts(i, minibatch)
 
             # Compute feature activations from this
