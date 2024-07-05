@@ -4,7 +4,6 @@
 import json
 import math
 import os
-import subprocess
 from pathlib import Path
 
 import requests
@@ -18,6 +17,11 @@ from sae_lens.sae import SAE
 from sae_lens.toolkit.pretrained_saes import load_sparsity
 from typing_extensions import Annotated
 
+from sae_dashboard.neuronpedia.neuronpedia_runner import (
+    NeuronpediaRunner,
+    NeuronpediaRunnerConfig,
+)
+
 OUTPUT_DIR_BASE = Path("../../neuronpedia_outputs")
 RUN_SETTINGS_FILE = "run_settings.json"
 
@@ -30,6 +34,7 @@ app = typer.Typer(
 
 @app.command()
 def generate(
+    ctx: typer.Context,
     sae_id: Annotated[
         str,
         typer.Option(
@@ -111,17 +116,32 @@ Enter value""",
     resume_from_batch: Annotated[
         int,
         typer.Option(
-            min=1,
+            min=0,
             help="Batch number to resume from.",
             prompt="""
 Do you want to resume from a specific batch number?
-Enter 1 to start from the beginning. Existing batch files will not be overwritten.""",
+Enter 0 to start from the beginning. Existing batch files will not be overwritten.""",
         ),
-    ] = 1,
+    ] = 0,
+    end_at_batch: Annotated[
+        int,
+        typer.Option(
+            min=-1,
+            help="Batch number to end at.",
+            prompt="""
+Do you want to end at a specific batch number?
+Enter -1 to do all batches. Existing batch files will not be overwritten.""",
+        ),
+    ] = -1,
 ):
     """
     This will start a batch job that generates features for Neuronpedia for a specific SAE. To upload those features, use the 'upload' command afterwards.
     """
+
+    print("\nRe-run this command with:")
+    command = "python neuronpedia.py generate"
+    for key, value in ctx.params.items():
+        command += f" --{key}={value}"
 
     # Check arguments
     if sae_path.is_dir() is not True:
@@ -234,6 +254,13 @@ Enter 1 to start from the beginning. Existing batch files will not be overwritte
         num_alive = len(alive_indexes)
         num_dead = sparse_autoencoder.cfg.d_sae - num_alive
 
+    num_batches = math.ceil(sparse_autoencoder.cfg.d_sae / feat_per_batch)
+    if end_at_batch >= num_batches:
+        print(
+            f"[red]Error: end_at_batch {end_at_batch} should not be >= num_batches {num_batches}"
+        )
+        raise typer.Abort()
+
     print("\n")
     print(
         Align.center(
@@ -248,7 +275,6 @@ Enter 1 to start from the beginning. Existing batch files will not be overwritte
             )
         )
     )
-    num_batches = math.ceil(num_alive / feat_per_batch)
     print(
         Align.center(
             Panel.fit(
@@ -259,7 +285,8 @@ Enter 1 to start from the beginning. Existing batch files will not be overwritte
 [white]Dead Features: [red]{num_dead}
 [white]Features per Batch: [green]{feat_per_batch}
 [white]Number of Batches: [green]{num_batches}
-{resume_from_batch != 1 and f"[white]Resuming from Batch: [green]{resume_from_batch}" or ""}
+{resume_from_batch != 0 and f"[white]Resuming from Batch: [green]{resume_from_batch}" or ""}
+{end_at_batch != -1 and f"[white]Ending at Batch: [green]{end_at_batch}" or ""}
 """,
                 title="Number of Features",
             )
@@ -291,54 +318,29 @@ Enter 1 to start from the beginning. Existing batch files will not be overwritte
 
     print(
         Align.center(
-            "\n========== [yellow]Starting batch feature generations...[/yellow] =========="
+            "\n========== [yellow]Starting batch feature generations...[/yellow] ==========\n"
         )
     )
 
-    # iterate from 1 to num_batches
-    for i in range(resume_from_batch, num_batches + 1):
-        command = [
-            "python",
-            "make_batch.py",
-            sae_id,
-            sae_path.absolute().as_posix(),
-            outputs_dir.absolute().as_posix(),
-            str(log_sparsity),
-            str(n_batches_to_sample),
-            str(n_prompts_to_select),
-            str(n_context_tokens),
-            str(feat_per_batch),
-            str(i),
-            str(i),
-        ]
-        print("\n")
-        print(
-            Align.center(
-                Panel.fit(
-                    f"""
-[yellow]{" ".join(command)}
-""",
-                    title="Running Command for Batch #" + str(i),
-                )
-            )
-        )
-        # make a subprocess call to python make_batch.py
-        subprocess.run(
-            [
-                "python",
-                "make_batch.py",
-                sae_id,
-                sae_path,
-                outputs_dir,
-                str(log_sparsity),
-                str(n_batches_to_sample),
-                str(n_prompts_to_select),
-                str(n_context_tokens),
-                str(feat_per_batch),
-                str(i),
-                str(i),
-            ]
-        )
+    print("\n\nRe-Run this with command:\n")
+    print(command + "\n\n")
+
+    # run the command
+    cfg = NeuronpediaRunnerConfig(
+        sae_id=sae_id,
+        sae_path=sae_path.absolute().as_posix(),
+        outputs_dir=outputs_dir.absolute().as_posix(),
+        sparsity_threshold=log_sparsity,
+        n_batches_to_sample_from=n_batches_to_sample,
+        n_prompts_to_select=n_prompts_to_select,
+        n_context_tokens=n_context_tokens if n_context_tokens != 0 else None,
+        n_features_at_a_time=feat_per_batch,
+        start_batch=resume_from_batch,
+        end_batch=end_at_batch if end_at_batch != -1 else num_batches,
+    )
+
+    runner = NeuronpediaRunner(cfg)
+    runner.run()
 
     print(
         Align.center(
@@ -462,6 +464,9 @@ Dead feature stubs created.
         )
     )
 
+
+if __name__ == "__main__":
+    app()
 
 if __name__ == "__main__":
     app()

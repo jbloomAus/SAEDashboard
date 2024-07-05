@@ -126,6 +126,12 @@ class NeuronpediaRunner:
             n_batches_in_buffer=16,
             device=self.cfg.activation_store_device,
         )
+        self.cached_activations_dir = Path(
+            f"./cached_activations/{self.model_id}_{self.cfg.sae_id}_{self.sae.cfg.hook_name}"
+        )
+        # TODO: make these into parameters too?
+        self.minibatch_size_features = 128
+        self.minibatch_size_tokens = 64
 
         # override the number of context tokens if we specified one
         # this is useful because sometimes the default context tokens is too large for us to quickly generate
@@ -290,14 +296,15 @@ class NeuronpediaRunner:
         self.target_feature_indexes = self.get_alive_features()
 
         feature_idx = self.get_feature_batches()
-        if self.cfg.start_batch > len(feature_idx) + 1:
+        if self.cfg.start_batch >= len(feature_idx):
             print(
-                f"Start batch {self.cfg.start_batch} is greater than number of batches + 1 {len(feature_idx)}, exiting"
+                f"Start batch {self.cfg.start_batch} is greater than number of batches {len(feature_idx)}, exiting"
             )
             exit()
 
         self.record_skipped_features()
         tokens = self.get_tokens()
+
         del self.activations_store
 
         with torch.no_grad():
@@ -346,16 +353,14 @@ class NeuronpediaRunner:
                 feature_vis_config_gpt = SaeVisConfig(
                     hook_point=self.sae.cfg.hook_name,
                     features=features_to_process,
-                    minibatch_size_features=128,
-                    minibatch_size_tokens=64,
+                    minibatch_size_features=self.minibatch_size_features,
+                    minibatch_size_tokens=self.minibatch_size_tokens,
                     verbose=True,
                     device=self.cfg.sae_device,
                     feature_centric_layout=layout,
                     perform_ablation_experiments=False,
                     # dtype="bfloat16",
-                    cache_dir=Path(
-                        f"./cached_activations/{self.model_id}_{self.cfg.sae_id}_{self.sae.cfg.hook_name}"
-                    ),
+                    cache_dir=self.cached_activations_dir,
                 )
 
                 feature_data = SaeVisRunner(feature_vis_config_gpt).run(
