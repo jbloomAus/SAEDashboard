@@ -23,7 +23,7 @@ from sae_dashboard.components_config import (
     SequencesConfig,
 )
 from sae_dashboard.layout import SaeVisLayoutConfig
-from sae_dashboard.neuronpedia.neuronpedia_feature import (
+from sae_dashboard.neuronpedia.neuronpedia_dashboard import (
     NeuronpediaDashboardActivation,
     NeuronpediaDashboardBatch,
     NeuronpediaDashboardFeature,

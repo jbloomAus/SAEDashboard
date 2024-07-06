@@ -4,12 +4,13 @@ from typing import Type, TypeVar
 
 from sae_lens.toolkit.pretrained_saes import download_sae_from_hf
 
-from sae_dashboard.neuronpedia.neuronpedia_feature import NeuronpediaDashboardBatch
+from sae_dashboard.neuronpedia.neuronpedia_dashboard import NeuronpediaDashboardBatch
 from sae_dashboard.neuronpedia.neuronpedia_runner import (
     NeuronpediaRunner,
     NeuronpediaRunnerConfig,
 )
 
+# depending on if device type, the results may be slightly different
 CORRECT_VALUE_TOLERANCE = 0.1
 
 T = TypeVar("T")
