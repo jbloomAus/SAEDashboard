@@ -82,27 +82,6 @@ class NeuronpediaDashboardActivation:
 
 @dataclass
 class NeuronpediaDashboardFeature:
-    feature_index: int
-    neuron_alignment_indices: list[int]
-    neuron_alignment_values: list[float]
-    neuron_alignment_l1: list[float]
-    correlated_neurons_indices: list[int]
-    correlated_neurons_l1: list[float]
-    correlated_neurons_pearson: list[float]
-    correlated_features_indices: list[int]
-    correlated_features_l1: list[float]
-    correlated_features_pearson: list[float]
-    neg_str: list[str]
-    neg_values: list[float]
-    pos_str: list[str]
-    pos_values: list[float]
-    frac_nonzero: float
-    freq_hist_data_bar_values: list[float]
-    freq_hist_data_bar_heights: list[float]
-    logits_hist_data_bar_heights: list[float]
-    logits_hist_data_bar_values: list[float]
-    num_tokens_for_dashboard: int
-    activations: list[NeuronpediaDashboardActivation]
 
     def __init__(
         self,
@@ -309,8 +288,6 @@ class NeuronpediaDashboardFeature:
 
 @dataclass
 class NeuronpediaDashboardSettings:
-    n_batches_to_sample_from: int
-    n_prompt_to_select: int
 
     def __init__(self, n_batches_to_sample_from: int = 0, n_prompt_to_select: int = 0):
         self.n_batches_to_sample_from = n_batches_to_sample_from
@@ -338,11 +315,6 @@ class NeuronpediaDashboardSettings:
 
 @dataclass
 class NeuronpediaDashboardBatch:
-    model_id: str
-    layer: int
-    sae_set: str
-    features: list[NeuronpediaDashboardFeature]
-    settings: NeuronpediaDashboardSettings
 
     def __init__(
         self,
@@ -355,7 +327,7 @@ class NeuronpediaDashboardBatch:
         self.model_id = model_id
         self.layer = layer
         self.sae_set = sae_set
-        self.features = []
+        self.features: list[NeuronpediaDashboardFeature] = []
         for feature in features:
             self.features.append(NeuronpediaDashboardFeature(**feature))
         self.settings = settings
