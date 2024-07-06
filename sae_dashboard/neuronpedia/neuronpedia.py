@@ -36,7 +36,7 @@ app = typer.Typer(
 @app.command()
 def generate(
     ctx: typer.Context,
-    sae_id: Annotated[
+    sae_set: Annotated[
         str,
         typer.Option(
             help="SAE ID to generate features for (must exactly match the one used on Neuronpedia). Example: res-jb",
@@ -185,7 +185,7 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
         dtype = sparse_autoencoder.cfg.dtype
 
     # make the outputs subdirectory if it doesn't exist, ensure it's not a file
-    outputs_subdir = f"{model_id}_{sae_id}_{sparse_autoencoder.cfg.hook_name}"
+    outputs_subdir = f"{model_id}_{sae_set}_{sparse_autoencoder.cfg.hook_name}"
     outputs_dir = OUTPUT_DIR_BASE.joinpath(outputs_subdir)
     if outputs_dir.exists() and outputs_dir.is_file():
         print(f"Error: Output directory {outputs_dir.as_posix()} exists and is a file.")
@@ -207,9 +207,9 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
                     f"[red]Error: log_sparsity in {run_settings_path.as_posix()} doesn't match the current log_sparsity:\n{run_settings['log_sparsity']} vs {log_sparsity}"
                 )
                 raise typer.Abort()
-            if run_settings["sae_id"] != sae_id:
+            if run_settings["sae_set"] != sae_set:
                 print(
-                    f"[red]Error: sae_id in {run_settings_path.as_posix()} doesn't match the current sae_id:\n{run_settings['sae_id']} vs {sae_id}"
+                    f"[red]Error: sae_set in {run_settings_path.as_posix()} doesn't match the current sae_set:\n{run_settings['sae_set']} vs {sae_set}"
                 )
                 raise typer.Abort()
             if run_settings["dtype"] != dtype:
@@ -246,7 +246,7 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
     else:
         print(f"[green]Creating run_settings.json in {run_settings_path.as_posix()}.")
         run_settings = {
-            "sae_id": sae_id,
+            "sae_set": sae_set,
             "sae_path": sae_path_string,
             "log_sparsity": log_sparsity,
             "dtype": dtype,
@@ -346,7 +346,7 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
 
     # run the command
     cfg = NeuronpediaRunnerConfig(
-        sae_id=sae_id,
+        sae_set=sae_set,
         sae_path=sae_path.absolute().as_posix(),
         dtype=dtype,
         outputs_dir=outputs_dir.absolute().as_posix(),
