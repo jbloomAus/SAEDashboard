@@ -26,6 +26,7 @@ def tokens(model: HookedTransformer) -> Int[Tensor, "batch seq"]:
 @pytest.fixture
 def autoencoder() -> SAE:
     cfg = SAEConfig(
+        architecture="standard",
         d_in=64,
         d_sae=128,
         apply_b_dec_to_input=False,
