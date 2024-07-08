@@ -121,6 +121,7 @@ class NeuronpediaRunner:
             self.cfg.sae_device = self.cfg.sae_device or "mps"
             self.cfg.model_device = self.cfg.model_device or "mps"
             self.cfg.model_n_devices = self.cfg.model_n_devices or 1
+            self.cfg.activation_store_device = self.cfg.activation_store_device or "mps"
         elif torch.cuda.is_available():
             device_count = torch.cuda.device_count()
             if device_count > 1:
@@ -128,9 +129,12 @@ class NeuronpediaRunner:
                 self.cfg.model_n_devices = self.cfg.model_n_devices or (
                     device_count - 1
                 )
+            else:
+                self.cfg.sae_device = self.cfg.sae_device or "cuda"
             self.cfg.model_device = self.cfg.model_device or "cuda"
-        # Activation store device is always CPU
-        self.cfg.activation_store_device = self.cfg.activation_store_device or "cpu"
+            self.cfg.activation_store_device = (
+                self.cfg.activation_store_device or "cuda"
+            )
 
         print(f"Device Count: {device_count}")
         print(f"SAE Device: {self.cfg.sae_device}")
@@ -165,7 +169,7 @@ class NeuronpediaRunner:
             streaming=True,
             store_batch_size_prompts=8,
             n_batches_in_buffer=16,
-            device=self.cfg.activation_store_device,
+            device=self.cfg.activation_store_device or "cpu",
         )
         self.cached_activations_dir = Path(
             f"./cached_activations/{self.model_id}_{self.cfg.sae_set}_{self.sae.cfg.hook_name}"
