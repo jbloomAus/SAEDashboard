@@ -96,7 +96,7 @@ class NeuronpediaRunnerConfig:
     top_acts_group_size: int = 20
     quantile_group_size: int = 5
 
-    dtype: str | None = None
+    dtype: str = ""
 
     sae_device: str | None = None
     activation_store_device: str | None = None
@@ -145,7 +145,7 @@ class NeuronpediaRunner:
         )
         self.sae.fold_W_dec_norm()
         # Default dtype to the SAE dtype unless we override
-        if self.cfg.dtype is None:
+        if self.cfg.dtype == "":
             self.cfg.dtype = self.sae.cfg.dtype
 
         # Initialize Model

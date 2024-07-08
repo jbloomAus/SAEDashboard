@@ -72,14 +72,14 @@ Enter value from -10 to 0 [1 to skip]""",
         ),
     ] = DEFAULT_SPARSITY_THRESHOLD,
     dtype: Annotated[
-        str | None,
+        str,
         typer.Option(
             help="Override DType",
             prompt="""
 Override DType type?
 [Enter to use SAE default]""",
         ),
-    ] = None,
+    ] = "",
     feat_per_batch: Annotated[
         int,
         typer.Option(
