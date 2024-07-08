@@ -74,7 +74,7 @@ class FeatureDataGenerator:
 
             # Compute feature activations from this
             with FeatureMaskingContext(self.encoder, feature_indices):
-                feature_acts = self.encoder.encode_fn(model_acts).to(
+                feature_acts = self.encoder.encode(model_acts).to(
                     DTYPES[self.cfg.dtype]
                 )
 
