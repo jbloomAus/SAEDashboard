@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "sae-dashboard"
-version = "0.2.0"
+version = "0.2.1"
 description = "Open-source SAE visualizer, based on Anthropic's published visualizer. Forked / Detached from sae_vis."
 authors = ["Callum McDougall <cal.s.mcdougall@gmail.com>", "Joseph Bloom, <jbloomaus@gmail.com>"]
 readme = "README.md"

@@ -2,6 +2,55 @@
 
 
 
+## v0.2.1 (2024-07-08)
+
+### Fix
+
+* fix: trigger release ([`87bf0b5`](https://github.com/jbloomAus/SAEDashboard/commit/87bf0b5f21f0d1f5397e514090601ec21c718e35))
+
+### Unknown
+
+* Merge pull request #6 from jbloomAus/fix-bfloat16
+
+fix bfloat 16 error ([`2f3c597`](https://github.com/jbloomAus/SAEDashboard/commit/2f3c597c1795357679e92caec3dd7e522c669fdb))
+
+* fix bfloat 16 error ([`63c3c62`](https://github.com/jbloomAus/SAEDashboard/commit/63c3c62f0a03e5656ed78cc0e8f853bea3f0938e))
+
+* Merge pull request #5 from jbloomAus/np-updates
+
+Updates + fixes for Neuronpedia ([`9e6b5c4`](https://github.com/jbloomAus/SAEDashboard/commit/9e6b5c427024b8a468b0d06e4e096c2561c35d5d))
+
+* Fix SAELens compatibility ([`139e1a2`](https://github.com/jbloomAus/SAEDashboard/commit/139e1a2f219d790c6f8faa9be34d9fbc9403dda3))
+
+* Rename file ([`16709ad`](https://github.com/jbloomAus/SAEDashboard/commit/16709add9ee5063b3682be34eef0aea2ddf4eceb))
+
+* Fix type ([`6b20386`](https://github.com/jbloomAus/SAEDashboard/commit/6b2038682ca41423dda3a3597bbe88120b120262))
+
+* Make Neuronpedia outputs an object, and add a real acceptance test ([`a5db256`](https://github.com/jbloomAus/SAEDashboard/commit/a5db2560e5f90a49257124635b3fdbee117ed860))
+
+* Np Runner: Multi-gpu defaults ([`07f7128`](https://github.com/jbloomAus/SAEDashboard/commit/07f71282681ffa801dd15f9265be349cd5745b42))
+
+* Ensure minibatch is on correct device ([`e206546`](https://github.com/jbloomAus/SAEDashboard/commit/e2065462c445df0e0985fb6588d4c01cb39bbef5))
+
+* NP Runner: Automatically use multi-gpu, devices ([`bf280e6`](https://github.com/jbloomAus/SAEDashboard/commit/bf280e685dc4dd2018cd41aa94a29bc853fcee18))
+
+* Allow dtype override ([`a40077d`](https://github.com/jbloomAus/SAEDashboard/commit/a40077dac1fa2ae880fcdabe3227878ef2cfaebe))
+
+* NP-Runner: Remove unnecessary layer of batching. ([`e2ac92b`](https://github.com/jbloomAus/SAEDashboard/commit/e2ac92b036d0192e132c8a8700a5a2f448d1983b))
+
+* NP Runner: Allow skipping sparsity check ([`ef74d2a`](https://github.com/jbloomAus/SAEDashboard/commit/ef74d2aeea2463afe150a5e8824da5a5206cd3d0))
+
+* Merge pull request #2 from jbloomAus/multiple-devices
+
+feat: Multiple devices ([`535e6c9`](https://github.com/jbloomAus/SAEDashboard/commit/535e6c9689d855f82a6ddfd9f169720fe367bde3))
+
+* format ([`7f892ad`](https://github.com/jbloomAus/SAEDashboard/commit/7f892ad0efb42025df0bcf26bdddd6fac4c2d8b1))
+
+* NP runner takes device args seperately ([`8fc31dd`](https://github.com/jbloomAus/SAEDashboard/commit/8fc31dd6ccd59f4f35742a4e15c380673c8cb2a3))
+
+* multi-gpu-support ([`5e24e4e`](https://github.com/jbloomAus/SAEDashboard/commit/5e24e4e6598dd7943f8d677042dcf84bc6f7a0a6))
+
+
 ## v0.2.0 (2024-06-10)
 
 ### Feature
