@@ -52,7 +52,7 @@ class SaeVisRunner:
         self.set_seeds()
 
         # add extra method to SAE which is not yet provided by SAE Lens.
-        encoder = self.mock_feature_acts_subset_for_now(encoder)
+        # encoder = self.mock_feature_acts_subset_for_now(encoder)
         encoder.fold_W_dec_norm()
 
         # set precision on encoders and model
@@ -262,16 +262,3 @@ class SaeVisRunner:
             progress = None
 
         return progress
-
-    def mock_feature_acts_subset_for_now(self, sae: SAE):
-        def sae_lens_get_feature_acts_subset(x: torch.Tensor, feature_idx):  # type: ignore
-            """
-            Get a subset of the feature activations for a dataset.
-            """
-            original_device = x.device
-            feature_activations = sae.encode(x.to(device=sae.device, dtype=sae.dtype))
-            return feature_activations[..., feature_idx].to(original_device)
-
-        sae.get_feature_acts_subset = sae_lens_get_feature_acts_subset  # type: ignore
-
-        return sae

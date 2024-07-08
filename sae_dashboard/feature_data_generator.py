@@ -3,7 +3,6 @@ from pathlib import Path
 import einops
 import numpy as np
 import torch
-import torch.nn.functional as F
 from jaxtyping import Float, Int
 from sae_lens import SAE
 from sae_lens.config import DTYPE_MAP as DTYPES
@@ -74,9 +73,10 @@ class FeatureDataGenerator:
             model_acts = self.get_model_acts(i, minibatch)
 
             # Compute feature activations from this
-            feature_acts = self.encoder.get_feature_acts_subset(
-                model_acts, feature_indices
-            ).to(DTYPES[self.cfg.dtype])
+            with FeatureMaskingContext(self.encoder, feature_indices):
+                feature_acts = self.encoder.encode_fn(model_acts).to(
+                    DTYPES[self.cfg.dtype]
+                )
 
             self.update_rolling_coefficients(
                 model_acts=model_acts,
@@ -147,40 +147,6 @@ class FeatureDataGenerator:
         return model_acts  # , residual
 
     @torch.inference_mode()
-    def compute_feat_acts(
-        self,
-        model_acts: Float[Tensor, "batch seq d_in"],
-        feature_idx: list[int],
-        encoder: SAE,
-    ) -> Float[Tensor, "batch seq feats"]:
-        """
-        This function computes the feature activations, given a bunch of model data. It also updates the rolling correlation
-        coefficient objects, if they're given.
-
-        Args:
-            model_acts: Float[Tensor, "batch seq d_in"]
-                The activations of the model, which the SAE was trained on.
-            feature_idx: list[int]
-                The features we're computing the activations for. This will be used to index the encoder's weights.
-            encoder: AutoEncoder
-                The encoder object, which we use to calculate the feature activations.
-            encoder_B: Optional[AutoEncoder]
-                The encoder-B object, which we use to calculate the feature activations.
-        """
-        # Get the feature act direction by indexing encoder.W_enc, and the bias by indexing encoder.b_enc
-        feature_act_dir = encoder.W_enc[:, feature_idx]  # (d_in, feats)
-        feature_bias = encoder.b_enc[feature_idx]  # (feats,)
-
-        # Calculate & store feature activations (we need to store them so we can get the sequence & histogram vis later)
-        x_cent = model_acts - encoder.b_dec
-        feat_acts_pre = einops.einsum(
-            x_cent, feature_act_dir, "batch seq d_in, d_in feats -> batch seq feats"
-        )
-        feat_acts = F.relu(feat_acts_pre + feature_bias)
-
-        return feat_acts
-
-    @torch.inference_mode()
     def update_rolling_coefficients(
         self,
         model_acts: Float[Tensor, "batch seq d_in"],
@@ -231,3 +197,74 @@ class FeatureDataGenerator:
                     feat_acts_B, "batch seq d_hidden -> d_hidden (batch seq)"
                 ),
             )
+
+
+from typing import List
+
+from torch import nn
+
+
+class FeatureMaskingContext:
+    def __init__(self, sae: SAE, feature_idxs: List[int]):
+        self.sae = sae
+        self.feature_idxs = feature_idxs
+        self.original_weight = {}
+
+    def __enter__(self):
+
+        ## W_dec
+        self.original_weight["W_dec"] = getattr(self.sae, "W_dec").data.clone()
+        # mask the weight
+        masked_weight = self.sae.W_dec[self.feature_idxs]
+        # set the weight
+        setattr(self.sae, "W_dec", nn.Parameter(masked_weight))
+
+        ## W_enc
+        # clone the weight.
+        self.original_weight["W_enc"] = getattr(self.sae, "W_enc").data.clone()
+        # mask the weight
+        masked_weight = self.sae.W_enc[:, self.feature_idxs]
+        # set the weight
+        setattr(self.sae, "W_enc", nn.Parameter(masked_weight))
+
+        if self.sae.cfg.architecture == "standard":
+
+            ## b_enc
+            self.original_weight["b_enc"] = getattr(self.sae, "b_enc").data.clone()
+            # mask the weight
+            masked_weight = self.sae.b_enc[self.feature_idxs]
+            # set the weight
+            setattr(self.sae, "b_enc", nn.Parameter(masked_weight))
+
+        elif self.sae.cfg.architecture == "gated":
+
+            ## b_gate
+            self.original_weight["b_gate"] = getattr(self.sae, "b_gate").data.clone()
+            # mask the weight
+            masked_weight = self.sae.b_gate[self.feature_idxs]
+            # set the weight
+            setattr(self.sae, "b_gate", nn.Parameter(masked_weight))
+
+            ## r_mag
+            self.original_weight["r_mag"] = getattr(self.sae, "r_mag").data.clone()
+            # mask the weight
+            masked_weight = self.sae.r_mag[self.feature_idxs]
+            # set the weight
+            setattr(self.sae, "r_mag", nn.Parameter(masked_weight))
+
+            ## b_mag
+            self.original_weight["b_mag"] = getattr(self.sae, "b_mag").data.clone()
+            # mask the weight
+            masked_weight = self.sae.b_mag[self.feature_idxs]
+            # set the weight
+            setattr(self.sae, "b_mag", nn.Parameter(masked_weight))
+        else:
+            raise (ValueError("Invalid architecture"))
+
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):  # type: ignore
+
+        # set everything back to normal
+        for key, value in self.original_weight.items():
+            setattr(self.sae, key, nn.Parameter(value))
