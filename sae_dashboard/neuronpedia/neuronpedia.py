@@ -4,7 +4,6 @@
 import json
 import math
 import os
-import subprocess
 from pathlib import Path
 
 import requests
@@ -18,6 +17,12 @@ from sae_lens.sae import SAE
 from sae_lens.toolkit.pretrained_saes import load_sparsity
 from typing_extensions import Annotated
 
+from sae_dashboard.neuronpedia.neuronpedia_runner import (
+    DEFAULT_SPARSITY_THRESHOLD,
+    NeuronpediaRunner,
+    NeuronpediaRunnerConfig,
+)
+
 OUTPUT_DIR_BASE = Path("../../neuronpedia_outputs")
 RUN_SETTINGS_FILE = "run_settings.json"
 
@@ -30,7 +35,8 @@ app = typer.Typer(
 
 @app.command()
 def generate(
-    sae_id: Annotated[
+    ctx: typer.Context,
+    sae_set: Annotated[
         str,
         typer.Option(
             help="SAE ID to generate features for (must exactly match the one used on Neuronpedia). Example: res-jb",
@@ -64,7 +70,16 @@ Enter path""",
 What is your desired feature log sparsity threshold?
 Enter value from -10 to 0 [1 to skip]""",
         ),
-    ] = -6,
+    ] = DEFAULT_SPARSITY_THRESHOLD,
+    dtype: Annotated[
+        str | None,
+        typer.Option(
+            help="Override DType",
+            prompt="""
+Override DType type?
+[Enter to use SAE default]""",
+        ),
+    ] = None,
     feat_per_batch: Annotated[
         int,
         typer.Option(
@@ -111,17 +126,32 @@ Enter value""",
     resume_from_batch: Annotated[
         int,
         typer.Option(
-            min=1,
+            min=0,
             help="Batch number to resume from.",
             prompt="""
 Do you want to resume from a specific batch number?
-Enter 1 to start from the beginning. Existing batch files will not be overwritten.""",
+Enter 0 to start from the beginning. Existing batch files will not be overwritten.""",
         ),
-    ] = 1,
+    ] = 0,
+    end_at_batch: Annotated[
+        int,
+        typer.Option(
+            min=-1,
+            help="Batch number to end at.",
+            prompt="""
+Do you want to end at a specific batch number?
+Enter -1 to do all batches. Existing batch files will not be overwritten.""",
+        ),
+    ] = -1,
 ):
     """
     This will start a batch job that generates features for Neuronpedia for a specific SAE. To upload those features, use the 'upload' command afterwards.
     """
+
+    print("\nRe-run this command with:")
+    command = "python neuronpedia.py generate"
+    for key, value in ctx.params.items():
+        command += f" --{key}={value}"
 
     # Check arguments
     if sae_path.is_dir() is not True:
@@ -151,9 +181,11 @@ Enter 1 to start from the beginning. Existing batch files will not be overwritte
         device = "cuda"
     sparse_autoencoder = SAE.load_from_pretrained(sae_path_string, device=device)
     model_id = sparse_autoencoder.cfg.model_name
+    if dtype is None:
+        dtype = sparse_autoencoder.cfg.dtype
 
     # make the outputs subdirectory if it doesn't exist, ensure it's not a file
-    outputs_subdir = f"{model_id}_{sae_id}_{sparse_autoencoder.cfg.hook_name}"
+    outputs_subdir = f"{model_id}_{sae_set}_{sparse_autoencoder.cfg.hook_name}"
     outputs_dir = OUTPUT_DIR_BASE.joinpath(outputs_subdir)
     if outputs_dir.exists() and outputs_dir.is_file():
         print(f"Error: Output directory {outputs_dir.as_posix()} exists and is a file.")
@@ -175,9 +207,14 @@ Enter 1 to start from the beginning. Existing batch files will not be overwritte
                     f"[red]Error: log_sparsity in {run_settings_path.as_posix()} doesn't match the current log_sparsity:\n{run_settings['log_sparsity']} vs {log_sparsity}"
                 )
                 raise typer.Abort()
-            if run_settings["sae_id"] != sae_id:
+            if run_settings["sae_set"] != sae_set:
                 print(
-                    f"[red]Error: sae_id in {run_settings_path.as_posix()} doesn't match the current sae_id:\n{run_settings['sae_id']} vs {sae_id}"
+                    f"[red]Error: sae_set in {run_settings_path.as_posix()} doesn't match the current sae_set:\n{run_settings['sae_set']} vs {sae_set}"
+                )
+                raise typer.Abort()
+            if run_settings["dtype"] != dtype:
+                print(
+                    f"[red]Error: dtype in {run_settings_path.as_posix()} doesn't match the current dtype:\n{run_settings['dtype']} vs {dtype}"
                 )
                 raise typer.Abort()
             if run_settings["sae_path"] != sae_path_string:
@@ -209,9 +246,10 @@ Enter 1 to start from the beginning. Existing batch files will not be overwritte
     else:
         print(f"[green]Creating run_settings.json in {run_settings_path.as_posix()}.")
         run_settings = {
-            "sae_id": sae_id,
+            "sae_set": sae_set,
             "sae_path": sae_path_string,
             "log_sparsity": log_sparsity,
+            "dtype": dtype,
             "n_batches_to_sample": n_batches_to_sample,
             "n_prompts_to_select": n_prompts_to_select,
             "n_context_tokens": n_context_tokens,
@@ -234,6 +272,13 @@ Enter 1 to start from the beginning. Existing batch files will not be overwritte
         num_alive = len(alive_indexes)
         num_dead = sparse_autoencoder.cfg.d_sae - num_alive
 
+    num_batches = math.ceil(sparse_autoencoder.cfg.d_sae / feat_per_batch)
+    if end_at_batch >= num_batches:
+        print(
+            f"[red]Error: end_at_batch {end_at_batch} should not be >= num_batches {num_batches}"
+        )
+        raise typer.Abort()
+
     print("\n")
     print(
         Align.center(
@@ -242,13 +287,13 @@ Enter 1 to start from the beginning. Existing batch files will not be overwritte
 [white]SAE Path: [green]{sae_path.as_posix()}
 [white]Model ID: [green]{model_id}
 [white]Hook Point: [green]{sparse_autoencoder.cfg.hook_name}
+[white]DType: [green]{dtype}
 [white]Using Device: [green]{device}
 """,
                 title="SAE Info",
             )
         )
     )
-    num_batches = math.ceil(num_alive / feat_per_batch)
     print(
         Align.center(
             Panel.fit(
@@ -259,7 +304,8 @@ Enter 1 to start from the beginning. Existing batch files will not be overwritte
 [white]Dead Features: [red]{num_dead}
 [white]Features per Batch: [green]{feat_per_batch}
 [white]Number of Batches: [green]{num_batches}
-{resume_from_batch != 1 and f"[white]Resuming from Batch: [green]{resume_from_batch}" or ""}
+{resume_from_batch != 0 and f"[white]Resuming from Batch: [green]{resume_from_batch}" or ""}
+{end_at_batch != -1 and f"[white]Ending at Batch: [green]{end_at_batch}" or ""}
 """,
                 title="Number of Features",
             )
@@ -291,54 +337,30 @@ Enter 1 to start from the beginning. Existing batch files will not be overwritte
 
     print(
         Align.center(
-            "\n========== [yellow]Starting batch feature generations...[/yellow] =========="
+            "\n========== [yellow]Starting batch feature generations...[/yellow] ==========\n"
         )
     )
 
-    # iterate from 1 to num_batches
-    for i in range(resume_from_batch, num_batches + 1):
-        command = [
-            "python",
-            "make_batch.py",
-            sae_id,
-            sae_path.absolute().as_posix(),
-            outputs_dir.absolute().as_posix(),
-            str(log_sparsity),
-            str(n_batches_to_sample),
-            str(n_prompts_to_select),
-            str(n_context_tokens),
-            str(feat_per_batch),
-            str(i),
-            str(i),
-        ]
-        print("\n")
-        print(
-            Align.center(
-                Panel.fit(
-                    f"""
-[yellow]{" ".join(command)}
-""",
-                    title="Running Command for Batch #" + str(i),
-                )
-            )
-        )
-        # make a subprocess call to python make_batch.py
-        subprocess.run(
-            [
-                "python",
-                "make_batch.py",
-                sae_id,
-                sae_path,
-                outputs_dir,
-                str(log_sparsity),
-                str(n_batches_to_sample),
-                str(n_prompts_to_select),
-                str(n_context_tokens),
-                str(feat_per_batch),
-                str(i),
-                str(i),
-            ]
-        )
+    print("\n\nRe-Run this with command:\n")
+    print(command + "\n\n")
+
+    # run the command
+    cfg = NeuronpediaRunnerConfig(
+        sae_set=sae_set,
+        sae_path=sae_path.absolute().as_posix(),
+        dtype=dtype,
+        outputs_dir=outputs_dir.absolute().as_posix(),
+        sparsity_threshold=log_sparsity,
+        n_batches_to_sample_from=n_batches_to_sample,
+        n_prompts_to_select=n_prompts_to_select,
+        n_context_tokens=n_context_tokens if n_context_tokens != 0 else None,
+        n_features_at_a_time=feat_per_batch,
+        start_batch=resume_from_batch,
+        end_batch=end_at_batch if end_at_batch != -1 else num_batches,
+    )
+
+    runner = NeuronpediaRunner(cfg)
+    runner.run()
 
     print(
         Align.center(
@@ -462,6 +484,9 @@ Dead feature stubs created.
         )
     )
 
+
+if __name__ == "__main__":
+    app()
 
 if __name__ == "__main__":
     app()

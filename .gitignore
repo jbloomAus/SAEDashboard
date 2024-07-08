@@ -176,3 +176,4 @@ tests/fixtures/cache_unit/
 
 neuronpedia_outputs/
 cached_activations/
+wandb/
