@@ -83,7 +83,7 @@ def add_neuron_alignment_data(
     top3_neurons_aligned = TopK(tensor=feature_out_dir.float(), k=n_rows, largest=True)
     feature_out_l1_norm = feature_out_dir.abs().sum(dim=-1, keepdim=True)
     pct_of_l1: Arr = np.absolute(top3_neurons_aligned.values) / utils.to_numpy(
-        feature_out_l1_norm
+        feature_out_l1_norm.float()
     )
     feature_tables_data["neuron_alignment_indices"] = (
         top3_neurons_aligned.indices.tolist()
