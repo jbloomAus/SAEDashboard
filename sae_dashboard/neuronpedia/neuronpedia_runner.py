@@ -363,11 +363,13 @@ class NeuronpediaRunner:
             for features_to_process in tqdm(feature_idx):
 
                 if feature_batch_count < self.cfg.start_batch:
+                    feature_batch_count = feature_batch_count + 1
                     continue
                 if (
                     self.cfg.end_batch is not None
                     and feature_batch_count > self.cfg.end_batch
                 ):
+                    feature_batch_count = feature_batch_count + 1
                     continue
 
                 output_file = f"{self.outputs_dir}/batch-{feature_batch_count}.json"
