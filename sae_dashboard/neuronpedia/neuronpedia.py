@@ -396,9 +396,9 @@ def upload(
     resume: Annotated[
         int,
         typer.Option(
-            prompt="""Resume from batch? (Default: 1)""",
+            prompt="""Resume from batch? (Default: 0)""",
         ),
-    ] = 1,
+    ] = 0,
 ):
     """
     This will upload features that were generated to Neuronpedia. It currently only works if you have admin access to a Neuronpedia instance via localhost:3000.
