@@ -151,7 +151,7 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
     print("\nRe-run command with:\n")
     command = "python neuronpedia.py generate"
     for key, value in ctx.params.items():
-        command += f" --{key.replace("_", "-")}={value}"
+        command += f" --{key.replace('_', '-')}={value}"  # type: ignore
     print(command + "\n\n")
 
     # Check arguments
