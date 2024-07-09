@@ -6,7 +6,7 @@ ARG APP_PATH=/opt/$APP_NAME
 ARG PYTHON_VERSION=3.12.2
 ARG POETRY_VERSION=1.8.3
 
-FROM pytorch/pytorch:2.2.0-cuda12.1-cudnn8-devel as staging
+FROM pytorch/pytorch:2.2.0-cuda12.1-cudnn8-devel AS staging
 ARG APP_NAME
 ARG APP_PATH
 ARG POETRY_VERSION
@@ -21,7 +21,7 @@ ENV \
     POETRY_VIRTUALENVS_IN_PROJECT=true \
     POETRY_NO_INTERACTION=1
 
-RUN apt-get update && apt-get -y install curl
+RUN apt-get update && apt-get install -y curl
 RUN curl -sSL https://install.python-poetry.org | python
 ENV PATH="$POETRY_HOME/bin:$PATH"
 
@@ -29,12 +29,18 @@ WORKDIR $APP_PATH
 COPY ./poetry.lock ./pyproject.toml ./README.md ./
 COPY ./$APP_NAME ./$APP_NAME
 
-FROM staging as development
+FROM staging AS development
 ARG APP_NAME
 ARG APP_PATH
 
 WORKDIR $APP_PATH
 RUN poetry install
+
+RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash
+RUN apt-get install -y git-lfs
+RUN git lfs install
+
+RUN apt-get install -y vim
 
 ENTRYPOINT ["/bin/bash"]
 CMD ["poetry", "shell"]

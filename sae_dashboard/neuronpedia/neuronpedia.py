@@ -148,10 +148,11 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
     This will start a batch job that generates features for Neuronpedia for a specific SAE. To upload those features, use the 'upload' command afterwards.
     """
 
-    print("\nRe-run this command with:")
+    print("\nRe-run command with:\n")
     command = "python neuronpedia.py generate"
     for key, value in ctx.params.items():
-        command += f" --{key}={value}"
+        command += f" --{key.replace("_", "-")}={value}"
+    print(command + "\n\n")
 
     # Check arguments
     if sae_path.is_dir() is not True:
@@ -341,7 +342,7 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
         )
     )
 
-    print("\n\nRe-Run this with command:\n")
+    print("\n\nRe-run with command:\n")
     print(command + "\n\n")
 
     # run the command
