@@ -26,7 +26,7 @@ RUN curl -sSL https://install.python-poetry.org | python
 ENV PATH="$POETRY_HOME/bin:$PATH"
 
 WORKDIR $APP_PATH
-COPY ./poetry.lock ./pyproject.toml ./
+COPY ./poetry.lock ./pyproject.toml ./README.md ./
 COPY ./$APP_NAME ./$APP_NAME
 
 FROM staging as development
