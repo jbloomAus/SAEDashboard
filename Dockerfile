@@ -21,7 +21,8 @@ ENV \
     POETRY_VIRTUALENVS_IN_PROJECT=true \
     POETRY_NO_INTERACTION=1
 
-RUN apt-get update && apt-get install -y curl
+RUN apt-get update && apt-get install -y curl git-lfs vim && rm -rf /var/lib/apt/lists/*
+
 RUN curl -sSL https://install.python-poetry.org | python
 ENV PATH="$POETRY_HOME/bin:$PATH"
 
@@ -38,10 +39,7 @@ RUN poetry lock
 RUN poetry install
 
 RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash
-RUN apt-get install -y git-lfs
 RUN git lfs install
-
-RUN apt-get install -y vim
 
 ENTRYPOINT ["/bin/bash"]
 CMD ["poetry", "shell"]
