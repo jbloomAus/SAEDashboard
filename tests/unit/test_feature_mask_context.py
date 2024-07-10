@@ -3,6 +3,7 @@ from sae_lens import SAE
 
 from sae_dashboard.feature_data_generator import FeatureMaskingContext
 
+
 @torch.no_grad()
 def test_feature_mask_context(autoencoder: SAE):
 
