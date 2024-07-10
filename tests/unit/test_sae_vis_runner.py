@@ -72,6 +72,8 @@ def sae_vis_data(
     autoencoder: SAE,
     tokens: Int[Tensor, "batch seq"],
 ) -> SaeVisData:
+    autoencoder.cfg.device = TEST_DEVICE
+    autoencoder.to(TEST_DEVICE)
     data = SaeVisRunner(cfg).run(encoder=autoencoder, model=model, tokens=tokens)
     return data
 

@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import List
 
 import einops
 import numpy as np
@@ -6,9 +7,7 @@ import torch
 from jaxtyping import Float, Int
 from sae_lens import SAE
 from sae_lens.config import DTYPE_MAP as DTYPES
-from safetensors import safe_open
-from safetensors.torch import save_file
-from torch import Tensor
+from torch import Tensor, nn
 from tqdm.auto import tqdm
 
 from sae_dashboard.sae_vis_data import SaeVisConfig
@@ -111,40 +110,29 @@ class FeatureDataGenerator:
 
     @torch.inference_mode()
     def get_model_acts(
-        self, minibatch_index: int, minibatch_tokens: Int[Tensor, "batch seq"]
+        self, minibatch_index: int, minibatch_tokens: torch.Tensor
     ) -> torch.Tensor:
         """
-        A function that gets the model activations and residuals for a given minibatch of tokens.
-        Handles the existence of a caching directory and whether or not activations are already cached.
+        A function that gets the model activations for a given minibatch of tokens.
+        Uses np.memmap for efficient caching.
         """
-
         if self.cfg.cache_dir is not None:
-            # check if the activations are already cached
-            cache_path = (
-                self.cfg.cache_dir / f"model_activations_{minibatch_index}.safetensors"
-            )
+            cache_path = self.cfg.cache_dir / f"model_activations_{minibatch_index}.dat"
             if cache_path.exists():
-                model_acts = self.get_cached_activation_results(cache_path)
+                model_acts = load_tensor_memmap(cache_path)
             else:
-                # generate and store the results
                 model_acts = self.model.forward(minibatch_tokens, return_logits=False)
-                tensors = {"activations": model_acts}
-                # could also save tokens to avoid needing to provide them above.
-                save_file(tensors, cache_path)
+                save_tensor_memmap(model_acts, cache_path)
         else:
             model_acts = self.model.forward(minibatch_tokens, return_logits=False)
 
+        if "cuda" in self.cfg.device:
+            # async copy to device
+            model_acts = model_acts.to(self.cfg.device, non_blocking=True)
+        else:
+            model_acts = model_acts.to(self.cfg.device)
+
         return model_acts
-
-    @torch.inference_mode()
-    def get_cached_activation_results(self, cache_path: Path) -> torch.Tensor:
-        with safe_open(cache_path, framework="pt", device=str(self.cfg.device)) as f:  # type: ignore
-            model_acts = f.get_tensor("activations")
-            # residual = f.get_tensor("residual")
-
-        model_acts = model_acts.to(DTYPES[self.cfg.dtype])
-        # residual = residual.to(DTYPES[self.cfg.dtype])
-        return model_acts  # , residual
 
     @torch.inference_mode()
     def update_rolling_coefficients(
@@ -199,9 +187,31 @@ class FeatureDataGenerator:
             )
 
 
-from typing import List
+def save_tensor_memmap(tensor: torch.Tensor, filename: Path):
+    array = tensor.float().cpu().numpy()
+    shape = array.shape
+    dtype = array.dtype
 
-from torch import nn
+    # Save shape and dtype info
+    np.savez(filename.with_suffix(".npz"), shape=shape, dtype=str(dtype))
+
+    # Save the actual data as memmap
+    mm = np.memmap(filename, dtype=dtype, mode="w+", shape=shape)
+    mm[:] = array[:]
+    mm.flush()
+
+
+def load_tensor_memmap(filename: Path) -> torch.Tensor:
+    # Load shape and dtype info
+    info = np.load(filename.with_suffix(".npz"))
+    shape = tuple(info["shape"])
+    dtype = np.dtype(info["dtype"].item())
+
+    # Load the memmap
+    mm = np.memmap(filename, dtype=dtype, mode="r", shape=shape)
+
+    # Convert to torch tensor
+    return torch.from_numpy(mm)
 
 
 class FeatureMaskingContext:

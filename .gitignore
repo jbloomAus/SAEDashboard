@@ -182,3 +182,5 @@ wandb/
 **.safetensors
 **flamegraph.html
 artifacts/
+
+.vscode/settings.json
