@@ -76,7 +76,7 @@ Enter value from -10 to 0 [1 to skip]""",
 Override DType type?
 [Enter to use SAE default]""",
         ),
-    ] = "float32",
+    ] = "",
     feat_per_batch: Annotated[
         int,
         typer.Option(
@@ -167,7 +167,7 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
         device = "cuda"
     sparse_autoencoder = SAE.load_from_pretrained(sae_path_string, device=device)
     model_id = sparse_autoencoder.cfg.model_name
-    if dtype is None:
+    if dtype == "":
         dtype = sparse_autoencoder.cfg.dtype
 
     # make the outputs subdirectory if it doesn't exist, ensure it's not a file

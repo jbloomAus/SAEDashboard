@@ -97,7 +97,7 @@ class NeuronpediaRunnerConfig:
     top_acts_group_size: int = 20
     quantile_group_size: int = 5
 
-    dtype: str = "bfloat16"
+    dtype: str = ""
 
     sae_device: str | None = None
     activation_store_device: str | None = None
@@ -138,6 +138,10 @@ class NeuronpediaRunner:
         # Activation store device is always CPU
         self.cfg.activation_store_device = self.cfg.activation_store_device or "cpu"
 
+        # Default dtype to the SAE dtype unless we override
+        if self.cfg.dtype == "":
+            self.cfg.dtype = self.sae.cfg.dtype
+
         # Initialize SAE
         self.sae = SAE.load_from_pretrained(
             path=self.cfg.sae_path,
@@ -156,6 +160,7 @@ class NeuronpediaRunner:
         print(f"Model Device: {self.cfg.model_device}")
         print(f"Model Num Devices: {self.cfg.model_n_devices}")
         print(f"Activation Store Device: {self.cfg.activation_store_device}")
+        print(f"DType: {self.cfg.dtype}")
         print(f"Dataset Path: {self.cfg.huggingface_dataset_path}")
         print(f"Forward Pass size: {self.cfg.n_tokens_in_prompt}")
 
@@ -180,11 +185,6 @@ class NeuronpediaRunner:
         self.sae.cfg.context_size = self.cfg.n_tokens_in_prompt
 
         self.sae.fold_W_dec_norm()
-        # Default dtype to the SAE dtype unless we override
-        if self.cfg.dtype == "":
-            self.cfg.dtype = self.sae.cfg.dtype
-
-        print(f"DType: {self.cfg.dtype}")
 
         # Initialize Model
         self.model_id = self.sae.cfg.model_name
