@@ -79,12 +79,13 @@ class NeuronpediaRunnerConfig:
     sae_path: str
     outputs_dir: str
     sparsity_threshold: int = DEFAULT_SPARSITY_THRESHOLD
+    huggingface_dataset_path: str = "SAE_TRAINING_DATASET"
 
     # ACTIVATION STORE PARAMETERS
     # token pars
-    n_batches_to_sample_from: int = 2**12
-    n_prompts_to_select: int = 4096 * 6
-    n_context_tokens: int | None = None
+    n_prompts_total: int = 24576
+    n_tokens_in_prompt: int = 128
+    n_prompts_in_forward_pass: int = 4096
 
     # batching
     n_features_at_a_time: int = 128
@@ -96,7 +97,7 @@ class NeuronpediaRunnerConfig:
     top_acts_group_size: int = 20
     quantile_group_size: int = 5
 
-    dtype: str | None = None
+    dtype: str = "bfloat16"
 
     sae_device: str | None = None
     activation_store_device: str | None = None
@@ -121,6 +122,7 @@ class NeuronpediaRunner:
             self.cfg.sae_device = self.cfg.sae_device or "mps"
             self.cfg.model_device = self.cfg.model_device or "mps"
             self.cfg.model_n_devices = self.cfg.model_n_devices or 1
+            self.cfg.activation_store_device = self.cfg.activation_store_device or "mps"
         elif torch.cuda.is_available():
             device_count = torch.cuda.device_count()
             if device_count > 1:
@@ -128,25 +130,61 @@ class NeuronpediaRunner:
                 self.cfg.model_n_devices = self.cfg.model_n_devices or (
                     device_count - 1
                 )
+            else:
+                self.cfg.sae_device = self.cfg.sae_device or "cuda"
             self.cfg.model_device = self.cfg.model_device or "cuda"
+            self.cfg.sae_device = self.cfg.sae_device or "cuda"
+
         # Activation store device is always CPU
         self.cfg.activation_store_device = self.cfg.activation_store_device or "cpu"
+
+        # Initialize SAE
+        self.sae = SAE.load_from_pretrained(
+            path=self.cfg.sae_path,
+            device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
+            dtype=self.cfg.dtype,
+        )
+        # double sure this works
+        self.sae.to(self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE)
+        self.sae.cfg.device = self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE
+
+        if self.cfg.huggingface_dataset_path == "SAE_TRAINING_DATASET":
+            self.cfg.huggingface_dataset_path = self.sae.cfg.dataset_path
 
         print(f"Device Count: {device_count}")
         print(f"SAE Device: {self.cfg.sae_device}")
         print(f"Model Device: {self.cfg.model_device}")
         print(f"Model Num Devices: {self.cfg.model_n_devices}")
         print(f"Activation Store Device: {self.cfg.activation_store_device}")
+        print(f"Dataset Path: {self.cfg.huggingface_dataset_path}")
+        print(f"Forward Pass size: {self.cfg.n_tokens_in_prompt}")
 
-        # Initialize SAE
-        self.sae = SAE.load_from_pretrained(
-            path=self.cfg.sae_path,
-            device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
-        )
+        # number of tokens
+        n_tokens_total = self.cfg.n_prompts_total * self.cfg.n_tokens_in_prompt
+        print(f"Total number of tokens: {n_tokens_total}")
+        print(f"Total number of contexts (prompts): {self.cfg.n_prompts_total}")
+
+        # get the sae's cfg and check if it has from pretrained kwargs
+        with open(f"{self.cfg.sae_path}/cfg.json", "r") as f:
+            sae_cfg_json = json.load(f)
+        sae_from_pretrained_kwargs = sae_cfg_json.get("from_pretrained_kwargs", {})
+        print("SAE Config on disk", sae_cfg_json)
+        if sae_from_pretrained_kwargs != {}:
+            print("SAE has from_pretrained_kwargs", sae_from_pretrained_kwargs)
+        else:
+            print(
+                "SAE does not have from_pretrained_kwargs. Standard TransformerLens Loading"
+            )
+
+        self.sae.cfg.dataset_path = self.cfg.huggingface_dataset_path
+        self.sae.cfg.context_size = self.cfg.n_tokens_in_prompt
+
         self.sae.fold_W_dec_norm()
         # Default dtype to the SAE dtype unless we override
-        if self.cfg.dtype is None:
+        if self.cfg.dtype == "":
             self.cfg.dtype = self.sae.cfg.dtype
+
+        print(f"DType: {self.cfg.dtype}")
 
         # Initialize Model
         self.model_id = self.sae.cfg.model_name
@@ -155,6 +193,7 @@ class NeuronpediaRunner:
             model_name=self.model_id,
             device=self.cfg.model_device,
             n_devices=self.cfg.model_n_devices or 1,
+            **sae_from_pretrained_kwargs,
         )
 
         # Initialize Activations Store
@@ -165,19 +204,19 @@ class NeuronpediaRunner:
             streaming=True,
             store_batch_size_prompts=8,
             n_batches_in_buffer=16,
-            device=self.cfg.activation_store_device,
+            device=self.cfg.activation_store_device or "cpu",
         )
         self.cached_activations_dir = Path(
             f"./cached_activations/{self.model_id}_{self.cfg.sae_set}_{self.sae.cfg.hook_name}"
         )
         # TODO: make these into parameters too?
-        self.minibatch_size_features = 128
-        self.minibatch_size_tokens = 64
+        self.minibatch_size_features = self.cfg.n_features_at_a_time
+        self.minibatch_size_tokens = self.cfg.n_prompts_in_forward_pass
 
         # override the number of context tokens if we specified one
         # this is useful because sometimes the default context tokens is too large for us to quickly generate
-        if self.cfg.n_context_tokens is not None:
-            self.activations_store.context_size = self.cfg.n_context_tokens
+        if self.cfg.n_tokens_in_prompt is not None:
+            self.activations_store.context_size = self.cfg.n_tokens_in_prompt
 
         if not os.path.exists(cfg.outputs_dir):
             os.makedirs(cfg.outputs_dir)
@@ -188,11 +227,10 @@ class NeuronpediaRunner:
     def generate_tokens(
         self,
         activations_store: ActivationsStore,
-        n_batches_to_sample_from: int = 4096 * 6,
-        n_prompts_to_select: int = 4096 * 6,
+        n_prompts: int = 4096 * 6,
     ):
         all_tokens_list = []
-        pbar = tqdm(range(n_batches_to_sample_from))
+        pbar = tqdm(range(n_prompts))
         for _ in pbar:
             batch_tokens = activations_store.get_batch_tokens()
             if self.cfg.shuffle_tokens:
@@ -204,7 +242,7 @@ class NeuronpediaRunner:
         all_tokens = torch.cat(all_tokens_list, dim=0)
         if self.cfg.shuffle_tokens:
             all_tokens = all_tokens[torch.randperm(all_tokens.shape[0])]
-        return all_tokens[:n_prompts_to_select]
+        return all_tokens
 
     def round_list(self, to_round: list[float]):
         return list(np.round(to_round, 3))
@@ -292,7 +330,7 @@ class NeuronpediaRunner:
 
     def get_tokens(self):
 
-        tokens_file = f"{self.outputs_dir}/tokens_{self.cfg.n_batches_to_sample_from}_{self.cfg.n_prompts_to_select}.pt"
+        tokens_file = f"{self.outputs_dir}/tokens_{self.cfg.n_prompts_total}.pt"
         if os.path.isfile(tokens_file):
             print("Tokens exist, loading them.")
             tokens = torch.load(tokens_file)
@@ -300,8 +338,7 @@ class NeuronpediaRunner:
             print("Tokens don't exist, making them.")
             tokens = self.generate_tokens(
                 self.activations_store,
-                self.cfg.n_batches_to_sample_from,
-                self.cfg.n_prompts_to_select,
+                self.cfg.n_prompts_total,
             )
             torch.save(
                 tokens,
@@ -359,11 +396,13 @@ class NeuronpediaRunner:
             for features_to_process in tqdm(feature_idx):
 
                 if feature_batch_count < self.cfg.start_batch:
+                    feature_batch_count = feature_batch_count + 1
                     continue
                 if (
                     self.cfg.end_batch is not None
                     and feature_batch_count > self.cfg.end_batch
                 ):
+                    feature_batch_count = feature_batch_count + 1
                     continue
 
                 output_file = f"{self.outputs_dir}/batch-{feature_batch_count}.json"
@@ -505,7 +544,8 @@ class NeuronpediaRunner:
                 logits_hist_data.bar_values
             )
 
-            feature_output.num_tokens_for_dashboard = self.cfg.n_prompts_to_select
+            # @Johnny, what is this doing?
+            feature_output.num_tokens_for_dashboard = self.cfg.n_prompts_total
 
             activations = []
             sdbs = feature.sequence_data
@@ -565,8 +605,10 @@ class NeuronpediaRunner:
         batch_data.sae_set = self.cfg.sae_set
         batch_data.features = features_outputs
         settings = NeuronpediaDashboardSettings()
-        settings.n_batches_to_sample_from = self.cfg.n_batches_to_sample_from
-        settings.n_prompt_to_select = self.cfg.n_prompts_to_select
+
+        # @Johnny, don't want to change artifact so leaving these.
+        settings.n_batches_to_sample_from = self.cfg.n_prompts_total
+        settings.n_prompt_to_select = self.cfg.n_prompts_total
         batch_data.settings = settings
 
         json_object = json.dumps(batch_data, cls=NpEncoder)

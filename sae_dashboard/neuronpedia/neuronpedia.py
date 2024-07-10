@@ -1,6 +1,3 @@
-# we use a script that launches separate python processes to work around OOM issues - this ensures every batch gets the whole system available memory
-# better fix is to investigate and fix the memory issues
-
 import json
 import math
 import os
@@ -23,7 +20,7 @@ from sae_dashboard.neuronpedia.neuronpedia_runner import (
     NeuronpediaRunnerConfig,
 )
 
-OUTPUT_DIR_BASE = Path("../../neuronpedia_outputs")
+OUTPUT_DIR_BASE = Path("./neuronpedia_outputs")
 RUN_SETTINGS_FILE = "run_settings.json"
 
 app = typer.Typer(
@@ -72,14 +69,14 @@ Enter value from -10 to 0 [1 to skip]""",
         ),
     ] = DEFAULT_SPARSITY_THRESHOLD,
     dtype: Annotated[
-        str | None,
+        str,
         typer.Option(
             help="Override DType",
             prompt="""
 Override DType type?
 [Enter to use SAE default]""",
         ),
-    ] = None,
+    ] = "float32",
     feat_per_batch: Annotated[
         int,
         typer.Option(
@@ -91,18 +88,7 @@ How many features do you want to generate per batch? More requires more memory.
 Enter value""",
         ),
     ] = 128,
-    n_batches_to_sample: Annotated[
-        int,
-        typer.Option(
-            min=1,
-            help="[Activation Text Generation] Number of batches to sample from.",
-            prompt="""
-[Activation Text Generation] How many batches do you want to sample from?
-Enter value""",
-        ),
-    ] = 2
-    ** 12,
-    n_prompts_to_select: Annotated[
+    n_prompts: Annotated[
         int,
         typer.Option(
             min=1,
@@ -111,8 +97,7 @@ Enter value""",
 [Activation Text Generation] How many prompts do you want to select from?
 Enter value""",
         ),
-    ] = 4096
-    * 6,
+    ] = 24576,
     n_context_tokens: Annotated[
         int,
         typer.Option(
@@ -148,10 +133,11 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
     This will start a batch job that generates features for Neuronpedia for a specific SAE. To upload those features, use the 'upload' command afterwards.
     """
 
-    print("\nRe-run this command with:")
+    print("\nRe-run command with:\n")
     command = "python neuronpedia.py generate"
     for key, value in ctx.params.items():
-        command += f" --{key}={value}"
+        command += f" --{key.replace('_', '-')}={value}"  # type: ignore
+    print(command + "\n\n")
 
     # Check arguments
     if sae_path.is_dir() is not True:
@@ -222,14 +208,9 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
                     f"[red]Error: sae_path in {run_settings_path.as_posix()} doesn't match the current sae_path:\n{run_settings['sae_path']} vs {sae_path_string}"
                 )
                 raise typer.Abort()
-            if run_settings["n_batches_to_sample"] != n_batches_to_sample:
+            if run_settings["n_prompts"] != n_prompts:
                 print(
-                    f"[red]Error: n_batches_to_sample in {run_settings_path.as_posix()} doesn't match the current n_batches_to_sample:\n{run_settings['n_batches_to_sample']} vs {n_batches_to_sample}"
-                )
-                raise typer.Abort()
-            if run_settings["n_prompts_to_select"] != n_prompts_to_select:
-                print(
-                    f"[red]Error: n_prompts_to_select in {run_settings_path.as_posix()} doesn't match the current n_prompts_to_select:\n{run_settings['n_prompts_to_select']} vs {n_prompts_to_select}"
+                    f"[red]Error: n_prompts in {run_settings_path.as_posix()} doesn't match the current n_prompts:\n{run_settings['n_prompts']} vs {n_prompts}"
                 )
                 raise typer.Abort()
             if run_settings["n_context_tokens"] != n_context_tokens:
@@ -250,8 +231,7 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
             "sae_path": sae_path_string,
             "log_sparsity": log_sparsity,
             "dtype": dtype,
-            "n_batches_to_sample": n_batches_to_sample,
-            "n_prompts_to_select": n_prompts_to_select,
+            "n_prompts": n_prompts,
             "n_context_tokens": n_context_tokens,
             "feat_per_batch": feat_per_batch,
         }
@@ -316,8 +296,7 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
             Panel.fit(
                 f"""
 [white]Dataset: [green]{sparse_autoencoder.cfg.dataset_path}
-[white]Batches to Sample From: [green]{n_batches_to_sample}
-[white]Prompts to Select From: [green]{n_prompts_to_select}
+[white]Prompts to Sample From: [green]{n_prompts}
 [white]Context Token Length: [green]{n_context_tokens if n_context_tokens != 0 else 0}
 """,
                 title="Activation Text Settings",
@@ -341,7 +320,7 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
         )
     )
 
-    print("\n\nRe-Run this with command:\n")
+    print("\n\nRe-run with command:\n")
     print(command + "\n\n")
 
     # run the command
@@ -351,9 +330,8 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
         dtype=dtype,
         outputs_dir=outputs_dir.absolute().as_posix(),
         sparsity_threshold=log_sparsity,
-        n_batches_to_sample_from=n_batches_to_sample,
-        n_prompts_to_select=n_prompts_to_select,
-        n_context_tokens=n_context_tokens if n_context_tokens != 0 else None,
+        n_prompts_total=n_prompts,
+        n_tokens_in_prompt=n_context_tokens if n_context_tokens != 0 else 128,
         n_features_at_a_time=feat_per_batch,
         start_batch=resume_from_batch,
         end_batch=end_at_batch if end_at_batch != -1 else num_batches,
@@ -396,9 +374,9 @@ def upload(
     resume: Annotated[
         int,
         typer.Option(
-            prompt="""Resume from batch? (Default: 1)""",
+            prompt="""Resume from batch? (Default: 0)""",
         ),
-    ] = 1,
+    ] = 0,
 ):
     """
     This will upload features that were generated to Neuronpedia. It currently only works if you have admin access to a Neuronpedia instance via localhost:3000.
@@ -484,9 +462,6 @@ Dead feature stubs created.
         )
     )
 
-
-if __name__ == "__main__":
-    app()
 
 if __name__ == "__main__":
     app()

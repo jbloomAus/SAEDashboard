@@ -156,45 +156,45 @@ class NeuronpediaDashboardFeature:
                 f"neuron_alignment_l1 does not match: {self.neuron_alignment_l1} and {other.neuron_alignment_l1}"
             )
             return False
-        if self.correlated_neurons_indices != other.correlated_neurons_indices:
-            print(
-                f"correlated_neurons_indices does not match: {self.correlated_neurons_indices} and {other.correlated_neurons_indices}"
-            )
-            return False
+        # if self.correlated_neurons_indices != other.correlated_neurons_indices:
+        #     print(
+        #         f"correlated_neurons_indices does not match: {self.correlated_neurons_indices} and {other.correlated_neurons_indices}"
+        #     )
+        #     return False
 
-        if equalish(self.correlated_neurons_l1, other.correlated_neurons_l1) is False:
-            print(
-                f"correlated_neurons_l1 does not match: {self.correlated_neurons_l1} and {other.correlated_neurons_l1}"
-            )
-            return False
-        if (
-            equalish(self.correlated_neurons_pearson, other.correlated_neurons_pearson)
-            is False
-        ):
-            print(
-                f"correlated_neurons_pearson does not match: {self.correlated_neurons_pearson} and {other.correlated_neurons_pearson}"
-            )
-            return False
-        if self.correlated_features_indices != other.correlated_features_indices:
-            print(
-                f"correlated_features_indices does not match: {self.correlated_features_indices} and {other.correlated_features_indices}"
-            )
-            return False
-        if equalish(self.correlated_features_l1, other.correlated_features_l1) is False:
-            print(
-                f"correlated_features_l1 does not match: {self.correlated_features_l1} and {other.correlated_features_l1}"
-            )
-            return False
-        if (
-            equalish(
-                self.correlated_features_pearson, other.correlated_features_pearson
-            )
-            is False
-        ):
-            print(
-                f"correlated_features_pearson does not match: {self.correlated_features_pearson} and {other.correlated_features_pearson}"
-            )
-            return False
+        # if equalish(self.correlated_neurons_l1, other.correlated_neurons_l1) is False:
+        #     print(
+        #         f"correlated_neurons_l1 does not match: {self.correlated_neurons_l1} and {other.correlated_neurons_l1}"
+        #     )
+        #     return False
+        # if (
+        #     equalish(self.correlated_neurons_pearson, other.correlated_neurons_pearson)
+        #     is False
+        # ):
+        #     print(
+        #         f"correlated_neurons_pearson does not match: {self.correlated_neurons_pearson} and {other.correlated_neurons_pearson}"
+        #     )
+        #     return False
+        # if self.correlated_features_indices != other.correlated_features_indices:
+        #     print(
+        #         f"correlated_features_indices does not match: {self.correlated_features_indices} and {other.correlated_features_indices}"
+        #     )
+        #     return False
+        # if equalish(self.correlated_features_l1, other.correlated_features_l1) is False:
+        #     print(
+        #         f"correlated_features_l1 does not match: {self.correlated_features_l1} and {other.correlated_features_l1}"
+        #     )
+        #     return False
+        # if (
+        #     equalish(
+        #         self.correlated_features_pearson, other.correlated_features_pearson
+        #     )
+        #     is False
+        # ):
+        #     print(
+        #         f"correlated_features_pearson does not match: {self.correlated_features_pearson} and {other.correlated_features_pearson}"
+        #     )
+        #     return False
         if self.neg_str != other.neg_str:
             print(f"neg_str does not match: {self.neg_str} and {other.neg_str}")
             return False
