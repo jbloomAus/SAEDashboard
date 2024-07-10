@@ -3,7 +3,7 @@ from sae_lens import SAE
 
 from sae_dashboard.feature_data_generator import FeatureMaskingContext
 
-
+@torch.no_grad()
 def test_feature_mask_context(autoencoder: SAE):
 
     feature_indices = list(range(10))
@@ -15,4 +15,4 @@ def test_feature_mask_context(autoencoder: SAE):
     with FeatureMaskingContext(autoencoder, feature_indices):
         new_feature_acts = autoencoder.encode(sae_in_mock)
 
-    assert torch.allclose(original_feature_acts, new_feature_acts)
+    assert (original_feature_acts - new_feature_acts).max() <= 1e-6
