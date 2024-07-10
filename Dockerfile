@@ -1,5 +1,5 @@
-# docker build --target development -t saedashboard-cuda --file Dockerfile .
-# docker run --entrypoint /bin/bash -it saedashboard-cuda
+# docker build --target development -t decoderesearch/saedashboard-cuda --file Dockerfile .
+# docker run --entrypoint /bin/bash -it decoderesearch/saedashboard-cuda
 
 ARG APP_NAME=sae_dashboard
 ARG APP_PATH=/opt/$APP_NAME
@@ -26,7 +26,7 @@ RUN curl -sSL https://install.python-poetry.org | python
 ENV PATH="$POETRY_HOME/bin:$PATH"
 
 WORKDIR $APP_PATH
-COPY ./poetry.lock ./pyproject.toml ./README.md ./
+COPY ./pyproject.toml ./README.md ./
 COPY ./$APP_NAME ./$APP_NAME
 
 FROM staging AS development
@@ -34,6 +34,7 @@ ARG APP_NAME
 ARG APP_PATH
 
 WORKDIR $APP_PATH
+RUN poetry lock
 RUN poetry install
 
 RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash

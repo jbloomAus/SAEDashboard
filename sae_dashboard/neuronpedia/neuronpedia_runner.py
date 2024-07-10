@@ -152,6 +152,8 @@ class NeuronpediaRunner:
         if self.cfg.dtype == "":
             self.cfg.dtype = self.sae.cfg.dtype
 
+        print(f"DType: {self.cfg.dtype}")
+
         # Initialize Model
         self.model_id = self.sae.cfg.model_name
         self.layer = self.sae.cfg.hook_layer

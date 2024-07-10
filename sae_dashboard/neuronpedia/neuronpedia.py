@@ -1,6 +1,3 @@
-# we use a script that launches separate python processes to work around OOM issues - this ensures every batch gets the whole system available memory
-# better fix is to investigate and fix the memory issues
-
 import json
 import math
 import os
