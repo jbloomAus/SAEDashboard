@@ -138,16 +138,18 @@ class NeuronpediaRunner:
         # Activation store device is always CPU
         self.cfg.activation_store_device = self.cfg.activation_store_device or "cpu"
 
-        # Default dtype to the SAE dtype unless we override
-        if self.cfg.dtype == "":
-            self.cfg.dtype = self.sae.cfg.dtype
-
-        # Initialize SAE
+        # Initialize SAE, defaulting to SAE dtype unless we override
         self.sae = SAE.load_from_pretrained(
             path=self.cfg.sae_path,
             device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
-            dtype=self.cfg.dtype,
+            dtype=self.cfg.dtype if self.cfg.dtype != "" else None,
         )
+        # If we didn't override dtype, then use the SAE's dtype
+        if self.cfg.dtype == "":
+            print(f"Using SAE configured dtype: {self.sae.cfg.dtype}")
+            self.cfg.dtype = self.sae.cfg.dtype
+        else:
+            print(f"Overriding dtype to {self.cfg.dtype}")
         # double sure this works
         self.sae.to(self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE)
         self.sae.cfg.device = self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE
@@ -160,7 +162,6 @@ class NeuronpediaRunner:
         print(f"Model Device: {self.cfg.model_device}")
         print(f"Model Num Devices: {self.cfg.model_n_devices}")
         print(f"Activation Store Device: {self.cfg.activation_store_device}")
-        print(f"DType: {self.cfg.dtype}")
         print(f"Dataset Path: {self.cfg.huggingface_dataset_path}")
         print(f"Forward Pass size: {self.cfg.n_tokens_in_prompt}")
 
@@ -442,7 +443,7 @@ class NeuronpediaRunner:
                     device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
                     feature_centric_layout=layout,
                     perform_ablation_experiments=False,
-                    dtype=self.cfg.dtype if self.cfg.dtype else self.sae.cfg.dtype,
+                    dtype=self.cfg.dtype,
                     cache_dir=self.cached_activations_dir,
                 )
 
