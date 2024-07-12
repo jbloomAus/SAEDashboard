@@ -85,7 +85,7 @@ class NeuronpediaRunnerConfig:
     # token pars
     n_prompts_total: int = 24576
     n_tokens_in_prompt: int = 128
-    n_prompts_in_forward_pass: int = 4096
+    n_prompts_in_forward_pass: int = 32
 
     # batching
     n_features_at_a_time: int = 128
@@ -202,8 +202,8 @@ class NeuronpediaRunner:
             sae=self.sae,
             # TODO: these are new parameters, double check them
             streaming=True,
-            store_batch_size_prompts=8,
-            n_batches_in_buffer=16,
+            store_batch_size_prompts=8, # these don't matter
+            n_batches_in_buffer=16, # these don't matter
             device=self.cfg.activation_store_device or "cpu",
         )
         self.cached_activations_dir = Path(
@@ -230,7 +230,7 @@ class NeuronpediaRunner:
         n_prompts: int = 4096 * 6,
     ):
         all_tokens_list = []
-        pbar = tqdm(range(n_prompts))
+        pbar = tqdm(range(n_prompts // activations_store.store_batch_size_prompts))
         for _ in pbar:
             batch_tokens = activations_store.get_batch_tokens()
             if self.cfg.shuffle_tokens:
