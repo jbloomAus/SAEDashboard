@@ -104,7 +104,9 @@ class NeuronpediaDashboardFeature:
         freq_hist_data_bar_heights: list[float] = [],
         logits_hist_data_bar_heights: list[float] = [],
         logits_hist_data_bar_values: list[float] = [],
-        num_tokens_for_dashboard: int = 0,
+        n_prompts_total: int = 0,
+        n_tokens_in_prompt: int = 0,
+        dataset: str = "",
         activations: list[dict[str, Any]] = [],
     ):
         self.feature_index = feature_index
@@ -126,7 +128,9 @@ class NeuronpediaDashboardFeature:
         self.freq_hist_data_bar_heights = freq_hist_data_bar_heights
         self.logits_hist_data_bar_heights = logits_hist_data_bar_heights
         self.logits_hist_data_bar_values = logits_hist_data_bar_values
-        self.num_tokens_for_dashboard = num_tokens_for_dashboard
+        self.n_prompts_total = n_prompts_total
+        self.n_tokens_in_prompt = n_tokens_in_prompt
+        self.dataset = dataset
         self.activations: list[NeuronpediaDashboardActivation] = []
         for activation in activations:
             self.activations.append(NeuronpediaDashboardActivation(**activation))
@@ -244,10 +248,18 @@ class NeuronpediaDashboardFeature:
                 f"logits_hist_data_bar_values does not match: {self.logits_hist_data_bar_values} and {other.logits_hist_data_bar_values}"
             )
             return False
-        if self.num_tokens_for_dashboard != other.num_tokens_for_dashboard:
+        if self.n_prompts_total != other.n_prompts_total:
             print(
-                f"num_tokens_for_dashboard does not match: {self.num_tokens_for_dashboard} and {other.num_tokens_for_dashboard}"
+                f"n_prompts_total does not match: {self.n_prompts_total} and {other.n_prompts_total}"
             )
+            return False
+        if self.n_tokens_in_prompt != other.n_tokens_in_prompt:
+            print(
+                f"n_tokens_in_prompt does not match: {self.n_tokens_in_prompt} and {other.n_tokens_in_prompt}"
+            )
+            return False
+        if self.dataset != other.dataset:
+            print(f"dataset does not match: {self.dataset} and {other.dataset}")
             return False
         for i, activation in enumerate(self.activations):
             if activation != other.activations[i]:
@@ -281,36 +293,39 @@ class NeuronpediaDashboardFeature:
             "freq_hist_data_bar_heights": self.freq_hist_data_bar_heights,
             "logits_hist_data_bar_heights": self.logits_hist_data_bar_heights,
             "logits_hist_data_bar_values": self.logits_hist_data_bar_values,
-            "num_tokens_for_dashboard": self.num_tokens_for_dashboard,
+            "n_prompts_total": self.n_prompts_total,
+            "n_tokens_in_prompt": self.n_tokens_in_prompt,
+            "dataset": self.dataset,
             "activations": [activation.to_dict() for activation in self.activations],
         }
 
 
-@dataclass
-class NeuronpediaDashboardSettings:
+# TODO: just add the NPRunnerConfig instead
+# @dataclass
+# class NeuronpediaDashboardSettings:
 
-    def __init__(self, n_batches_to_sample_from: int = 0, n_prompt_to_select: int = 0):
-        self.n_batches_to_sample_from = n_batches_to_sample_from
-        self.n_prompt_to_select = n_prompt_to_select
+#     def __init__(self, n_batches_to_sample_from: int = 0, n_prompt_to_select: int = 0):
+#         self.n_batches_to_sample_from = n_batches_to_sample_from
+#         self.n_prompt_to_select = n_prompt_to_select
 
-    def __eq__(self, other: Any):
-        if self.n_batches_to_sample_from != other.n_batches_to_sample_from:
-            print(
-                f"n_batches_to_sample_from does not match: {self.n_batches_to_sample_from} and {other.n_batches_to_sample_from}"
-            )
-            return False
-        if self.n_prompt_to_select != other.n_prompt_to_select:
-            print(
-                f"n_prompt_to_select does not match: {self.n_prompt_to_select} and {other.n_prompt_to_select}"
-            )
-            return False
-        return True
+#     def __eq__(self, other: Any):
+#         if self.n_batches_to_sample_from != other.n_batches_to_sample_from:
+#             print(
+#                 f"n_batches_to_sample_from does not match: {self.n_batches_to_sample_from} and {other.n_batches_to_sample_from}"
+#             )
+#             return False
+#         if self.n_prompt_to_select != other.n_prompt_to_select:
+#             print(
+#                 f"n_prompt_to_select does not match: {self.n_prompt_to_select} and {other.n_prompt_to_select}"
+#             )
+#             return False
+#         return True
 
-    def to_dict(self):
-        return {
-            "n_batches_to_sample_from": self.n_batches_to_sample_from,
-            "n_prompt_to_select": self.n_prompt_to_select,
-        }
+#     def to_dict(self):
+#         return {
+#             "n_batches_to_sample_from": self.n_batches_to_sample_from,
+#             "n_prompt_to_select": self.n_prompt_to_select,
+#         }
 
 
 @dataclass
@@ -322,7 +337,7 @@ class NeuronpediaDashboardBatch:
         layer: int = 0,
         sae_set: str = "",
         features: list[dict[str, Any]] = [],
-        settings: NeuronpediaDashboardSettings = NeuronpediaDashboardSettings(),
+        # settings: NeuronpediaDashboardSettings = NeuronpediaDashboardSettings(),
     ):
         self.model_id = model_id
         self.layer = layer
@@ -330,7 +345,7 @@ class NeuronpediaDashboardBatch:
         self.features: list[NeuronpediaDashboardFeature] = []
         for feature in features:
             self.features.append(NeuronpediaDashboardFeature(**feature))
-        self.settings = settings
+        # self.settings = settings
 
     def __eq__(self, other: Any):
         if self.model_id != other.model_id:
@@ -348,9 +363,9 @@ class NeuronpediaDashboardBatch:
                     f"feature {feature.feature_index} does not match: {feature} and {other.features[i]}"
                 )
                 return False
-        if self.settings != other.settings:
-            print(f"settings does not match: {self.settings} and {other.settings}")
-            return False
+        # if self.settings != other.settings:
+        #     print(f"settings does not match: {self.settings} and {other.settings}")
+        #     return False
         return True
 
     def to_dict(self):
@@ -359,5 +374,5 @@ class NeuronpediaDashboardBatch:
             "layer": self.layer,
             "sae_set": self.sae_set,
             "features": [feature.to_dict() for feature in self.features],
-            "settings": self.settings.to_dict(),
+            # "settings": self.settings.to_dict(),
         }
