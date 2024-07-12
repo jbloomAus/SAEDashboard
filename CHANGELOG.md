@@ -2,6 +2,73 @@
 
 
 
+## v0.2.2 (2024-07-12)
+
+### Fix
+
+* fix: don&#39;t sample too many tokens + other fixes
+
+fix: don&#39;t sample too many tokens ([`b2554b0`](https://github.com/jbloomAus/SAEDashboard/commit/b2554b017e75d14b38b343fc6e0c1bcc32be2359))
+
+* fix: don&#39;t sample too many tokens ([`0cbb2ed`](https://github.com/jbloomAus/SAEDashboard/commit/0cbb2edb480b83823dc1a98dd7e5978ecdda0d81))
+
+### Unknown
+
+* - Don&#39;t force manual overrides for dtype - default to SAE&#39;s dtype
+- Add n_prompts_in_forward_pass to neuronpedia.py
+- Add n_prompts_total, n_tokens_in_prompt, and dataset to neuronpedia artifact
+- Remove NPDashboardSettings for now (just save the NPRunnerConfig later)
+- Fix lint error
+- Consolidate minibatch_size_features/tokens to n_feats_at_a_time and n_prompts_in_fwd_pass
+- Update/Fix NP acceptance test ([`b6282c8`](https://github.com/jbloomAus/SAEDashboard/commit/b6282c83e1898e356e271af0926e2271fb23f707))
+
+* Merge pull request #7 from jbloomAus/performance-improvement
+
+feat: performance improvement ([`f98b3dc`](https://github.com/jbloomAus/SAEDashboard/commit/f98b3dcf84c42687dfc92fa38377edd1c3f6fa30))
+
+* delete unused snapshots ([`4210b48`](https://github.com/jbloomAus/SAEDashboard/commit/4210b48608792adc9b841ea92a64050311e66cd6))
+
+* format ([`de57a2d`](https://github.com/jbloomAus/SAEDashboard/commit/de57a2d84564fc0eb7d5e42799c00f73c7007cf8))
+
+* linter ([`4725ffa`](https://github.com/jbloomAus/SAEDashboard/commit/4725ffa2cbe743aa0bb615213f11105b6911f10d))
+
+* hope flaky tests start passing ([`8ac9e8e`](https://github.com/jbloomAus/SAEDashboard/commit/8ac9e8e93127d4ab811019fc62bbe050a9a00e2c))
+
+* np.memmap caching and more explicit hyperparams ([`9a24186`](https://github.com/jbloomAus/SAEDashboard/commit/9a24186cc1c118725c6db7dc3c77feb815cf938f))
+
+* Move docker&#34; ([`27b1a27`](https://github.com/jbloomAus/SAEDashboard/commit/27b1a27118bcccf54576eb1891b936bd92848f3f))
+
+* Add docker to workflow ([`a354fa4`](https://github.com/jbloomAus/SAEDashboard/commit/a354fa47cfb005dd2304b4237f9182e2408daeed))
+
+* Dockerignore file ([`ed9fcf3`](https://github.com/jbloomAus/SAEDashboard/commit/ed9fcf3a634cd57f6517170784d56d86431e1710))
+
+* new versions ([`f64e54d`](https://github.com/jbloomAus/SAEDashboard/commit/f64e54df5c1b643fc3acaff7f4d40d5597edf61a))
+
+* Add tools to docker image ([`2a70f64`](https://github.com/jbloomAus/SAEDashboard/commit/2a70f64cfd4177d807a8345e64699054dd103e8d))
+
+* Fix docker ([`3805f20`](https://github.com/jbloomAus/SAEDashboard/commit/3805f20bff622582d16fd6603bef4b77e6bada9e))
+
+* Fix docker image ([`7f9ff2f`](https://github.com/jbloomAus/SAEDashboard/commit/7f9ff2f9b10ce08264b2153e8191eca32f9ee48a))
+
+* Fix NP simple test, remove check for correlated neurons/features ([`355fad5`](https://github.com/jbloomAus/SAEDashboard/commit/355fad58ab2ab036a33375c02d9006db634702b9))
+
+* Dockerfile, small batching fix ([`4df4c51`](https://github.com/jbloomAus/SAEDashboard/commit/4df4c5138341a1c233c3d0fe1a3d399846e92407))
+
+* set sae_device, activation_store device ([`6d65b22`](https://github.com/jbloomAus/SAEDashboard/commit/6d65b22ef541326cc9558119b40baeb95cc2e47e))
+
+* Fix NP dtype error ([`8bb4d9d`](https://github.com/jbloomAus/SAEDashboard/commit/8bb4d9de0c75ffed5daaba4d5ec563fbbee38f86))
+
+* format ([`f667d92`](https://github.com/jbloomAus/SAEDashboard/commit/f667d92d9359e5c7976e21e821ac0dde8a081da6))
+
+* depend on latest sae_lens ([`4a2a6a0`](https://github.com/jbloomAus/SAEDashboard/commit/4a2a6a0fd70d7b4a3f1f870a510a800b31f57264))
+
+* use a much better method for getting subsets of feature activations ([`7101f13`](https://github.com/jbloomAus/SAEDashboard/commit/7101f13e13b4de5659623433ec359ecf2142daef))
+
+* add to gitignore ([`20180e0`](https://github.com/jbloomAus/SAEDashboard/commit/20180e06a279ef93d6127b467511911db352bce5))
+
+* add isort ([`3ab0fda`](https://github.com/jbloomAus/SAEDashboard/commit/3ab0fdaf75f735ec2eedc904529909111d0db0de))
+
+
 ## v0.2.1 (2024-07-08)
 
 ### Fix
