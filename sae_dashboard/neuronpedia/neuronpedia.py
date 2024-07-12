@@ -76,7 +76,7 @@ Enter value from -10 to 0 [1 to skip]""",
 Override DType type?
 [Enter to use SAE default]""",
         ),
-    ] = "float32",
+    ] = "",
     feat_per_batch: Annotated[
         int,
         typer.Option(
@@ -108,6 +108,16 @@ Enter value""",
 Enter value""",
         ),
     ] = 0,
+    n_prompts_in_forward_pass: Annotated[
+        int,
+        typer.Option(
+            min=0,
+            help="[Activation Text Generation] Number of prompts per forward pass.",
+            prompt="""
+[Activation Text Generation] Numbe of prompts per forward pass? (32 = Default)
+Enter value""",
+        ),
+    ] = 32,
     resume_from_batch: Annotated[
         int,
         typer.Option(
@@ -167,7 +177,7 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
         device = "cuda"
     sparse_autoencoder = SAE.load_from_pretrained(sae_path_string, device=device)
     model_id = sparse_autoencoder.cfg.model_name
-    if dtype is None:
+    if dtype == "":
         dtype = sparse_autoencoder.cfg.dtype
 
     # make the outputs subdirectory if it doesn't exist, ensure it's not a file
@@ -298,6 +308,7 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
 [white]Dataset: [green]{sparse_autoencoder.cfg.dataset_path}
 [white]Prompts to Sample From: [green]{n_prompts}
 [white]Context Token Length: [green]{n_context_tokens if n_context_tokens != 0 else 0}
+[white]Prompts per Forward Pass: [green]{n_prompts_in_forward_pass}
 """,
                 title="Activation Text Settings",
             )
@@ -332,6 +343,7 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
         sparsity_threshold=log_sparsity,
         n_prompts_total=n_prompts,
         n_tokens_in_prompt=n_context_tokens if n_context_tokens != 0 else 128,
+        n_prompts_in_forward_pass=n_prompts_in_forward_pass,
         n_features_at_a_time=feat_per_batch,
         start_batch=resume_from_batch,
         end_batch=end_at_batch if end_at_batch != -1 else num_batches,

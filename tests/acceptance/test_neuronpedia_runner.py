@@ -37,7 +37,7 @@ def test_simple_neuronpedia_runner():
     NUM_FEATURES_PER_BATCH = 2
     NUM_BATCHES = 2
 
-    # # delete output files if present
+    # delete output files if present
     os.system(f"rm -rf {NP_OUTPUT_FOLDER}")
     os.system(f"rm -rf {ACT_CACHE_FOLDER}")
 
@@ -49,6 +49,7 @@ def test_simple_neuronpedia_runner():
         sparsity_threshold=-5,
         n_prompts_total=5000,
         n_features_at_a_time=NUM_FEATURES_PER_BATCH,
+        n_prompts_in_forward_pass=32,
         start_batch=0,
         end_batch=NUM_BATCHES - 1,
         use_wandb=True,
