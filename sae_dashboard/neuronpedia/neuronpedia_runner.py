@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import torch
+import wandb
 from matplotlib import colors
 from sae_lens.sae import SAE
 from sae_lens.toolkit.pretrained_saes import load_sparsity
@@ -13,7 +14,6 @@ from sae_lens.training.activations_store import ActivationsStore
 from tqdm import tqdm
 from transformer_lens import HookedTransformer
 
-import wandb
 from sae_dashboard.components_config import (
     ActsHistogramConfig,
     Column,
@@ -133,6 +133,9 @@ class NeuronpediaRunner:
                 self.cfg.sae_device = self.cfg.sae_device or "cuda"
             self.cfg.model_device = self.cfg.model_device or "cuda"
             self.cfg.sae_device = self.cfg.sae_device or "cuda"
+            self.cfg.activation_store_device = (
+                self.cfg.activation_store_device or "cuda"
+            )
 
         # Activation store device is always CPU
         self.cfg.activation_store_device = self.cfg.activation_store_device or "cpu"
