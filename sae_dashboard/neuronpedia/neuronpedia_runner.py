@@ -136,9 +136,11 @@ class NeuronpediaRunner:
             self.cfg.activation_store_device = (
                 self.cfg.activation_store_device or "cuda"
             )
-
-        # Activation store device is always CPU
-        self.cfg.activation_store_device = self.cfg.activation_store_device or "cpu"
+        else:
+            self.cfg.sae_device = self.cfg.sae_device or "cpu"
+            self.cfg.model_device = self.cfg.model_device or "cpu"
+            self.cfg.model_n_devices = self.cfg.model_n_devices or 1
+            self.cfg.activation_store_device = self.cfg.activation_store_device or "cpu"
 
         # Initialize SAE, defaulting to SAE dtype unless we override
         self.sae = SAE.load_from_pretrained(
