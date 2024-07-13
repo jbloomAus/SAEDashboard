@@ -57,6 +57,19 @@ What is the absolute local path to your SAE's directory (with cfg.json, sae_weig
 Enter path""",
         ),
     ],
+    dataset_path: Annotated[
+        str,
+        typer.Option(
+            exists=True,
+            dir_okay=True,
+            readable=True,
+            resolve_path=True,
+            help="Path of HuggingFace dataset to use for prompts (default: SAE configured dataset)",
+            prompt="""
+Override dataset with custom HuggingFace dataset path?
+Enter path""",
+        ),
+    ] = "",
     log_sparsity: Annotated[
         int,
         typer.Option(
@@ -180,6 +193,9 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
     if dtype == "":
         dtype = sparse_autoencoder.cfg.dtype
 
+    if dataset_path == "":
+        dataset_path = sparse_autoencoder.cfg.dataset_path
+
     # make the outputs subdirectory if it doesn't exist, ensure it's not a file
     outputs_subdir = f"{model_id}_{sae_set}_{sparse_autoencoder.cfg.hook_name}"
     outputs_dir = OUTPUT_DIR_BASE.joinpath(outputs_subdir)
@@ -275,6 +291,7 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
             Panel.fit(
                 f"""
 [white]SAE Path: [green]{sae_path.as_posix()}
+[white]Dataset Path: [green]{dataset_path}
 [white]Model ID: [green]{model_id}
 [white]Hook Point: [green]{sparse_autoencoder.cfg.hook_name}
 [white]DType: [green]{dtype}
@@ -305,7 +322,7 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
         Align.center(
             Panel.fit(
                 f"""
-[white]Dataset: [green]{sparse_autoencoder.cfg.dataset_path}
+[white]Dataset: [green]{dataset_path}
 [white]Prompts to Sample From: [green]{n_prompts}
 [white]Context Token Length: [green]{n_context_tokens if n_context_tokens != 0 else 0}
 [white]Prompts per Forward Pass: [green]{n_prompts_in_forward_pass}
@@ -338,6 +355,7 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
     cfg = NeuronpediaRunnerConfig(
         sae_set=sae_set,
         sae_path=sae_path.absolute().as_posix(),
+        huggingface_dataset_path=dataset_path,
         dtype=dtype,
         outputs_dir=outputs_dir.absolute().as_posix(),
         sparsity_threshold=log_sparsity,

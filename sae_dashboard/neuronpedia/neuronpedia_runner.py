@@ -78,7 +78,7 @@ class NeuronpediaRunnerConfig:
     sae_path: str
     outputs_dir: str
     sparsity_threshold: int = DEFAULT_SPARSITY_THRESHOLD
-    huggingface_dataset_path: str = "SAE_TRAINING_DATASET"
+    huggingface_dataset_path: str = ""
 
     # ACTIVATION STORE PARAMETERS
     # token pars
@@ -153,7 +153,7 @@ class NeuronpediaRunner:
         self.sae.to(self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE)
         self.sae.cfg.device = self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE
 
-        if self.cfg.huggingface_dataset_path == "SAE_TRAINING_DATASET":
+        if self.cfg.huggingface_dataset_path == "":
             self.cfg.huggingface_dataset_path = self.sae.cfg.dataset_path
 
         print(f"Device Count: {device_count}")
@@ -546,7 +546,7 @@ class NeuronpediaRunner:
             # save settings so we know what we used to generate this dashboard
             feature_output.n_prompts_total = self.cfg.n_prompts_total
             feature_output.n_tokens_in_prompt = self.cfg.n_tokens_in_prompt
-            feature_output.dataset = self.sae.cfg.dataset_path
+            feature_output.dataset = self.cfg.huggingface_dataset_path
 
             activations = []
             sdbs = feature.sequence_data
