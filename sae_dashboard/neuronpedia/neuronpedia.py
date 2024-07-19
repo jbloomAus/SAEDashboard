@@ -395,6 +395,13 @@ def upload(
             prompt="What is the absolute local file path to the feature outputs directory?",
         ),
     ],
+    api_key: Annotated[
+        str,
+        typer.Option(
+            prompt="""Your Neuronpedia API key? (input will be hidden)""",
+            hide_input=True,
+        ),
+    ],
     host: Annotated[
         str,
         typer.Option(
@@ -435,6 +442,7 @@ def upload(
         requests.post(
             url,
             json=data,
+            headers={"x-api-key": api_key},
         )
 
     print(
@@ -461,6 +469,13 @@ def upload_dead_stubs(
             prompt="What is the absolute local file path to the feature outputs directory?",
         ),
     ],
+    api_key: Annotated[
+        str,
+        typer.Option(
+            prompt="""Your Neuronpedia API key? (input will be hidden)""",
+            hide_input=True,
+        ),
+    ],
     host: Annotated[
         str,
         typer.Option(
@@ -479,6 +494,7 @@ def upload_dead_stubs(
     requests.post(
         url,
         json=data,
+        headers={"x-api-key": api_key},
     )
 
     print(
