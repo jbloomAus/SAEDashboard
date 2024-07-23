@@ -395,6 +395,13 @@ def upload(
             prompt="What is the absolute local file path to the feature outputs directory?",
         ),
     ],
+    api_key: Annotated[
+        str,
+        typer.Option(
+            prompt="""Your Neuronpedia API key? (input will be hidden)""",
+            hide_input=True,
+        ),
+    ],
     host: Annotated[
         str,
         typer.Option(
@@ -407,10 +414,29 @@ def upload(
             prompt="""Resume from batch? (Default: 0)""",
         ),
     ] = 0,
+    upload_dead_stubs: Annotated[
+        bool,
+        typer.Option(
+            prompt="""Upload dead stubs? (Default: True)""",
+        ),
+    ] = True,
 ):
     """
     This will upload features that were generated to Neuronpedia. It currently only works if you have admin access to a Neuronpedia instance via localhost:3000.
     """
+
+    if upload_dead_stubs:
+        skipped_path = os.path.join(outputs_dir, "skipped_indexes.json")
+        f = open(skipped_path, "r")
+        data = json.load(f)
+        url = host + "/api/local/upload-skipped-features"
+        result = requests.post(
+            url,
+            json=data,
+            headers={"x-api-key": api_key},
+        )
+        if result.status_code != 200:
+            raise Exception(f"Upload failed with status code: {result.status_code}")
 
     files_to_upload = list(outputs_dir.glob("batch-*.json"))
 
@@ -432,10 +458,13 @@ def upload(
         data = json.load(f, parse_constant=NanAndInfReplacer)
 
         url = host + "/api/local/upload-features"
-        requests.post(
+        result = requests.post(
             url,
             json=data,
+            headers={"x-api-key": api_key},
         )
+        if result.status_code != 200:
+            raise Exception(f"Upload failed with status code: {result.status_code}")
 
     print(
         Align.center(
@@ -444,50 +473,6 @@ def upload(
 {len(files_to_upload)} batch files uploaded to Neuronpedia.
 """,
                 title="Uploads Complete",
-            )
-        )
-    )
-
-
-@app.command()
-def upload_dead_stubs(
-    outputs_dir: Annotated[
-        Path,
-        typer.Option(
-            exists=True,
-            dir_okay=True,
-            readable=True,
-            resolve_path=True,
-            prompt="What is the absolute local file path to the feature outputs directory?",
-        ),
-    ],
-    host: Annotated[
-        str,
-        typer.Option(
-            prompt="""Host to upload to? (Default: http://localhost:3000)""",
-        ),
-    ] = "http://localhost:3000",
-):
-    """
-    This will create "There are no activations for this feature" stubs for dead features on Neuronpedia.  It currently only works if you have admin access to a Neuronpedia instance via localhost:3000.
-    """
-
-    skipped_path = os.path.join(outputs_dir, "skipped_indexes.json")
-    f = open(skipped_path, "r")
-    data = json.load(f)
-    url = host + "/api/local/upload-skipped-features"
-    requests.post(
-        url,
-        json=data,
-    )
-
-    print(
-        Align.center(
-            Panel(
-                """
-Dead feature stubs created.
-""",
-                title="Complete",
             )
         )
     )
