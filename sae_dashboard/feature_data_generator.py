@@ -246,6 +246,24 @@ class FeatureMaskingContext:
             # set the weight
             setattr(self.sae, "b_enc", nn.Parameter(masked_weight))
 
+        elif self.sae.cfg.architecture == "jumprelu":
+
+            ## b_enc
+            self.original_weight["b_enc"] = getattr(self.sae, "b_enc").data.clone()
+            # mask the weight
+            masked_weight = self.sae.b_enc[self.feature_idxs]
+            # set the weight
+            setattr(self.sae, "b_enc", nn.Parameter(masked_weight))
+
+            ## threshold
+            self.original_weight["threshold"] = getattr(
+                self.sae, "threshold"
+            ).data.clone()
+            # mask the weight
+            masked_weight = self.sae.threshold[self.feature_idxs]
+            # set the weight
+            setattr(self.sae, "threshold", nn.Parameter(masked_weight))
+
         elif self.sae.cfg.architecture == "gated":
 
             ## b_gate
