@@ -1075,10 +1075,10 @@ class HistogramData:
             tick_vals = [round(t, 1) for t in tick_vals]
 
         return cls(  # type: ignore
-            bar_heights=bar_heights,
-            bar_values=bar_values,
-            tick_vals=tick_vals,
-            title=title,
+            bar_heights=bar_heights,  # type: ignore
+            bar_values=bar_values,  # type: ignore
+            tick_vals=tick_vals,  # type: ignore
+            title=title,  # type: ignore
         )
 
 
