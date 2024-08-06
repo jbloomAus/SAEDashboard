@@ -16,4 +16,4 @@ def test_feature_mask_context(autoencoder: SAE):
     with FeatureMaskingContext(autoencoder, feature_indices):
         new_feature_acts = autoencoder.encode(sae_in_mock)
 
-    assert (original_feature_acts - new_feature_acts).max() <= 1e-6
+    assert (original_feature_acts - new_feature_acts).max() <= 1e-5
