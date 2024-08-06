@@ -77,6 +77,7 @@ class NeuronpediaRunnerConfig:
     sae_set: str
     sae_path: str
     outputs_dir: str
+    from_local_sae: bool = False
     sparsity_threshold: int = DEFAULT_SPARSITY_THRESHOLD
     huggingface_dataset_path: str = ""
 
@@ -143,11 +144,30 @@ class NeuronpediaRunner:
             self.cfg.activation_store_device = self.cfg.activation_store_device or "cpu"
 
         # Initialize SAE, defaulting to SAE dtype unless we override
-        self.sae = SAE.load_from_pretrained(
-            path=self.cfg.sae_path,
-            device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
-            dtype=self.cfg.dtype if self.cfg.dtype != "" else None,
-        )
+        if self.cfg.from_local_sae:
+            self.sae = SAE.load_from_pretrained(
+                path=self.cfg.sae_path,
+                device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
+                dtype=self.cfg.dtype if self.cfg.dtype != "" else None,
+            )
+        else:
+            self.sae, _, _ = SAE.from_pretrained(
+                release=self.cfg.sae_set,
+                sae_id=self.cfg.sae_path,
+                device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
+            )
+            if self.cfg.dtype != "":
+                if self.cfg.dtype == "float16":
+                    self.sae.to(dtype=torch.float16)
+                elif self.cfg.dtype == "float32":
+                    self.sae.to(dtype=torch.float32)
+                elif self.cfg.dtype == "bfloat16":
+                    self.sae.to(dtype=torch.bfloat16)
+                else:
+                    raise ValueError(
+                        f"Unsupported dtype: {self.cfg.dtype}, we support float16, float32, bfloat16"
+                    )
+
         # If we didn't override dtype, then use the SAE's dtype
         if self.cfg.dtype == "":
             print(f"Using SAE configured dtype: {self.sae.cfg.dtype}")
@@ -175,8 +195,8 @@ class NeuronpediaRunner:
         print(f"Total number of contexts (prompts): {self.cfg.n_prompts_total}")
 
         # get the sae's cfg and check if it has from pretrained kwargs
-        with open(f"{self.cfg.sae_path}/cfg.json", "r") as f:
-            sae_cfg_json = json.load(f)
+        # with open(f"{self.cfg.sae_path}/cfg.json", "r") as f:
+        sae_cfg_json = self.sae.cfg.to_dict()
         sae_from_pretrained_kwargs = sae_cfg_json.get("from_pretrained_kwargs", {})
         print("SAE Config on disk:")
         print(json.dumps(sae_cfg_json, indent=2))
