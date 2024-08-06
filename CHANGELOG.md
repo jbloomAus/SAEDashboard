@@ -2,6 +2,45 @@
 
 
 
+## v0.2.3 (2024-08-06)
+
+### Fix
+
+* fix: neuronpedia uses api_key for uploading features, and update sae_id-&gt;sae_set ([`0336a35`](https://github.com/jbloomAus/SAEDashboard/commit/0336a3587f825f0be15af79cc9a0033dda3d4a3f))
+
+### Unknown
+
+* Merge pull request #11 from jbloomAus/ignore_bos_option
+
+Ignore bos option ([`ae34b70`](https://github.com/jbloomAus/SAEDashboard/commit/ae34b70b61993b4cce49a758bf85514410c67bd8))
+
+* change threshold ([`4a0be67`](https://github.com/jbloomAus/SAEDashboard/commit/4a0be67622826f879191ced225c8c075d34bfe56))
+
+* type fix ([`525b6a1`](https://github.com/jbloomAus/SAEDashboard/commit/525b6a10331b9fa0a464ae0c7f01af90ae97d0bb))
+
+* default ignore bos eos pad ([`d2396a7`](https://github.com/jbloomAus/SAEDashboard/commit/d2396a714dd9ea3d59e516aa0fe30a9c9225e22f))
+
+* ignore bos tokens ([`96cf6e9`](https://github.com/jbloomAus/SAEDashboard/commit/96cf6e9427cadf13fa13b55b7d1bc83ae81d9ec0))
+
+* jump relu support in feature masking context ([`a1ba87a`](https://github.com/jbloomAus/SAEDashboard/commit/a1ba87a5c5e03687d7d7b5c5677bd9773fa49517))
+
+* depend on latest sae lens ([`4988207`](https://github.com/jbloomAus/SAEDashboard/commit/4988207abaca24256f52235e474fe5fbb5028c1a))
+
+* Merge pull request #10 from jbloomAus/auth_and_sae_set
+
+fix: neuronpedia uses api_key for uploading features, and update sae_id -&gt; sae_set ([`4684aca`](https://github.com/jbloomAus/SAEDashboard/commit/4684aca54b69dbc913c1122f1a322ed4d808dce0))
+
+* Combine upload-features and upload-dead-stubs ([`faac839`](https://github.com/jbloomAus/SAEDashboard/commit/faac8398fee8582b12c2d1a29df6d4de7e542bed))
+
+* Activation store device should be cuda when available ([`93050b1`](https://github.com/jbloomAus/SAEDashboard/commit/93050b1f5c2b87c8e889fe3449d440016c996762))
+
+* Activation store device should be cuda when available ([`4469066`](https://github.com/jbloomAus/SAEDashboard/commit/4469066af06bb4944832f2e596e36afa09adf160))
+
+* Better support for huggingface dataset path ([`3dc4b78`](https://github.com/jbloomAus/SAEDashboard/commit/3dc4b783a1ced7b938ab45c4d10effedd148a829))
+
+* Docker tweak ([`a1a70cb`](https://github.com/jbloomAus/SAEDashboard/commit/a1a70cb28c726887de9439024b7b1d01082d3932))
+
+
 ## v0.2.2 (2024-07-12)
 
 ### Fix
