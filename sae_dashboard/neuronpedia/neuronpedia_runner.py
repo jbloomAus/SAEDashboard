@@ -448,6 +448,7 @@ class NeuronpediaRunner:
                     perform_ablation_experiments=False,
                     dtype=self.cfg.dtype,
                     cache_dir=self.cached_activations_dir,
+                    ignore_tokens={self.model.tokenizer.pad_token_id, self.model.tokenizer.bos_token_id, self.model.tokenizer.eos_token_id},  # type: ignore
                 )
 
                 feature_data = SaeVisRunner(feature_vis_config_gpt).run(
