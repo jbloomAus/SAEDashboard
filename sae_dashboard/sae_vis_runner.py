@@ -150,7 +150,17 @@ class SaeVisRunner:
 
                 # Get data for feature activations histogram (including the title!)
                 feat_acts = all_feat_acts[..., i]
-                nonzero_feat_acts = feat_acts[feat_acts > 0]
+
+                # ignore any tokens in self.cfg.ignore_tokens
+                ignore_tokens_mask = ~torch.isin(
+                    tokens,
+                    torch.tensor(
+                        list(self.cfg.ignore_tokens),
+                        dtype=tokens.dtype,
+                        device=tokens.device,
+                    ),
+                )
+                nonzero_feat_acts = feat_acts[(feat_acts > 0) & (ignore_tokens_mask)]
                 frac_nonzero = nonzero_feat_acts.numel() / feat_acts.numel()
                 feature_data_dict[feat].acts_histogram_data = (
                     ActsHistogramData.from_data(

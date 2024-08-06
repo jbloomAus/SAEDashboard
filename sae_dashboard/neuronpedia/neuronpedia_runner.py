@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import torch
+import wandb
 from matplotlib import colors
 from sae_lens.sae import SAE
 from sae_lens.toolkit.pretrained_saes import load_sparsity
@@ -13,7 +14,6 @@ from sae_lens.training.activations_store import ActivationsStore
 from tqdm import tqdm
 from transformer_lens import HookedTransformer
 
-import wandb
 from sae_dashboard.components_config import (
     ActsHistogramConfig,
     Column,
@@ -448,6 +448,7 @@ class NeuronpediaRunner:
                     perform_ablation_experiments=False,
                     dtype=self.cfg.dtype,
                     cache_dir=self.cached_activations_dir,
+                    ignore_tokens={self.model.tokenizer.pad_token_id, self.model.tokenizer.bos_token_id, self.model.tokenizer.eos_token_id},  # type: ignore
                 )
 
                 feature_data = SaeVisRunner(feature_vis_config_gpt).run(

@@ -37,6 +37,7 @@ class SaeVisConfig:
     perform_ablation_experiments: bool = False
     device: str = "cpu"
     dtype: str = "float32"
+    ignore_tokens: set[int] = field(default_factory=set)
 
     # Vis
     feature_centric_layout: SaeVisLayoutConfig = field(
