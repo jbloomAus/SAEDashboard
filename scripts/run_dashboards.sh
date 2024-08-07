@@ -5,7 +5,8 @@ neuronpedia-runner \
   --np-set-name="gemmascope-res-65k" \
   --dataset-path="monology/pile-uncopyrighted" \
   --output-dir="neuronpedia_outputs/" \
-  --dtype="float32" \
+  --sae_dtype="float32" \
+  --model_dtype="bfloat16" \
   --sparsity-threshold=1 \
   --n-prompts=128 \
   --n-tokens-in-prompt=128 \

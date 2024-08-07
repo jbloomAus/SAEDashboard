@@ -101,7 +101,8 @@ class NeuronpediaRunnerConfig:
     top_acts_group_size: int = 20
     quantile_group_size: int = 5
 
-    dtype: str = ""
+    model_dtype: str = ""
+    sae_dtype: str = ""
 
     sae_device: str | None = None
     activation_store_device: str | None = None
@@ -152,7 +153,7 @@ class NeuronpediaRunner:
             self.sae = SAE.load_from_pretrained(
                 path=self.cfg.sae_path,
                 device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
-                dtype=self.cfg.dtype if self.cfg.dtype != "" else None,
+                dtype=self.cfg.sae_dtype if self.cfg.sae_dtype != "" else None,
             )
         else:
             self.sae, _, _ = SAE.from_pretrained(
@@ -160,24 +161,24 @@ class NeuronpediaRunner:
                 sae_id=self.cfg.sae_path,
                 device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
             )
-            if self.cfg.dtype != "":
-                if self.cfg.dtype == "float16":
+            if self.cfg.sae_dtype != "":
+                if self.cfg.sae_dtype == "float16":
                     self.sae.to(dtype=torch.float16)
-                elif self.cfg.dtype == "float32":
+                elif self.cfg.sae_dtype == "float32":
                     self.sae.to(dtype=torch.float32)
-                elif self.cfg.dtype == "bfloat16":
+                elif self.cfg.sae_dtype == "bfloat16":
                     self.sae.to(dtype=torch.bfloat16)
                 else:
                     raise ValueError(
-                        f"Unsupported dtype: {self.cfg.dtype}, we support float16, float32, bfloat16"
+                        f"Unsupported dtype: {self.cfg.sae_dtype}, we support float16, float32, bfloat16"
                     )
 
         # If we didn't override dtype, then use the SAE's dtype
-        if self.cfg.dtype == "":
+        if self.cfg.sae_dtype == "":
             print(f"Using SAE configured dtype: {self.sae.cfg.dtype}")
-            self.cfg.dtype = self.sae.cfg.dtype
+            self.cfg.sae_dtype = self.sae.cfg.dtype
         else:
-            print(f"Overriding dtype to {self.cfg.dtype}")
+            print(f"Overriding sae dtype to {self.cfg.sae_dtype}")
         # double sure this works
         self.sae.to(self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE)
         self.sae.cfg.device = self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE
@@ -216,7 +217,8 @@ class NeuronpediaRunner:
 
         self.sae.fold_W_dec_norm()
 
-        print(f"DType: {self.cfg.dtype}")
+        print(f"SAE DType: {self.cfg.sae_dtype}")
+        print(f"Model DType: {self.cfg.model_dtype}")
 
         # Initialize Model
         self.model_id = self.sae.cfg.model_name
@@ -226,6 +228,7 @@ class NeuronpediaRunner:
             device=self.cfg.model_device,
             n_devices=self.cfg.model_n_devices or 1,
             **sae_from_pretrained_kwargs,
+            dtype=self.cfg.model_dtype,
         )
 
         # Initialize Activations Store
@@ -248,21 +251,23 @@ class NeuronpediaRunner:
 
         if not os.path.exists(cfg.outputs_dir):
             os.makedirs(cfg.outputs_dir)
-        self.outputs_dir =  self.create_output_directory()
+        self.outputs_dir = self.create_output_directory()
 
         self.vocab_dict = self.get_vocab_dict()
 
     def create_output_directory(self) -> Path:
         """
         Creates the output directory for storing generated features.
-        
+
         Returns:
             Path: The path to the created output directory.
         """
         outputs_subdir = f"{self.model_id}_{self.cfg.sae_set}_{self.sae.cfg.hook_name}"
         outputs_dir = Path(self.cfg.outputs_dir).joinpath(outputs_subdir)
         if outputs_dir.exists() and outputs_dir.is_file():
-            raise ValueError(f"Error: Output directory {outputs_dir.as_posix()} exists and is a file.")
+            raise ValueError(
+                f"Error: Output directory {outputs_dir.as_posix()} exists and is a file."
+            )
         outputs_dir.mkdir(parents=True, exist_ok=True)
         return outputs_dir
 
@@ -410,9 +415,11 @@ class NeuronpediaRunner:
 
         wandb_cfg = self.cfg.__dict__
         wandb_cfg["sae_cfg"] = self.sae.cfg.to_dict()
-        
+
         current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        set_name = self.cfg.sae_set if self.cfg.np_set_name is None else self.cfg.np_set_name
+        set_name = (
+            self.cfg.sae_set if self.cfg.np_set_name is None else self.cfg.np_set_name
+        )
         if self.cfg.use_wandb:
             wandb.init(
                 project="sae-dashboard-generation",
@@ -440,7 +447,9 @@ class NeuronpediaRunner:
         del self.activations_store
 
         with torch.no_grad():
-            for feature_batch_count, features_to_process in tqdm(enumerate(feature_idx)):
+            for feature_batch_count, features_to_process in tqdm(
+                enumerate(feature_idx)
+            ):
 
                 if feature_batch_count < self.cfg.start_batch:
                     feature_batch_count = feature_batch_count + 1
@@ -489,7 +498,7 @@ class NeuronpediaRunner:
                     device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
                     feature_centric_layout=layout,
                     perform_ablation_experiments=False,
-                    dtype=self.cfg.dtype,
+                    dtype=self.cfg.sae_dtype,
                     cache_dir=self.cached_activations_dir,
                     ignore_tokens={self.model.tokenizer.pad_token_id, self.model.tokenizer.bos_token_id, self.model.tokenizer.eos_token_id},  # type: ignore
                 )
@@ -499,22 +508,29 @@ class NeuronpediaRunner:
                     model=self.model,
                     tokens=tokens,
                 )
-                
-                
+
                 if feature_batch_count == 0:
-                    html_save_path = f"{self.outputs_dir}/batch-{feature_batch_count}.html"
+                    html_save_path = (
+                        f"{self.outputs_dir}/batch-{feature_batch_count}.html"
+                    )
                     save_feature_centric_vis(
-                        sae_vis_data=feature_data, 
+                        sae_vis_data=feature_data,
                         filename=html_save_path,
                         # use only the first 10 features for the dashboard
-                        include_only = features_to_process[:max(10, len(features_to_process))]
+                        include_only=features_to_process[
+                            : max(10, len(features_to_process))
+                        ],
                     )
-                    
+
                     if self.cfg.use_wandb:
                         wandb.log(
-                            data = {"batch": feature_batch_count, "dashboard": wandb.Html(open(html_save_path))},
-                            step = feature_batch_count)
-                
+                            data={
+                                "batch": feature_batch_count,
+                                "dashboard": wandb.Html(open(html_save_path)),
+                            },
+                            step=feature_batch_count,
+                        )
+
                 json_object = self.convert_feature_data_to_np_json(feature_data)
                 with open(
                     output_file,
@@ -528,9 +544,7 @@ class NeuronpediaRunner:
                     wandb.log(
                         {"batch": feature_batch_count},
                         step=feature_batch_count,
-                        )
-
-
+                    )
 
         if self.cfg.use_wandb:
             wandb.finish()
@@ -671,7 +685,9 @@ class NeuronpediaRunner:
         batch_data = NeuronpediaDashboardBatch()
         batch_data.model_id = self.model_id
         batch_data.layer = self.layer
-        batch_data.sae_set = self.cfg.sae_set if not self.cfg.np_set_name else self.cfg.np_set_name
+        batch_data.sae_set = (
+            self.cfg.sae_set if not self.cfg.np_set_name else self.cfg.np_set_name
+        )
         batch_data.features = features_outputs
 
         # no additional settings currently needed
@@ -685,25 +701,54 @@ class NeuronpediaRunner:
         return json_object
 
 
-
-
 def main():
     parser = argparse.ArgumentParser(description="Run Neuronpedia feature generation")
     parser.add_argument("--sae-set", required=True, help="SAE set name")
     parser.add_argument("--sae-path", required=True, help="Path to SAE")
     parser.add_argument("--np-set-name", required=True, help="Neuronpedia set name")
-    parser.add_argument("--dataset-path", required=True, help="HuggingFace dataset path")
-    parser.add_argument("--dtype", default="float32", help="Data type for computations")
-    parser.add_argument("--output-dir", default="neuronpedia_outputs/", help="Output directory")
-    parser.add_argument("--sparsity-threshold", type=int, default=1, help="Sparsity threshold")
+    parser.add_argument(
+        "--dataset-path", required=True, help="HuggingFace dataset path"
+    )
+    parser.add_argument(
+        "--sae_dtype", default="float32", help="Data type for sae computations"
+    )
+    parser.add_argument(
+        "--model_dtype", default="float32", help="Data type for model computations"
+    )
+    parser.add_argument(
+        "--output-dir", default="neuronpedia_outputs/", help="Output directory"
+    )
+    parser.add_argument(
+        "--sparsity-threshold", type=int, default=1, help="Sparsity threshold"
+    )
     parser.add_argument("--n-prompts", type=int, default=128, help="Number of prompts")
-    parser.add_argument("--n-tokens-in-prompt", type=int, default=128, help="Number of tokens in prompt")
-    parser.add_argument("--n-prompts-in-forward-pass", type=int, default=128, help="Number of prompts in forward pass")
-    parser.add_argument("--n-features-per-batch", type=int, default=2, help="Number of features per batch")
-    parser.add_argument("--start-batch", type=int, default=0, help="Starting batch number")
-    parser.add_argument("--end-batch", type=int, default=None, help="Ending batch number")
-    parser.add_argument("--use-wandb", action="store_true", help="Use Weights & Biases for logging")
-    parser.add_argument("--from-local-sae", action="store_true", help="Load SAE from local path")
+    parser.add_argument(
+        "--n-tokens-in-prompt", type=int, default=128, help="Number of tokens in prompt"
+    )
+    parser.add_argument(
+        "--n-prompts-in-forward-pass",
+        type=int,
+        default=128,
+        help="Number of prompts in forward pass",
+    )
+    parser.add_argument(
+        "--n-features-per-batch",
+        type=int,
+        default=2,
+        help="Number of features per batch",
+    )
+    parser.add_argument(
+        "--start-batch", type=int, default=0, help="Starting batch number"
+    )
+    parser.add_argument(
+        "--end-batch", type=int, default=None, help="Ending batch number"
+    )
+    parser.add_argument(
+        "--use-wandb", action="store_true", help="Use Weights & Biases for logging"
+    )
+    parser.add_argument(
+        "--from-local-sae", action="store_true", help="Load SAE from local path"
+    )
 
     args = parser.parse_args()
 
@@ -713,7 +758,8 @@ def main():
         np_set_name=args.np_set_name,
         from_local_sae=args.from_local_sae,
         huggingface_dataset_path=args.dataset_path,
-        dtype=args.dtype,
+        sae_dtype=args.sae_dtype,
+        model_dtype=args.model_dtype,
         outputs_dir=args.output_dir,
         sparsity_threshold=args.sparsity_threshold,
         n_prompts_total=args.n_prompts,
@@ -722,11 +768,12 @@ def main():
         n_features_at_a_time=args.n_features_per_batch,
         start_batch=args.start_batch,
         end_batch=args.end_batch,
-        use_wandb=args.use_wandb
+        use_wandb=args.use_wandb,
     )
 
     runner = NeuronpediaRunner(cfg)
     runner.run()
+
 
 if __name__ == "__main__":
     main()

@@ -44,7 +44,8 @@ cfg = NeuronpediaRunnerConfig(
     model_device="cuda",
     model_n_devices=1,
     activation_store_device="cuda",
-    dtype="bfloat16",
+    model_dtype="bfloat16",
+    sae_dtype="float32",
 )
 
 runner = NeuronpediaRunner(cfg)
