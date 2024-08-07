@@ -76,11 +76,11 @@ def test_simple_neuronpedia_runner():
 
     # assert the actual features/batches
     for i in range(0, NUM_BATCHES - 1):
-        correct_path = os.path.join(CORRECT_OUTPUTS_FOLDER, f"batch-{i}.json")
+        correct_path = os.path.join(runner.outputs_dir, f"batch-{i}.json")
 
         correct_data = json_to_class(correct_path, NeuronpediaDashboardBatch)
 
-        test_path = os.path.join(NP_OUTPUT_FOLDER, f"batch-{i}.json")
+        test_path = os.path.join(runner.outputs_dir, f"batch-{i}.json")
         assert os.path.exists(test_path), f"file {test_path} does not exist"
         test_data = json_to_class(test_path, NeuronpediaDashboardBatch)
 

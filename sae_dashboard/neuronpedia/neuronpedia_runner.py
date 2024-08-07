@@ -244,9 +244,23 @@ class NeuronpediaRunner:
 
         if not os.path.exists(cfg.outputs_dir):
             os.makedirs(cfg.outputs_dir)
-        self.outputs_dir = cfg.outputs_dir
+        self.outputs_dir =  self.create_output_directory()
 
         self.vocab_dict = self.get_vocab_dict()
+
+    def create_output_directory(self) -> Path:
+        """
+        Creates the output directory for storing generated features.
+        
+        Returns:
+            Path: The path to the created output directory.
+        """
+        outputs_subdir = f"{self.model_id}_{self.cfg.sae_set}_{self.sae.cfg.hook_name}"
+        outputs_dir = Path(self.cfg.outputs_dir).joinpath(outputs_subdir)
+        if outputs_dir.exists() and outputs_dir.is_file():
+            raise ValueError(f"Error: Output directory {outputs_dir.as_posix()} exists and is a file.")
+        outputs_dir.mkdir(parents=True, exist_ok=True)
+        return outputs_dir
 
     def generate_tokens(
         self,
