@@ -36,7 +36,7 @@ from sae_dashboard.sae_vis_runner import SaeVisRunner
 
 # set TOKENIZERS_PARALLELISM to false to avoid warnings
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-
+RUN_SETTINGS_FILE = "run_settings.json"
 OUT_OF_RANGE_TOKEN = "<|outofrange|>"
 
 BG_COLOR_MAP = colors.LinearSegmentedColormap.from_list(
@@ -179,6 +179,10 @@ class NeuronpediaRunner:
             self.cfg.sae_dtype = self.sae.cfg.dtype
         else:
             print(f"Overriding sae dtype to {self.cfg.sae_dtype}")
+
+        if self.cfg.model_dtype == "":
+            self.cfg.model_dtype = "float32"
+
         # double sure this works
         self.sae.to(self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE)
         self.sae.cfg.device = self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE
@@ -251,11 +255,11 @@ class NeuronpediaRunner:
 
         if not os.path.exists(cfg.outputs_dir):
             os.makedirs(cfg.outputs_dir)
-        self.outputs_dir = self.create_output_directory()
+        self.cfg.outputs_dir = self.create_output_directory()
 
         self.vocab_dict = self.get_vocab_dict()
 
-    def create_output_directory(self) -> Path:
+    def create_output_directory(self) -> str:
         """
         Creates the output directory for storing generated features.
 
@@ -269,7 +273,7 @@ class NeuronpediaRunner:
                 f"Error: Output directory {outputs_dir.as_posix()} exists and is a file."
             )
         outputs_dir.mkdir(parents=True, exist_ok=True)
-        return outputs_dir
+        return str(outputs_dir)
 
     def generate_tokens(
         self,
@@ -372,12 +376,12 @@ class NeuronpediaRunner:
                 "skipped_indexes": list(skipped_indexes),
             }
         )
-        with open(f"{self.outputs_dir}/skipped_indexes.json", "w") as f:
+        with open(f"{self.cfg.outputs_dir}/skipped_indexes.json", "w") as f:
             f.write(skipped_indexes_json)
 
     def get_tokens(self):
 
-        tokens_file = f"{self.outputs_dir}/tokens_{self.cfg.n_prompts_total}.pt"
+        tokens_file = f"{self.cfg.outputs_dir}/tokens_{self.cfg.n_prompts_total}.pt"
         if os.path.isfile(tokens_file):
             print("Tokens exist, loading them.")
             tokens = torch.load(tokens_file)
@@ -412,6 +416,11 @@ class NeuronpediaRunner:
 
     # TODO: make this function simpler
     def run(self):
+
+        run_settings_path = self.cfg.outputs_dir + "/" + RUN_SETTINGS_FILE
+        run_settings = self.cfg.__dict__
+        with open(run_settings_path, "w") as f:
+            json.dump(run_settings, f, indent=4)
 
         wandb_cfg = self.cfg.__dict__
         wandb_cfg["sae_cfg"] = self.sae.cfg.to_dict()
@@ -461,7 +470,7 @@ class NeuronpediaRunner:
                     feature_batch_count = feature_batch_count + 1
                     continue
 
-                output_file = f"{self.outputs_dir}/batch-{feature_batch_count}.json"
+                output_file = f"{self.cfg.outputs_dir}/batch-{feature_batch_count}.json"
                 # if output_file exists, skip
                 if os.path.isfile(output_file):
                     logline = f"\n++++++++++ Skipping Batch #{feature_batch_count} output. File exists: {output_file} ++++++++++\n"
@@ -511,7 +520,7 @@ class NeuronpediaRunner:
 
                 if feature_batch_count == 0:
                     html_save_path = (
-                        f"{self.outputs_dir}/batch-{feature_batch_count}.html"
+                        f"{self.cfg.outputs_dir}/batch-{feature_batch_count}.html"
                     )
                     save_feature_centric_vis(
                         sae_vis_data=feature_data,

@@ -81,11 +81,13 @@ def test_simple_neuronpedia_runner():
 
         correct_data = json_to_class(correct_path, NeuronpediaDashboardBatch)
 
-        test_path = os.path.join(runner.outputs_dir, f"batch-{i}.json")
+        test_path = os.path.join(runner.cfg.outputs_dir, f"batch-{i}.json")
         assert os.path.exists(test_path), f"file {test_path} does not exist"
         test_data = json_to_class(test_path, NeuronpediaDashboardBatch)
 
         assert test_data == correct_data
+
+    assert "run_settings.json" in os.listdir(runner.cfg.outputs_dir)
 
 
 def test_simple_neuronpedia_runner_local_sae():
@@ -145,7 +147,7 @@ def test_simple_neuronpedia_runner_local_sae():
 
         correct_data = json_to_class(correct_path, NeuronpediaDashboardBatch)
 
-        test_path = os.path.join(runner.outputs_dir, f"batch-{i}.json")
+        test_path = os.path.join(runner.cfg.outputs_dir, f"batch-{i}.json")
         assert os.path.exists(test_path), f"file {test_path} does not exist"
         test_data = json_to_class(test_path, NeuronpediaDashboardBatch)
 
@@ -212,7 +214,7 @@ def test_simple_neuronpedia_runner_different_dtypes_sae_model():
 
         correct_data = json_to_class(correct_path, NeuronpediaDashboardBatch)
 
-        test_path = os.path.join(runner.outputs_dir, f"batch-{i}.json")
+        test_path = os.path.join(runner.cfg.outputs_dir, f"batch-{i}.json")
         assert os.path.exists(test_path), f"file {test_path} does not exist"
         test_data = json_to_class(test_path, NeuronpediaDashboardBatch)
 
