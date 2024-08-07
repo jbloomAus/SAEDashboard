@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 from dataclasses import dataclass
@@ -22,6 +23,7 @@ from sae_dashboard.components_config import (
     LogitsTableConfig,
     SequencesConfig,
 )
+from sae_dashboard.data_writing_fns import save_feature_centric_vis
 from sae_dashboard.layout import SaeVisLayoutConfig
 from sae_dashboard.neuronpedia.neuronpedia_dashboard import (
     NeuronpediaDashboardActivation,
@@ -407,9 +409,15 @@ class NeuronpediaRunner:
 
         wandb_cfg = self.cfg.__dict__
         wandb_cfg["sae_cfg"] = self.sae.cfg.to_dict()
+        
+        current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        set_name = self.cfg.sae_set if self.cfg.np_set_name is None else self.cfg.np_set_name
         if self.cfg.use_wandb:
             wandb.init(
                 project="sae-dashboard-generation",
+                name=f"{self.model_id}_{set_name}_{self.sae.cfg.hook_name}_{current_time}",
+                save_code=True,
+                mode="online",
                 config=wandb_cfg,
             )
 
@@ -431,8 +439,7 @@ class NeuronpediaRunner:
         del self.activations_store
 
         with torch.no_grad():
-            feature_batch_count = 0
-            for features_to_process in tqdm(feature_idx):
+            for feature_batch_count, features_to_process in tqdm(enumerate(feature_idx)):
 
                 if feature_batch_count < self.cfg.start_batch:
                     feature_batch_count = feature_batch_count + 1
@@ -491,6 +498,22 @@ class NeuronpediaRunner:
                     model=self.model,
                     tokens=tokens,
                 )
+                
+                
+                if feature_batch_count == 0:
+                    html_save_path = f"{self.outputs_dir}/batch-{feature_batch_count}.html"
+                    save_feature_centric_vis(
+                        sae_vis_data=feature_data, 
+                        filename=html_save_path,
+                        # use only the first 10 features for the dashboard
+                        include_only = features_to_process[:max(10, len(features_to_process))]
+                    )
+                    
+                    if self.cfg.use_wandb:
+                        wandb.log(
+                            data = {"batch": feature_batch_count, "dashboard": wandb.Html(open(html_save_path))},
+                            step = feature_batch_count)
+                
                 json_object = self.convert_feature_data_to_np_json(feature_data)
                 with open(
                     output_file,
@@ -501,9 +524,12 @@ class NeuronpediaRunner:
 
                 logline = f"\n========== Completed Batch #{feature_batch_count} output: {output_file} ==========\n"
                 if self.cfg.use_wandb:
-                    wandb.log({"batch": feature_batch_count})
+                    wandb.log(
+                        {"batch": feature_batch_count},
+                        step=feature_batch_count,
+                        )
 
-                feature_batch_count = feature_batch_count + 1
+
 
         if self.cfg.use_wandb:
             wandb.finish()

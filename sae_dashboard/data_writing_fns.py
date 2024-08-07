@@ -20,6 +20,7 @@ def save_feature_centric_vis(
     sae_vis_data: SaeVisData,
     filename: str | Path,
     feature_idx: int | None = None,
+    include_only: list[int] | None = None,
 ) -> None:
     """
     Returns the HTML string for the view which lets you navigate between different features.
@@ -45,7 +46,10 @@ def save_feature_centric_vis(
     decode_fn = get_decode_html_safe_fn(sae_vis_data.model.tokenizer)
 
     # Create iterator
-    iterator = list(sae_vis_data.feature_data_dict.items())
+    if include_only is not None:
+        iterator = [(i, sae_vis_data.feature_data_dict[i]) for i in include_only]
+    else:
+        iterator = list(sae_vis_data.feature_data_dict.items())
     if sae_vis_data.cfg.verbose:
         iterator = tqdm(iterator, desc="Saving feature-centric vis")
 
