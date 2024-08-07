@@ -1,1 +1,1 @@
-{"model_id": "gpt2-small", "layer": "0", "sae_set": "gpt2-small-res-jb", "log_sparsity": 1, "skipped_indexes": []}
+{"model_id": "gpt2-small", "layer": "0", "sae_set": "res-jb", "log_sparsity": 1, "skipped_indexes": []}

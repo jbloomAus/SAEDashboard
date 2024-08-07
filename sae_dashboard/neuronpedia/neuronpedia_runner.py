@@ -77,6 +77,7 @@ class NeuronpediaRunnerConfig:
     sae_set: str
     sae_path: str
     outputs_dir: str
+    np_set_name: Optional[str] = None
     from_local_sae: bool = False
     sparsity_threshold: int = DEFAULT_SPARSITY_THRESHOLD
     huggingface_dataset_path: str = ""
@@ -643,7 +644,7 @@ class NeuronpediaRunner:
         batch_data = NeuronpediaDashboardBatch()
         batch_data.model_id = self.model_id
         batch_data.layer = self.layer
-        batch_data.sae_set = self.cfg.sae_set
+        batch_data.sae_set = self.cfg.sae_set if not self.cfg.np_set_name else self.cfg.np_set_name
         batch_data.features = features_outputs
 
         # no additional settings currently needed
