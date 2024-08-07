@@ -47,10 +47,6 @@ Enter SAE ID""",
     sae_path: Annotated[
         Path,
         typer.Option(
-            exists=True,
-            dir_okay=True,
-            readable=True,
-            resolve_path=True,
             help="Absolute local path to the SAE directory (with cfg.json, sae_weights.safetensors, sparsity.safetensors).",
             prompt="""
 What is the absolute local path to your SAE's directory (with cfg.json, sae_weights.safetensors, sparsity.safetensors)?
@@ -163,22 +159,22 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
     print(command + "\n\n")
 
     # Check arguments
-    if sae_path.is_dir() is not True:
-        print("Error: SAE path must be a directory.")
-        raise typer.Abort()
-    if sae_path.joinpath("cfg.json").is_file() is not True:
-        print("Error: cfg.json file not found in SAE directory.")
-        raise typer.Abort()
-    if sae_path.joinpath("sae_weights.safetensors").is_file() is not True:
-        print("Error: sae_weights.safetensors file not found in SAE directory.")
-        raise typer.Abort()
+    # if sae_path.is_dir() is not True:
+    #     print("Error: SAE path must be a directory.")
+    #     raise typer.Abort()
+    # if sae_path.joinpath("cfg.json").is_file() is not True:
+    #     print("Error: cfg.json file not found in SAE directory.")
+    #     raise typer.Abort()
+    # if sae_path.joinpath("sae_weights.safetensors").is_file() is not True:
+    #     print("Error: sae_weights.safetensors file not found in SAE directory.")
+    #     raise typer.Abort()
     # Allow skipping sparsity file
-    if (
-        log_sparsity != 1
-        and sae_path.joinpath("sparsity.safetensors").is_file() is not True
-    ):
-        print("Error: sparsity.safetensors file not found in SAE directory.")
-        raise typer.Abort()
+    # if (
+    #     log_sparsity != 1
+    #     and sae_path.joinpath("sparsity.safetensors").is_file() is not True
+    # ):
+    #     print("Error: sparsity.safetensors file not found in SAE directory.")
+    #     raise typer.Abort()
 
     sae_path_string = sae_path.as_posix()
 
@@ -188,7 +184,12 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
         device = "mps"
     elif torch.cuda.is_available():
         device = "cuda"
-    sparse_autoencoder = SAE.load_from_pretrained(sae_path_string, device=device)
+    try:
+        sparse_autoencoder = SAE.load_from_pretrained(sae_path_string, device=device)
+    except Exception:
+        sparse_autoencoder, _, _ = SAE.from_pretrained(
+            sae_set, str(sae_path), device=device
+        )
     model_id = sparse_autoencoder.cfg.model_name
     if dtype == "":
         dtype = sparse_autoencoder.cfg.dtype
@@ -354,9 +355,10 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
     # run the command
     cfg = NeuronpediaRunnerConfig(
         sae_set=sae_set,
-        sae_path=sae_path.absolute().as_posix(),
+        sae_path=str(sae_path),  # .absolute().as_posix(),
         huggingface_dataset_path=dataset_path,
-        dtype=dtype,
+        sae_dtype=dtype,
+        model_dtype=dtype,
         outputs_dir=outputs_dir.absolute().as_posix(),
         sparsity_threshold=log_sparsity,
         n_prompts_total=n_prompts,

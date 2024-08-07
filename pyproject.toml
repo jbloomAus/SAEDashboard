@@ -34,6 +34,9 @@ flake8 = "^7.0.0"
 pytest-cov = "^5.0.0"
 black = "^24.4.2"
 
+[tool.poetry.scripts]
+neuronpedia-runner = "sae_dashboard.neuronpedia.neuronpedia_runner:main"
+
 [tool.isort]
 profile = "black"
 src_paths = ["sae_dashboard", "tests"]
