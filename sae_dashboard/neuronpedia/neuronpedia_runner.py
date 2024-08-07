@@ -1,7 +1,8 @@
-import datetime
+import argparse
 import json
 import os
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
@@ -682,3 +683,50 @@ class NeuronpediaRunner:
         json_object = json.dumps(batch_data, cls=NpEncoder)
 
         return json_object
+
+
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Run Neuronpedia feature generation")
+    parser.add_argument("--sae-set", required=True, help="SAE set name")
+    parser.add_argument("--sae-path", required=True, help="Path to SAE")
+    parser.add_argument("--np-set-name", required=True, help="Neuronpedia set name")
+    parser.add_argument("--dataset-path", required=True, help="HuggingFace dataset path")
+    parser.add_argument("--dtype", default="float32", help="Data type for computations")
+    parser.add_argument("--output-dir", default="neuronpedia_outputs/", help="Output directory")
+    parser.add_argument("--sparsity-threshold", type=int, default=1, help="Sparsity threshold")
+    parser.add_argument("--n-prompts", type=int, default=128, help="Number of prompts")
+    parser.add_argument("--n-tokens-in-prompt", type=int, default=128, help="Number of tokens in prompt")
+    parser.add_argument("--n-prompts-in-forward-pass", type=int, default=128, help="Number of prompts in forward pass")
+    parser.add_argument("--n-features-per-batch", type=int, default=2, help="Number of features per batch")
+    parser.add_argument("--start-batch", type=int, default=0, help="Starting batch number")
+    parser.add_argument("--end-batch", type=int, default=None, help="Ending batch number")
+    parser.add_argument("--use-wandb", action="store_true", help="Use Weights & Biases for logging")
+    parser.add_argument("--from-local-sae", action="store_true", help="Load SAE from local path")
+
+    args = parser.parse_args()
+
+    cfg = NeuronpediaRunnerConfig(
+        sae_set=args.sae_set,
+        sae_path=args.sae_path,
+        np_set_name=args.np_set_name,
+        from_local_sae=args.from_local_sae,
+        huggingface_dataset_path=args.dataset_path,
+        dtype=args.dtype,
+        outputs_dir=args.output_dir,
+        sparsity_threshold=args.sparsity_threshold,
+        n_prompts_total=args.n_prompts,
+        n_tokens_in_prompt=args.n_tokens_in_prompt,
+        n_prompts_in_forward_pass=args.n_prompts_in_forward_pass,
+        n_features_at_a_time=args.n_features_per_batch,
+        start_batch=args.start_batch,
+        end_batch=args.end_batch,
+        use_wandb=args.use_wandb
+    )
+
+    runner = NeuronpediaRunner(cfg)
+    runner.run()
+
+if __name__ == "__main__":
+    main()
