@@ -55,6 +55,10 @@ class SaeVisRunner:
         # encoder = self.mock_feature_acts_subset_for_now(encoder)
         encoder.fold_W_dec_norm()
 
+        # turn off reshaping mode since that's not useful if we're caching activations on disk
+        if encoder.hook_z_reshaping_mode:
+            encoder.turn_off_forward_pass_hook_z_reshaping()
+
         # set precision on encoders and model
         # encoder = encoder.to(DTYPES[self.cfg.dtype])
         # # model = cast(HookedTransformer, model.to(DTYPES[self.cfg.dtype]))
