@@ -286,3 +286,39 @@ def test_benchmark_neuronpedia_runner_distributed():
 
     runner = NeuronpediaRunner(cfg)
     runner.run()
+
+
+def test_simple_neuronpedia_runner_hook_z_sae():
+
+    NP_OUTPUT_FOLDER = "neuronpedia_outputs/test_attn"
+    ACT_CACHE_FOLDER = "cached_activations"
+    SAE_SET = "gpt2-small-hook-z-kk"
+    SAE_PATH = "blocks.0.hook_z"
+    NUM_FEATURES_PER_BATCH = 2
+    NUM_BATCHES = 2
+
+    # delete output files if present
+    os.system(f"rm -rf {NP_OUTPUT_FOLDER}")
+    os.system(f"rm -rf {ACT_CACHE_FOLDER}")
+
+    # # we make two batches of 2 features each
+    cfg = NeuronpediaRunnerConfig(
+        sae_set=SAE_SET,
+        sae_path=SAE_PATH,
+        np_set_name="att-kk",
+        from_local_sae=False,
+        outputs_dir=NP_OUTPUT_FOLDER,
+        sparsity_threshold=1,
+        n_prompts_total=5000,
+        n_features_at_a_time=NUM_FEATURES_PER_BATCH,
+        n_prompts_in_forward_pass=32,
+        start_batch=0,
+        end_batch=NUM_BATCHES - 1,
+        use_wandb=True,
+        shuffle_tokens=False,
+    )
+
+    runner = NeuronpediaRunner(cfg)
+    runner.run()
+
+    assert "run_settings.json" in os.listdir(runner.cfg.outputs_dir)
