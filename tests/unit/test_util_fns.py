@@ -1,7 +1,6 @@
 import numpy as np
 import pytest
 import torch
-from torch.profiler import ProfilerActivity, profile, record_function
 
 from sae_dashboard.utils_fns import (
     FeatureStatistics,
@@ -9,6 +8,9 @@ from sae_dashboard.utils_fns import (
     TopK,
     sample_unique_indices,
 )
+
+# from torch.profiler import ProfilerActivity, profile, record_function
+
 
 SYMMETRIC_RANGES_AND_PRECISIONS: list[tuple[list[float], int]] = [
     ([0.0, 0.01], 5),
