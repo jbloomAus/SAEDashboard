@@ -1,7 +1,17 @@
 import random
 import re
 from dataclasses import dataclass, field
-from typing import Any, Callable, Iterable, Literal, Sequence, Type, TypeVar, overload
+from typing import (
+    Any,
+    Callable,
+    Iterable,
+    Literal,
+    Optional,
+    Sequence,
+    Type,
+    TypeVar,
+    overload,
+)
 
 import einops
 import numpy as np
@@ -457,6 +467,76 @@ ASYMMETRIC_RANGES_AND_PRECISIONS: list[tuple[list[float], int]] = [
 ]
 
 
+def float16_quantile(
+    input: torch.Tensor,
+    q: torch.Tensor,
+    dim: Optional[int] = None,
+    keepdim: bool = False,
+    interpolation: str = "linear",
+) -> torch.Tensor:
+    """Performs the torch quantile function for float16 tensors.
+
+    Args:
+        input (torch.Tensor): The input tensor.
+        q (torch.Tensor): The quantile(s) to compute, which must be between 0 and 1.
+        dim: The dimension(s) to reduce.
+        keepdim: Whether to keep the same as the original.
+        interpolation: The interpolation method to use when the desired quantile lies between two data points i and j.
+
+    Returns:
+        torch.Tensor: The computed quantile(s).
+    """
+    if dim is None:
+        input = input.flatten()
+        dim = 0
+
+    # Ensure q is a 1D tensor
+    q = q.squeeze()
+
+    # Move dim to the end for easier processing
+    input = input.transpose(dim, -1)
+
+    sorted_input, _ = torch.sort(input, dim=-1)
+
+    quantile_indices = (
+        (q * (input.shape[-1] - 1))
+        .to(input.dtype)
+        .unsqueeze(0)
+        .expand(input.shape[:-1] + (-1,))
+    )
+    lower_indices = torch.floor(quantile_indices).long()
+    upper_indices = torch.ceil(quantile_indices).long()
+    fractional_part = quantile_indices - lower_indices.to(input.dtype)
+
+    if interpolation == "linear":
+        lower_values = torch.gather(sorted_input, -1, lower_indices)
+        upper_values = torch.gather(sorted_input, -1, upper_indices)
+        result = lower_values * (1 - fractional_part) + upper_values * fractional_part
+    elif interpolation == "lower":
+        result = torch.gather(sorted_input, -1, lower_indices)
+    elif interpolation == "higher":
+        result = torch.gather(sorted_input, -1, upper_indices)
+    elif interpolation == "nearest":
+        nearest_indices = torch.where(
+            fractional_part < 0.5, lower_indices, upper_indices
+        )
+        result = torch.gather(sorted_input, -1, nearest_indices)
+    elif interpolation == "midpoint":
+        lower_values = torch.gather(sorted_input, -1, lower_indices)
+        upper_values = torch.gather(sorted_input, -1, upper_indices)
+        result = (lower_values + upper_values) / 2
+    else:
+        raise ValueError(f"Invalid interpolation method: {interpolation}")
+
+    # Move dim back to its original position
+    result = result.transpose(0, dim)
+
+    if not keepdim:
+        result = result.squeeze(dim)
+
+    return result
+
+
 @dataclass_json
 @dataclass
 class FeatureStatistics:
@@ -523,9 +603,14 @@ class FeatureStatistics:
             _max = data.max(dim=-1).values.tolist()
             frac_nonzero = (data.abs() > 1e-6).float().mean(dim=-1).tolist()
             quantiles_tensor = torch.tensor(quantiles, dtype=data.dtype).to(data.device)
-            quantile_data = torch.quantile(
-                data.to(torch.float32), quantiles_tensor.to(torch.float32), dim=-1
-            ).T.tolist()
+
+            if data.dtype == torch.float16:
+                quantile_data = float16_quantile(data, quantiles_tensor, dim=-1)
+            else:
+                quantile_data = torch.quantile(
+                    data.to(torch.float32), quantiles_tensor.to(torch.float32), dim=-1
+                )
+            quantile_data = quantile_data.T.tolist()
 
         quantiles = [round(q, 6) for q in quantiles + [1.0]]
         quantile_data = [[round(q, 6) for q in qd] for qd in quantile_data]
