@@ -106,7 +106,7 @@ def test_TopK_without_mask_smallest():
     assert topk.indices.tolist() == [0, 1, 2]
 
 
-def test_feature_statistics_create(precision_data):
+def test_feature_statistics_create(precision_data: tuple[torch.Tensor, torch.dtype]):
     data, dtype = precision_data
 
     # Create FeatureStatistics object
