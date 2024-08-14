@@ -583,6 +583,7 @@ class FeatureStatistics:
         ranges_and_precisions: list[
             tuple[list[float], int]
         ] = ASYMMETRIC_RANGES_AND_PRECISIONS,
+        reduce_precision: bool = True,
         batch_size: Optional[int] = None,
     ) -> "FeatureStatistics":
 
@@ -630,12 +631,18 @@ class FeatureStatistics:
                 )
                 batch_quantile_data = float16_quantile(batch, quantiles_tensor, dim=-1)
             else:
-                print(
-                    f"Using float32 quantile calculation for batch {i//batch_size + 1}"
-                )
-                batch_quantile_data = torch.quantile(
-                    batch.to(torch.float32), quantiles_tensor.to(torch.float32), dim=-1
-                )
+                if reduce_precision:
+                    batch_quantile_data = float16_quantile(
+                        batch.to(torch.float16),
+                        quantiles_tensor.to(torch.float16),
+                        dim=-1,
+                    )
+                else:
+                    batch_quantile_data = torch.quantile(
+                        batch.to(torch.float32),
+                        quantiles_tensor.to(torch.float32),
+                        dim=-1,
+                    )
 
             quantile_data.extend(batch_quantile_data.T.tolist())
 
