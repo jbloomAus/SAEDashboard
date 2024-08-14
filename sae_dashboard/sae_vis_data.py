@@ -34,6 +34,7 @@ class SaeVisConfig:
     features: Iterable[int]
     minibatch_size_features: int = 256
     minibatch_size_tokens: int = 64
+    quantile_feature_batch_size: int = 64
     perform_ablation_experiments: bool = False
     device: str = "cpu"
     dtype: str = "float32"

@@ -93,6 +93,7 @@ class NeuronpediaRunnerConfig:
 
     # batching
     n_features_at_a_time: int = 128
+    quantile_feature_batch_size: int = 64
     start_batch: int = 0
     end_batch: Optional[int] = None
 
@@ -503,6 +504,7 @@ class NeuronpediaRunner:
                     features=features_to_process,
                     minibatch_size_features=self.cfg.n_features_at_a_time,
                     minibatch_size_tokens=self.cfg.n_prompts_in_forward_pass,
+                    quantile_feature_batch_size=self.cfg.quantile_feature_batch_size,
                     verbose=True,
                     device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
                     feature_centric_layout=layout,

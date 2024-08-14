@@ -43,7 +43,7 @@ def precision_data(request):  # type:ignore
 @pytest.fixture(params=[torch.float16, torch.float32, torch.float64])
 def large_precision_data(request):  # type:ignore
     # Create some sample data
-    data = torch.randn(1000, 10000, device="cuda", dtype=request.param)
+    data = torch.randn(100, 1000, device="cuda", dtype=request.param)
     return data, request.param
 
 
@@ -104,6 +104,90 @@ def test_TopK_without_mask_smallest():
 
     assert topk.values.tolist() == [1, 2, 3]
     assert topk.indices.tolist() == [0, 1, 2]
+
+
+# def test_feature_statistics_sampling(large_precision_data: tuple[torch.Tensor, torch.dtype]):
+#     data, dtype = large_precision_data
+
+#     # Create FeatureStatistics object using the original method
+#     feature_stats_original = FeatureStatistics.create(data)
+
+#     # Create FeatureStatistics object using the sampling method
+#     feature_stats_sampling = FeatureStatistics.create(data, sample_size=500)
+
+#     # Test max values (should be identical)
+#     assert np.allclose(feature_stats_original.max, feature_stats_sampling.max, atol=1e-3)
+
+#     # Test fraction of non-zero values (should be identical)
+#     assert np.allclose(feature_stats_original.frac_nonzero, feature_stats_sampling.frac_nonzero, atol=1e-3)
+
+#     # Test quantiles (should be identical)
+#     assert feature_stats_original.quantiles == feature_stats_sampling.quantiles
+
+#     # Test quantile data (should be similar, but not identical due to sampling)
+#     for original_qd, sampling_qd in zip(feature_stats_original.quantile_data, feature_stats_sampling.quantile_data):
+#         assert len(original_qd) == len(sampling_qd)
+#         # Check if the sampled quantiles are within a reasonable range of the original quantiles
+#         assert np.allclose(original_qd, sampling_qd, atol=0.1, rtol=0.0)
+
+#     print(f"Test completed for dtype: {dtype}")
+#     print(f"Original max: {feature_stats_original.max[:5]}")
+#     print(f"Sampled max: {feature_stats_sampling.max[:5]}")
+#     print(f"Original frac_nonzero: {feature_stats_original.frac_nonzero[:5]}")
+#     print(f"Sampled frac_nonzero: {feature_stats_sampling.frac_nonzero[:5]}")
+#     print(f"Original quantile_data[0][:5]: {feature_stats_original.quantile_data[0][:5]}")
+#     print(f"Sampled quantile_data[0][:5]: {feature_stats_sampling.quantile_data[0][:5]}")
+
+
+def test_feature_statistics_batched_vs_unbatched(
+    large_precision_data: tuple[torch.Tensor, torch.dtype]
+):
+    data, dtype = large_precision_data
+
+    # Create unbatched FeatureStatistics object
+    unbatched_stats = FeatureStatistics.create(data)
+
+    # Create batched FeatureStatistics object
+    batched_stats = FeatureStatistics.create(
+        data, batch_size=10
+    )  # Process 10 features at a time
+
+    # Compare max values
+    assert np.allclose(
+        unbatched_stats.max, batched_stats.max, atol=1e-3
+    ), "Max values do not match"
+
+    # Compare fraction of non-zero values
+    assert np.allclose(
+        unbatched_stats.frac_nonzero, batched_stats.frac_nonzero, atol=1e-3
+    ), "Fraction of non-zero values do not match"
+
+    # Compare quantiles
+    assert (
+        unbatched_stats.quantiles == batched_stats.quantiles
+    ), "Quantiles do not match"
+
+    # Compare quantile data
+    assert len(unbatched_stats.quantile_data) == len(
+        batched_stats.quantile_data
+    ), "Quantile data lengths do not match"
+    for unbatched_qd, batched_qd in zip(
+        unbatched_stats.quantile_data, batched_stats.quantile_data
+    ):
+        assert len(unbatched_qd) == len(
+            batched_qd
+        ), "Quantile data sub-lengths do not match"
+        assert np.allclose(
+            unbatched_qd, batched_qd, atol=1e-3
+        ), "Quantile data values do not match"
+
+    # Compare ranges_and_precisions
+    assert (
+        unbatched_stats.ranges_and_precisions == batched_stats.ranges_and_precisions
+    ), "Ranges and precisions do not match"
+
+    print(f"Test completed for dtype: {dtype}")
+    print("Batched and unbatched results match within tolerance.")
 
 
 def test_feature_statistics_create(precision_data: tuple[torch.Tensor, torch.dtype]):

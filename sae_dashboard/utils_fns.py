@@ -486,6 +486,7 @@ def float16_quantile(
     Returns:
         torch.Tensor: The computed quantile(s).
     """
+    print("Using float16 quantile calculation")
     if dim is None:
         input = input.flatten()
         dim = 0
@@ -578,10 +579,11 @@ class FeatureStatistics:
     @classmethod
     def create(
         cls,
-        data: Float[Tensor, "batch data"] | None = None,
+        data: Optional[torch.Tensor] = None,
         ranges_and_precisions: list[
             tuple[list[float], int]
         ] = ASYMMETRIC_RANGES_AND_PRECISIONS,
+        batch_size: int = 128,  # New parameter for controlling batch size
     ) -> "FeatureStatistics":
         # Generate quantiles from the ranges_and_precisions list
         quantiles = []
@@ -591,31 +593,52 @@ class FeatureStatistics:
             quantiles.extend(np.arange(start, end - 0.5 * step, step))
 
         # If data is None, then set the quantiles and quantile_data to None, and return
-        skew = []
-        kurtosis = []
         if data is None:
-            _max = []
-            frac_nonzero = []
-            quantiles = []
-            quantile_data = []
-        # Else, get the actual stats & quantile values (which we'll use to calculate the quantiles of any new data)
-        else:
-            _max = data.max(dim=-1).values.tolist()
-            frac_nonzero = (data.abs() > 1e-6).float().mean(dim=-1).tolist()
-            quantiles_tensor = torch.tensor(quantiles, dtype=data.dtype).to(data.device)
+            return cls(
+                max=[],
+                frac_nonzero=[],
+                skew=[],
+                kurtosis=[],
+                quantile_data=[],
+                quantiles=[round(q, 6) for q in quantiles + [1.0]],
+                ranges_and_precisions=ranges_and_precisions,
+            )
 
-            if data.dtype == torch.float16:
-                quantile_data = float16_quantile(data, quantiles_tensor, dim=-1)
-            else:
-                quantile_data = torch.quantile(
-                    data.to(torch.float32), quantiles_tensor.to(torch.float32), dim=-1
+        # Process data in batches
+        n_features = data.shape[0]
+        _max = []
+        frac_nonzero = []
+        quantile_data = []
+
+        for i in range(0, n_features, batch_size):
+            batch = data[i : min(i + batch_size, n_features)]
+
+            _max.extend(batch.max(dim=-1).values.tolist())
+            frac_nonzero.extend((batch.abs() > 1e-6).float().mean(dim=-1).tolist())
+
+            quantiles_tensor = torch.tensor(
+                quantiles, dtype=batch.dtype, device=batch.device
+            )
+
+            if batch.dtype in [torch.float16, torch.bfloat16]:
+                print(
+                    f"Using float16 quantile calculation for batch {i//batch_size + 1}"
                 )
-            quantile_data = quantile_data.T.tolist()
+                batch_quantile_data = float16_quantile(batch, quantiles_tensor, dim=-1)
+            else:
+                print(
+                    f"Using float32 quantile calculation for batch {i//batch_size + 1}"
+                )
+                batch_quantile_data = torch.quantile(
+                    batch.to(torch.float32), quantiles_tensor.to(torch.float32), dim=-1
+                )
+
+            quantile_data.extend(batch_quantile_data.T.tolist())
 
         quantiles = [round(q, 6) for q in quantiles + [1.0]]
         quantile_data = [[round(q, 6) for q in qd] for qd in quantile_data]
 
-        # Now, strip out the quantile data prefixes which are all zeros
+        # Strip out the quantile data prefixes which are all zeros
         for i, qd in enumerate(quantile_data):
             first_nonzero = next(
                 (i for i, x in enumerate(qd) if abs(x) > 1e-6), len(qd)
@@ -625,10 +648,75 @@ class FeatureStatistics:
         return cls(
             max=_max,
             frac_nonzero=frac_nonzero,
-            skew=skew,
-            kurtosis=kurtosis,
+            skew=[],  # Placeholder for skew calculation
+            kurtosis=[],  # Placeholder for kurtosis calculation
             quantile_data=quantile_data,
             quantiles=quantiles,
+            ranges_and_precisions=ranges_and_precisions,
+        )
+
+    @classmethod
+    def create_sampled(
+        cls,
+        data: Float[Tensor, "batch data"] | None = None,
+        ranges_and_precisions: list[
+            tuple[list[float], int]
+        ] = ASYMMETRIC_RANGES_AND_PRECISIONS,
+        sample_size: Optional[int] = None,
+    ) -> "FeatureStatistics":
+        # Generate quantiles from the ranges_and_precisions list
+        quantiles = []
+        for r, p in ranges_and_precisions:
+            start, end = r
+            step = 10**-p
+            quantiles.extend(np.arange(start, end - 0.5 * step, step))
+        quantiles = torch.tensor(quantiles + [1.0], dtype=torch.float32)
+
+        if data is None:
+            return cls(
+                max=[],
+                frac_nonzero=[],
+                quantile_data=[],
+                quantiles=quantiles.tolist(),
+                ranges_and_precisions=ranges_and_precisions,
+            )
+
+        # Compute max and frac_nonzero on full data
+        _max = data.max(dim=-1).values.tolist()
+        frac_nonzero = (data.abs() > 1e-6).float().mean(dim=-1).tolist()
+
+        # Sample for quantile calculation
+        if sample_size and data.shape[-1] > sample_size:
+            indices = torch.randperm(data.shape[-1])[:sample_size]
+            data_sample = data[..., indices]
+        else:
+            data_sample = data
+
+        # Compute quantiles on the sample
+        if data_sample.dtype in [torch.float16, torch.bfloat16]:
+            quantile_data = float16_quantile(
+                data_sample, quantiles.to(data_sample.device), dim=-1
+            )
+        else:
+            quantile_data = torch.quantile(
+                data_sample.to(torch.float32), quantiles.to(data_sample.device), dim=-1
+            )
+
+        quantile_data = quantile_data.T.tolist()
+
+        # Post-process quantile data
+        quantile_data = [[round(q, 6) for q in qd] for qd in quantile_data]
+        for i, qd in enumerate(quantile_data):
+            first_nonzero = next(
+                (i for i, x in enumerate(qd) if abs(x) > 1e-6), len(qd)
+            )
+            quantile_data[i] = qd[first_nonzero:]
+
+        return cls(
+            max=_max,
+            frac_nonzero=frac_nonzero,
+            quantile_data=quantile_data,
+            quantiles=quantiles.tolist(),
             ranges_and_precisions=ranges_and_precisions,
         )
 
