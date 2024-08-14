@@ -626,7 +626,6 @@ class FeatureStatistics:
             )
 
             if batch.dtype in [torch.float16, torch.bfloat16]:
-                
                 batch_quantile_data = float16_quantile(batch, quantiles_tensor, dim=-1)
             else:
                 if reduce_precision:
