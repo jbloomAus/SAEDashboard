@@ -24,12 +24,10 @@ class FeatureDataGenerator:
         tokens: Int[Tensor, "batch seq"],
         model: TransformerLensWrapper,
         encoder: SAE,
-        encoder_B: SAE | None = None,
     ):
         self.cfg = cfg
         self.model = model
         self.encoder = encoder
-        self.encoder_B = encoder_B
         self.token_minibatches = self.batch_tokens(tokens)
 
     @torch.inference_mode()
@@ -59,7 +57,6 @@ class FeatureDataGenerator:
         # Create objects to store the data for computing rolling stats
         corrcoef_neurons = RollingCorrCoef()
         corrcoef_encoder = RollingCorrCoef(indices=feature_indices, with_self=True)
-        corrcoef_encoder_B = RollingCorrCoef() if self.encoder_B is not None else None
 
         # Get encoder & decoder directions
         feature_out_dir = self.encoder.W_dec[feature_indices]  # [feats d_autoencoder]
@@ -82,7 +79,6 @@ class FeatureDataGenerator:
                 feature_acts=feature_acts,
                 corrcoef_neurons=corrcoef_neurons,
                 corrcoef_encoder=corrcoef_encoder,
-                corrcoef_encoder_B=corrcoef_encoder_B,
             )
 
             # Add these to the lists (we'll eventually concat)
@@ -105,7 +101,6 @@ class FeatureDataGenerator:
             feature_out_dir,
             corrcoef_neurons,
             corrcoef_encoder,
-            corrcoef_encoder_B,
         )
 
     @torch.inference_mode()
@@ -141,8 +136,6 @@ class FeatureDataGenerator:
         feature_acts: Float[Tensor, "batch seq feats"],
         corrcoef_neurons: RollingCorrCoef | None,
         corrcoef_encoder: RollingCorrCoef | None,
-        corrcoef_encoder_B: RollingCorrCoef | None,
-        encoder_B: SAE | None = None,
     ) -> None:
         """
 
@@ -151,14 +144,10 @@ class FeatureDataGenerator:
                 The activations of the model, which the SAE was trained on.
             feature_idx: list[int]
                 The features we're computing the activations for. This will be used to index the encoder's weights.
-            encoder_B: Optional[AutoEncoder]
-                The encoder-B object, which we use to calculate the feature activations.
             corrcoef_neurons: Optional[RollingCorrCoef]
                 The object storing the minimal data necessary to compute corrcoef between feature activations & neurons.
             corrcoef_encoder: Optional[RollingCorrCoef]
                 The object storing the minimal data necessary to compute corrcoef between pairwise feature activations.
-            corrcoef_encoder_B: Optional[RollingCorrCoef]
-                The object storing minimal data to compute corrcoef between feature activations & encoder-B features.
         """
         # Update the CorrCoef object between feature activation & neurons
         if corrcoef_neurons is not None:
@@ -172,18 +161,6 @@ class FeatureDataGenerator:
             corrcoef_encoder.update(
                 einops.rearrange(feature_acts, "batch seq feats -> feats (batch seq)"),
                 einops.rearrange(feature_acts, "batch seq feats -> feats (batch seq)"),
-            )
-
-        # Calculate encoder-B feature acts (we don't need to store encoder-B acts; it's just for left-hand feature tables)
-        if corrcoef_encoder_B is not None:
-            feat_acts_B = encoder_B.get_feature_acts(model_acts)  # type: ignore (we know encoder_B is not None)
-
-            # Update the CorrCoef object between feature activation & encoder-B features
-            corrcoef_encoder_B.update(
-                einops.rearrange(feature_acts, "batch seq feats -> feats (batch seq)"),
-                einops.rearrange(
-                    feat_acts_B, "batch seq d_hidden -> d_hidden (batch seq)"
-                ),
             )
 
 
