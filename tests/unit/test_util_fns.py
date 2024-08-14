@@ -111,39 +111,6 @@ def test_TopK_without_mask_smallest():
     assert topk.indices.tolist() == [0, 1, 2]
 
 
-# def test_feature_statistics_sampling(large_precision_data: tuple[torch.Tensor, torch.dtype]):
-#     data, dtype = large_precision_data
-
-#     # Create FeatureStatistics object using the original method
-#     feature_stats_original = FeatureStatistics.create(data)
-
-#     # Create FeatureStatistics object using the sampling method
-#     feature_stats_sampling = FeatureStatistics.create(data, sample_size=500)
-
-#     # Test max values (should be identical)
-#     assert np.allclose(feature_stats_original.max, feature_stats_sampling.max, atol=1e-3)
-
-#     # Test fraction of non-zero values (should be identical)
-#     assert np.allclose(feature_stats_original.frac_nonzero, feature_stats_sampling.frac_nonzero, atol=1e-3)
-
-#     # Test quantiles (should be identical)
-#     assert feature_stats_original.quantiles == feature_stats_sampling.quantiles
-
-#     # Test quantile data (should be similar, but not identical due to sampling)
-#     for original_qd, sampling_qd in zip(feature_stats_original.quantile_data, feature_stats_sampling.quantile_data):
-#         assert len(original_qd) == len(sampling_qd)
-#         # Check if the sampled quantiles are within a reasonable range of the original quantiles
-#         assert np.allclose(original_qd, sampling_qd, atol=0.1, rtol=0.0)
-
-#     print(f"Test completed for dtype: {dtype}")
-#     print(f"Original max: {feature_stats_original.max[:5]}")
-#     print(f"Sampled max: {feature_stats_sampling.max[:5]}")
-#     print(f"Original frac_nonzero: {feature_stats_original.frac_nonzero[:5]}")
-#     print(f"Sampled frac_nonzero: {feature_stats_sampling.frac_nonzero[:5]}")
-#     print(f"Original quantile_data[0][:5]: {feature_stats_original.quantile_data[0][:5]}")
-#     print(f"Sampled quantile_data[0][:5]: {feature_stats_sampling.quantile_data[0][:5]}")
-
-
 def test_feature_statistics_batched_vs_unbatched(
     large_precision_data: tuple[torch.Tensor, torch.dtype]
 ):
@@ -192,6 +159,63 @@ def test_feature_statistics_batched_vs_unbatched(
     ), "Ranges and precisions do not match"
 
     print(f"Test completed for dtype: {dtype}")
+    print("Batched and unbatched results match within tolerance.")
+
+
+@pytest.mark.parametrize("n_features,batch_size", [(100, 10), (100, 30), (100, 7)])
+def test_feature_statistics_batched_vs_unbatched_uneven_sizes(
+    large_precision_data: tuple[torch.Tensor, torch.dtype],
+    n_features: int,
+    batch_size: int,
+):
+    data, dtype = large_precision_data
+
+    # Slice the data to the specified number of features
+    data = data[:n_features]
+
+    # Create unbatched FeatureStatistics object
+    unbatched_stats = FeatureStatistics.create(data)
+
+    # Create batched FeatureStatistics object
+    batched_stats = FeatureStatistics.create(data, batch_size=batch_size)
+
+    # Compare max values
+    assert np.allclose(
+        unbatched_stats.max, batched_stats.max, atol=1e-3
+    ), f"Max values do not match for n_features={n_features}, batch_size={batch_size}"
+
+    # Compare fraction of non-zero values
+    assert np.allclose(
+        unbatched_stats.frac_nonzero, batched_stats.frac_nonzero, atol=1e-3
+    ), f"Fraction of non-zero values do not match for n_features={n_features}, batch_size={batch_size}"
+
+    # Compare quantiles
+    assert (
+        unbatched_stats.quantiles == batched_stats.quantiles
+    ), f"Quantiles do not match for n_features={n_features}, batch_size={batch_size}"
+
+    # Compare quantile data
+    assert len(unbatched_stats.quantile_data) == len(
+        batched_stats.quantile_data
+    ), f"Quantile data lengths do not match for n_features={n_features}, batch_size={batch_size}"
+    for unbatched_qd, batched_qd in zip(
+        unbatched_stats.quantile_data, batched_stats.quantile_data
+    ):
+        assert len(unbatched_qd) == len(
+            batched_qd
+        ), f"Quantile data sub-lengths do not match for n_features={n_features}, batch_size={batch_size}"
+        assert np.allclose(
+            unbatched_qd, batched_qd, atol=1e-3
+        ), f"Quantile data values do not match for n_features={n_features}, batch_size={batch_size}"
+
+    # Compare ranges_and_precisions
+    assert (
+        unbatched_stats.ranges_and_precisions == batched_stats.ranges_and_precisions
+    ), f"Ranges and precisions do not match for n_features={n_features}, batch_size={batch_size}"
+
+    print(
+        f"Test completed for dtype: {dtype}, n_features: {n_features}, batch_size: {batch_size}"
+    )
     print("Batched and unbatched results match within tolerance.")
 
 

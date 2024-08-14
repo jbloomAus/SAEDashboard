@@ -583,8 +583,12 @@ class FeatureStatistics:
         ranges_and_precisions: list[
             tuple[list[float], int]
         ] = ASYMMETRIC_RANGES_AND_PRECISIONS,
-        batch_size: int = 128,  # New parameter for controlling batch size
+        batch_size: Optional[int] = None,
     ) -> "FeatureStatistics":
+
+        if not batch_size:
+            batch_size = 0 if data is None else data.shape[0]
+
         # Generate quantiles from the ranges_and_precisions list
         quantiles = []
         for r, p in ranges_and_precisions:
@@ -652,71 +656,6 @@ class FeatureStatistics:
             kurtosis=[],  # Placeholder for kurtosis calculation
             quantile_data=quantile_data,
             quantiles=quantiles,
-            ranges_and_precisions=ranges_and_precisions,
-        )
-
-    @classmethod
-    def create_sampled(
-        cls,
-        data: Float[Tensor, "batch data"] | None = None,
-        ranges_and_precisions: list[
-            tuple[list[float], int]
-        ] = ASYMMETRIC_RANGES_AND_PRECISIONS,
-        sample_size: Optional[int] = None,
-    ) -> "FeatureStatistics":
-        # Generate quantiles from the ranges_and_precisions list
-        quantiles = []
-        for r, p in ranges_and_precisions:
-            start, end = r
-            step = 10**-p
-            quantiles.extend(np.arange(start, end - 0.5 * step, step))
-        quantiles = torch.tensor(quantiles + [1.0], dtype=torch.float32)
-
-        if data is None:
-            return cls(
-                max=[],
-                frac_nonzero=[],
-                quantile_data=[],
-                quantiles=quantiles.tolist(),
-                ranges_and_precisions=ranges_and_precisions,
-            )
-
-        # Compute max and frac_nonzero on full data
-        _max = data.max(dim=-1).values.tolist()
-        frac_nonzero = (data.abs() > 1e-6).float().mean(dim=-1).tolist()
-
-        # Sample for quantile calculation
-        if sample_size and data.shape[-1] > sample_size:
-            indices = torch.randperm(data.shape[-1])[:sample_size]
-            data_sample = data[..., indices]
-        else:
-            data_sample = data
-
-        # Compute quantiles on the sample
-        if data_sample.dtype in [torch.float16, torch.bfloat16]:
-            quantile_data = float16_quantile(
-                data_sample, quantiles.to(data_sample.device), dim=-1
-            )
-        else:
-            quantile_data = torch.quantile(
-                data_sample.to(torch.float32), quantiles.to(data_sample.device), dim=-1
-            )
-
-        quantile_data = quantile_data.T.tolist()
-
-        # Post-process quantile data
-        quantile_data = [[round(q, 6) for q in qd] for qd in quantile_data]
-        for i, qd in enumerate(quantile_data):
-            first_nonzero = next(
-                (i for i, x in enumerate(qd) if abs(x) > 1e-6), len(qd)
-            )
-            quantile_data[i] = qd[first_nonzero:]
-
-        return cls(
-            max=_max,
-            frac_nonzero=frac_nonzero,
-            quantile_data=quantile_data,
-            quantiles=quantiles.tolist(),
             ranges_and_precisions=ranges_and_precisions,
         )
 
