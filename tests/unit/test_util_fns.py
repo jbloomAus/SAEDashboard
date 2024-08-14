@@ -42,8 +42,13 @@ def precision_data(request):  # type:ignore
 
 @pytest.fixture(params=[torch.float16, torch.float32, torch.float64])
 def large_precision_data(request):  # type:ignore
+    # check if cuda is available, and if so, set device to this
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
     # Create some sample data
-    data = torch.randn(100, 1000, device="cuda", dtype=request.param)
+    data = torch.randn(100, 1000, device=device, dtype=request.param)
     return data, request.param
 
 
