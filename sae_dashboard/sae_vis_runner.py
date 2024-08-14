@@ -113,8 +113,11 @@ class SaeVisRunner:
             ).to(self.device)
 
             # ! Get stats (including quantiles, which will be useful for the prompt-centric visualisation)
+            print(f"all_feat_acts dtype: {all_feat_acts.dtype}")
+            print(f"all_feat_acts shape: {all_feat_acts.shape}")
             feature_stats = FeatureStatistics.create(
-                data=einops.rearrange(all_feat_acts, "b s feats -> feats (b s)")
+                data=einops.rearrange(all_feat_acts, "b s feats -> feats (b s)"),
+                batch_size=self.cfg.quantile_feature_batch_size,
             )
 
             # ! Data setup code (defining the main objects we'll eventually return)
