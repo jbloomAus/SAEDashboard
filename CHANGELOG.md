@@ -2,6 +2,79 @@
 
 
 
+## v0.3.0 (2024-08-15)
+
+### Feature
+
+* feat: seperate files per dashboard html ([`cd8d050`](https://github.com/jbloomAus/SAEDashboard/commit/cd8d050218ae3c6eeb7a9779072e60b78bfe0b58))
+
+### Unknown
+
+* Merge pull request #17 from jbloomAus/refactor/remove_enc_b
+
+Removed all encoder B code ([`67c9c3f`](https://github.com/jbloomAus/SAEDashboard/commit/67c9c3fdc8bd220938f65c1f97214034cc7528b4))
+
+* Merge pull request #18 from jbloomAus/feat-seperate-files-per-html-dashboard
+
+feat: seperate files per dashboard html ([`8ff69ba`](https://github.com/jbloomAus/SAEDashboard/commit/8ff69ba207692d4acb8d5fc19d038090067690df))
+
+* Removed all encoder B code ([`5174e2e`](https://github.com/jbloomAus/SAEDashboard/commit/5174e2e161030dc756c148f1740e50c52baf6a91))
+
+* Merge pull request #16 from jbloomAus/performance_refactor
+
+Create() will now reduce precision by default ([`fb07b90`](https://github.com/jbloomAus/SAEDashboard/commit/fb07b90eaac395a58f02ba927460dcc2c9e61d1a))
+
+* Removed line ([`d795490`](https://github.com/jbloomAus/SAEDashboard/commit/d795490c1c9d8193c8cf84d0352b9d93c41947fe))
+
+* Removed unnecessary print ([`4544f86`](https://github.com/jbloomAus/SAEDashboard/commit/4544f86472480f0df00344fa84111a7c2a52fcef))
+
+* Precision will now be reduced by default for quantile calc ([`539d222`](https://github.com/jbloomAus/SAEDashboard/commit/539d222ded9e3a0944f5240f3a4cd84497d11a74))
+
+* Merge pull request #15 from jbloomAus/quantile_efficiency
+
+Quantile OOM prevention ([`4a40c37`](https://github.com/jbloomAus/SAEDashboard/commit/4a40c3704aab9363163fef3e2830d42f2fecdc6b))
+
+* Made quantile batch optional and removed sampling code ([`2df51d3`](https://github.com/jbloomAus/SAEDashboard/commit/2df51d353f818a196916a15f2bc56f70480dd853))
+
+* Added device check for test ([`afbb960`](https://github.com/jbloomAus/SAEDashboard/commit/afbb960d3c9376ad512607146826b7d1c1e68d48))
+
+* Added parameter for quantile calculation batching ([`49d0a7a`](https://github.com/jbloomAus/SAEDashboard/commit/49d0a7ab37896a085f80409900e3d0b261b8c9e0))
+
+* Added type annotation ([`c71c4aa`](https://github.com/jbloomAus/SAEDashboard/commit/c71c4aa1c8bc25d85b9a955b482823cbde445a51))
+
+* Removed unused imports ([`ec01bfe`](https://github.com/jbloomAus/SAEDashboard/commit/ec01bfefc2f0f4d880cd5744ff6a2ea71991349b))
+
+* Added float16 version of quantile calculation ([`2f01eb8`](https://github.com/jbloomAus/SAEDashboard/commit/2f01eb8d9f84a20918f19e81c23df86ddc9d7f0c))
+
+* Merge pull request #13 from jbloomAus/hook_z_support
+
+fix: restore hook_z support following regression. ([`ea87559`](https://github.com/jbloomAus/SAEDashboard/commit/ea87559359f9821e352dcab582e23b42fef1cebf))
+
+* format ([`21e3617`](https://github.com/jbloomAus/SAEDashboard/commit/21e3617196ef57944c141563e9263101baf9c7f1))
+
+* make sure hook_z works ([`efaeec0`](https://github.com/jbloomAus/SAEDashboard/commit/efaeec0fdf8c2c43bb13bfd652b812a38ebc0200))
+
+* Merge pull request #12 from jbloomAus/use_sae_lens_loading
+
+Use sae lens loading ([`89bba3e`](https://github.com/jbloomAus/SAEDashboard/commit/89bba3e7a10877782608c50f4b8dd9054f204381))
+
+* add settings.json ([`d8f3034`](https://github.com/jbloomAus/SAEDashboard/commit/d8f3034c0ed7241c35e9761d60a9ee4072403fd0))
+
+* add dtype ([`0d8008a`](https://github.com/jbloomAus/SAEDashboard/commit/0d8008afe93a2a2a5bfc954571c680a529ab883f))
+
+* cli util ([`9da440e`](https://github.com/jbloomAus/SAEDashboard/commit/9da440eb3d50d48a7fdc4d3ee3d26de13a458593))
+
+* wandb logging improvement ([`a077369`](https://github.com/jbloomAus/SAEDashboard/commit/a077369ca43009f4e50c0b1e7176cae398703856))
+
+* add override for np set name ([`8906d10`](https://github.com/jbloomAus/SAEDashboard/commit/8906d103ab8d10bd01b791331dfc5485ac047a4f))
+
+* auto add folder path to output dir ([`35e06ab`](https://github.com/jbloomAus/SAEDashboard/commit/35e06ab89bce257fc15ffaa4918b9598577d6df0))
+
+* update tests ([`50163b0`](https://github.com/jbloomAus/SAEDashboard/commit/50163b04ca29b492b9fb71244aa26798655b663f))
+
+* first step towards sae_lens remote loading ([`415a2d1`](https://github.com/jbloomAus/SAEDashboard/commit/415a2d1e484e9ea2351bf98de221f6a83a805107))
+
+
 ## v0.2.3 (2024-08-06)
 
 ### Fix
