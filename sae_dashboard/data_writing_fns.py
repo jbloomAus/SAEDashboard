@@ -21,18 +21,18 @@ def save_feature_centric_vis(
     filename: str | Path,
     feature_idx: int | None = None,
     include_only: list[int] | None = None,
+    separate_files: bool = False,
 ) -> None:
     """
     Returns the HTML string for the view which lets you navigate between different features.
 
     Args:
-        model:          Used to get the tokenizer (for converting token IDs to string tokens).
-        filename:       The HTML filepath we'll save the visualization to.
+        sae_vis_data:   Object containing visualization data.
+        filename:       The HTML filepath we'll save the visualization to. If separate_files is True, this is used as a base name.
         feature_idx:    This is the default feature index we'll start on. If None, we use the first feature.
+        include_only:   Optional list of specific features to include.
+        separate_files: If True, saves each feature to a separate HTML file.
     """
-    # Initialize the object we'll eventually get_html from
-    HTML_OBJ = HTML()
-
     # Set the default argument for the dropdown (i.e. when the page first loads)
     first_feature = (
         next(iter(sae_vis_data.feature_data_dict))
@@ -53,29 +53,57 @@ def save_feature_centric_vis(
     if sae_vis_data.cfg.verbose:
         iterator = tqdm(iterator, desc="Saving feature-centric vis")
 
-    # For each FeatureData object, we get the html_obj for its feature-centric vis, and merge it with HTML_OBJ
-    # (we arbitarily set the HTML string to be the HTML string for the first feature's view; they're all the same)
+    HTML_OBJ = HTML()  # Initialize HTML object for combined file
+
+    # For each FeatureData object, we get the html_obj for its feature-centric vis
     for feature, feature_data in iterator:
         html_obj = feature_data._get_html_data_feature_centric(
             sae_vis_data.cfg.feature_centric_layout, decode_fn
         )
-        HTML_OBJ.js_data[str(feature)] = deepcopy(html_obj.js_data)
-        if feature == first_feature:
-            HTML_OBJ.html_data = deepcopy(html_obj.html_data)
 
-    # Add the aggdata
-    HTML_OBJ.js_data = {
-        "AGGDATA": sae_vis_data.feature_stats.aggdata,
-        "DASHBOARD_DATA": HTML_OBJ.js_data,
-    }
+        if separate_files:
+            feature_HTML_OBJ = HTML()  # Initialize a new HTML object for each feature
+            feature_HTML_OBJ.js_data[str(feature)] = deepcopy(html_obj.js_data)
+            feature_HTML_OBJ.html_data = deepcopy(html_obj.html_data)
 
-    # Save our full HTML
-    HTML_OBJ.get_html(
-        layout_columns=sae_vis_data.cfg.feature_centric_layout.columns,
-        layout_height=sae_vis_data.cfg.feature_centric_layout.height,
-        filename=filename,
-        first_key=str(first_feature),
-    )
+            # Add the aggdata
+            feature_HTML_OBJ.js_data = {
+                "AGGDATA": sae_vis_data.feature_stats.aggdata,
+                "DASHBOARD_DATA": feature_HTML_OBJ.js_data,
+            }
+
+            # Generate filename for this feature
+            feature_filename = Path(filename).with_stem(
+                f"{Path(filename).stem}_feature_{feature}"
+            )
+
+            # Save the HTML for this feature
+            feature_HTML_OBJ.get_html(
+                layout_columns=sae_vis_data.cfg.feature_centric_layout.columns,
+                layout_height=sae_vis_data.cfg.feature_centric_layout.height,
+                filename=feature_filename,
+                first_key=str(feature),
+            )
+        else:
+            # Original behavior: accumulate all features in one HTML object
+            HTML_OBJ.js_data[str(feature)] = deepcopy(html_obj.js_data)
+            if feature == first_feature:
+                HTML_OBJ.html_data = deepcopy(html_obj.html_data)
+
+    if not separate_files:
+        # Add the aggdata
+        HTML_OBJ.js_data = {
+            "AGGDATA": sae_vis_data.feature_stats.aggdata,
+            "DASHBOARD_DATA": HTML_OBJ.js_data,
+        }
+
+        # Save our full HTML
+        HTML_OBJ.get_html(
+            layout_columns=sae_vis_data.cfg.feature_centric_layout.columns,
+            layout_height=sae_vis_data.cfg.feature_centric_layout.height,
+            filename=filename,
+            first_key=str(first_feature),
+        )
 
 
 def save_prompt_centric_vis(
