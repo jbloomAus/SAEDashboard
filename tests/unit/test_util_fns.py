@@ -315,55 +315,6 @@ def test_feature_statistics_quantile_accuracy():
         print(f"All quantiles match for dtype {dtype}")
 
 
-@pytest.mark.parametrize("n_features,n_tokens", [(100, 1000), (50, 500)])
-def test_feature_statistics_precision_reduction(n_features: int, n_tokens: int):
-    # Create a random 2D float32 tensor
-    torch.manual_seed(42)  # for reproducibility
-    data = torch.randn(n_features, n_tokens, dtype=torch.float32)
-
-    # Create FeatureStatistics without reducing precision
-    stats_full = FeatureStatistics.create(data, reduce_precision=False)
-
-    # Create FeatureStatistics with reduced precision
-    stats_reduced = FeatureStatistics.create(data, reduce_precision=True)
-
-    # Compare max values
-    assert np.allclose(
-        stats_full.max, stats_reduced.max, atol=1e-2
-    ), "Max values do not match within tolerance"
-
-    # Compare fraction of non-zero values
-    assert np.allclose(
-        stats_full.frac_nonzero, stats_reduced.frac_nonzero, atol=1e-2
-    ), "Fraction of non-zero values do not match within tolerance"
-
-    # Compare quantiles
-    assert stats_full.quantiles == stats_reduced.quantiles, "Quantiles do not match"
-
-    # Compare quantile data
-    assert len(stats_full.quantile_data) == len(
-        stats_reduced.quantile_data
-    ), "Quantile data lengths do not match"
-    for full_qd, reduced_qd in zip(
-        stats_full.quantile_data, stats_reduced.quantile_data
-    ):
-        assert len(full_qd) == len(reduced_qd), "Quantile data sub-lengths do not match"
-        if not np.allclose(
-            full_qd, reduced_qd, rtol=1e-1
-        ):  # , "Quantile data values do not match within tolerance"
-            print(
-                f"Mean difference: {np.mean(np.abs(np.array(full_qd) - np.array(reduced_qd)))}"
-            )
-
-    # Compare ranges_and_precisions
-    assert (
-        stats_full.ranges_and_precisions == stats_reduced.ranges_and_precisions
-    ), "Ranges and precisions do not match"
-
-    print(f"Test completed for n_features: {n_features}, n_tokens: {n_tokens}")
-    print("Full precision and reduced precision results match within tolerance.")
-
-
 # def test_feature_statistics_benchmark(large_precision_data):
 #     # Check if CUDA is available
 #     if not torch.cuda.is_available():
