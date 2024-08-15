@@ -42,11 +42,7 @@ class SaeVisRunner:
 
     @torch.inference_mode()
     def run(
-        self,
-        encoder: SAE,
-        model: HookedTransformer,
-        tokens: Int[Tensor, "batch seq"],
-        encoder_B: SAE | None = None,
+        self, encoder: SAE, model: HookedTransformer, tokens: Int[Tensor, "batch seq"]
     ) -> SaeVisData:
         # Apply random seed
         self.set_seeds()
@@ -62,8 +58,6 @@ class SaeVisRunner:
         # set precision on encoders and model
         # encoder = encoder.to(DTYPES[self.cfg.dtype])
         # # model = cast(HookedTransformer, model.to(DTYPES[self.cfg.dtype]))
-        # if encoder_B is not None:
-        #     encoder_B.to(DTYPES[self.cfg.dtype])
 
         # Create objects to store all the data we'll get from `_get_feature_data`
         sae_vis_data = SaeVisData(cfg=self.cfg)
@@ -80,7 +74,6 @@ class SaeVisRunner:
             cfg=self.cfg,
             model=model_wrapper,
             encoder=encoder,
-            encoder_B=encoder_B,
             tokens=tokens,
         )
 
@@ -102,7 +95,6 @@ class SaeVisRunner:
                 feature_out_dir,
                 corrcoef_neurons,
                 corrcoef_encoder,
-                corrcoef_encoder_B,
             ) = feature_data_generator.get_feature_data(features, progress)
 
             # Get the logits of all features (i.e. the directions this feature writes to the logit output)
@@ -132,7 +124,6 @@ class SaeVisRunner:
                 feature_out_dir=feature_out_dir,
                 corrcoef_neurons=corrcoef_neurons,
                 corrcoef_encoder=corrcoef_encoder,
-                corrcoef_encoder_B=corrcoef_encoder_B,
                 n_rows=layout.feature_tables_cfg.n_rows,  # type: ignore
             )
 
@@ -226,7 +217,6 @@ class SaeVisRunner:
         sae_vis_data.cfg = self.cfg
         sae_vis_data.model = model
         sae_vis_data.encoder = encoder
-        sae_vis_data.encoder_B = encoder_B
 
         return sae_vis_data
 

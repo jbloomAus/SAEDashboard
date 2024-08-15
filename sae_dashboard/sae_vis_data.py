@@ -131,7 +131,6 @@ class SaeVisData:
         cfg:                The vis config, used for the both the data gathering and the vis layout.
         model:              The model which our encoder was trained on.
         encoder:            The encoder used to get the feature activations.
-        encoder_B:          The encoder used to get the feature activations for the second model (if applicable).
     """
 
     cfg: SaeVisConfig  # = field(default_factory=SaeVisConfig)
@@ -140,7 +139,6 @@ class SaeVisData:
 
     model: HookedTransformer | None = None
     encoder: SAE | None = None
-    encoder_B: SAE | None = None
 
     def update(self, other: "SaeVisData") -> None:
         """
@@ -160,7 +158,6 @@ class SaeVisData:
     #     model: HookedTransformer,
     #     tokens: Int[Tensor, "batch seq"],
     #     cfg: SaeVisConfig,
-    #     encoder_B: AutoEncoder | None = None,
     # ) -> "SaeVisData":
     #     from sae_dashboard.data_fetching_fns import get_feature_data
 
@@ -184,12 +181,10 @@ class SaeVisData:
     #         model=model,
     #         tokens=tokens,
     #         cfg=cfg,
-    #         encoder_B=encoder_B,
     #     )
     #     sae_vis_data.cfg = cfg
     #     sae_vis_data.model = model
     #     sae_vis_data.encoder = encoder_wrapper
-    #     sae_vis_data.encoder_B = encoder_B
 
     #     return sae_vis_data
 
@@ -216,7 +211,6 @@ class SaeVisData:
         cfg: SaeVisConfig,
         model: HookedTransformer,
         encoder: SAE,
-        encoder_B: SAE,
     ) -> "SaeVisData":
         """
         Loads an SaeVisData instance from JSON file. The config, model & encoder arguments must be user-supplied.
@@ -236,7 +230,6 @@ class SaeVisData:
             feature_stats=_self.feature_stats,
             model=model,
             encoder=encoder,
-            encoder_B=encoder_B,
         )
 
         return self

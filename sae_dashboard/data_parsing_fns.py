@@ -20,7 +20,6 @@ def get_features_table_data(
     n_rows: int,
     corrcoef_neurons: RollingCorrCoef | None = None,
     corrcoef_encoder: RollingCorrCoef | None = None,
-    corrcoef_encoder_B: RollingCorrCoef | None = None,
 ) -> dict[str, list[list[int]] | list[list[float]]]:
     # ! Calculate all data for the left-hand column visualisations, i.e. the 3 tables
     # Store kwargs (makes it easier to turn the tables on and off individually)
@@ -47,14 +46,6 @@ def get_features_table_data(
     if corrcoef_encoder is not None:
         add_intra_encoder_correlations(
             corrcoef_encoder=corrcoef_encoder,
-            feature_tables_data=feature_tables_data,
-            n_rows=n_rows,
-        )
-
-    # Table 4: encoder-B features correlated with this feature, based on their activations
-    if corrcoef_encoder_B is not None:
-        add_encoder_B_feature_correlations(
-            corrcoef_encoder_B=corrcoef_encoder_B,
             feature_tables_data=feature_tables_data,
             n_rows=n_rows,
         )
@@ -108,19 +99,6 @@ def add_feature_neuron_correlations(
     feature_tables_data["correlated_neurons_cossim"] = neuron_cossim
 
 
-def add_encoder_B_feature_correlations(
-    corrcoef_encoder_B: RollingCorrCoef,
-    feature_tables_data: dict[str, list[list[int]] | list[list[float]]],
-    n_rows: int,
-):
-    encB_indices, encB_pearson, encB_cossim = corrcoef_encoder_B.topk_pearson(
-        k=n_rows,
-    )
-    feature_tables_data["correlated_b_features_indices"] = encB_indices
-    feature_tables_data["correlated_b_features_pearson"] = encB_pearson
-    feature_tables_data["correlated_b_features_cossim"] = encB_cossim
-
-
 def get_logits_table_data(logit_vector: Float[Tensor, "d_vocab"], n_rows: int):
     # Get logits table data
     top_logits = TopK(logit_vector.float(), k=n_rows, largest=True)
@@ -148,7 +126,6 @@ def get_logits_table_data(logit_vector: Float[Tensor, "d_vocab"], n_rows: int):
 #     model: HookedTransformer,
 #     tokens: Int[Tensor, "batch seq"],
 #     cfg: SaeVisConfig,
-#     encoder_B: AutoEncoder | None = None,
 # ) -> SaeVisData:
 #     """
 #     This is the main function which users will run to generate the feature visualization data. It batches this
