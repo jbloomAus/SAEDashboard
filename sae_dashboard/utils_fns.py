@@ -467,77 +467,6 @@ ASYMMETRIC_RANGES_AND_PRECISIONS: list[tuple[list[float], int]] = [
 ]
 
 
-def float16_quantile(
-    input: torch.Tensor,
-    q: torch.Tensor,
-    dim: Optional[int] = None,
-    keepdim: bool = False,
-    interpolation: str = "linear",
-) -> torch.Tensor:
-    """Performs the torch quantile function for float16 tensors.
-
-    Args:
-        input (torch.Tensor): The input tensor.
-        q (torch.Tensor): The quantile(s) to compute, which must be between 0 and 1.
-        dim: The dimension(s) to reduce.
-        keepdim: Whether to keep the same as the original.
-        interpolation: The interpolation method to use when the desired quantile lies between two data points i and j.
-
-    Returns:
-        torch.Tensor: The computed quantile(s).
-    """
-    print("Using float16 quantile calculation")
-    if dim is None:
-        input = input.flatten()
-        dim = 0
-
-    # Ensure q is a 1D tensor
-    q = q.squeeze()
-
-    # Move dim to the end for easier processing
-    input = input.transpose(dim, -1)
-
-    sorted_input, _ = torch.sort(input, dim=-1)
-
-    quantile_indices = (
-        (q * (input.shape[-1] - 1))
-        .to(input.dtype)
-        .unsqueeze(0)
-        .expand(input.shape[:-1] + (-1,))
-    )
-    lower_indices = torch.floor(quantile_indices).long()
-    upper_indices = torch.ceil(quantile_indices).long()
-    fractional_part = quantile_indices - lower_indices.to(input.dtype)
-
-    if interpolation == "linear":
-        lower_values = torch.gather(sorted_input, -1, lower_indices)
-        upper_values = torch.gather(sorted_input, -1, upper_indices)
-        result = lower_values * (1 - fractional_part) + upper_values * fractional_part
-    elif interpolation == "lower":
-        result = torch.gather(sorted_input, -1, lower_indices)
-    elif interpolation == "higher":
-        result = torch.gather(sorted_input, -1, upper_indices)
-    elif interpolation == "nearest":
-        nearest_indices = torch.where(
-            fractional_part < 0.5, lower_indices, upper_indices
-        )
-        result = torch.gather(sorted_input, -1, nearest_indices)
-    elif interpolation == "midpoint":
-        lower_values = torch.gather(sorted_input, -1, lower_indices)
-        upper_values = torch.gather(sorted_input, -1, upper_indices)
-        result = (lower_values + upper_values) / 2
-    else:
-        raise ValueError(f"Invalid interpolation method: {interpolation}")
-
-    # Move dim back to its original position
-    result = result.transpose(0, dim)
-
-    if not keepdim:
-        result = result.squeeze(dim)
-
-    return result
-
-
 @dataclass_json
 @dataclass
 class FeatureStatistics:
@@ -585,7 +514,16 @@ class FeatureStatistics:
         ] = ASYMMETRIC_RANGES_AND_PRECISIONS,
         batch_size: Optional[int] = None,
     ) -> "FeatureStatistics":
+        """Calculates various statistics for a tensor of activations.
 
+        Args:
+            data: A tensor of activations; should be shape (n_features, n_samples (n_prompts * n_prompt_tokens)).
+            ranges_and_precisions: A list of tuples of the form (range, precision).
+            batch_size: The feature batch size to use for processing the acts. Reduce this if you encounter OOM errors.
+
+        Returns:
+            A FeatureStatistics object.
+        """
         if not batch_size:
             batch_size = 0 if data is None else data.shape[0]
 
@@ -624,14 +562,11 @@ class FeatureStatistics:
                 quantiles, dtype=batch.dtype, device=batch.device
             )
 
-            if batch.dtype in [torch.float16, torch.bfloat16]:
-                batch_quantile_data = float16_quantile(batch, quantiles_tensor, dim=-1)
-            else:
-                batch_quantile_data = torch.quantile(
-                    batch.to(torch.float32),
-                    quantiles_tensor.to(torch.float32),
-                    dim=-1,
-                )
+            batch_quantile_data = torch.quantile(
+                batch.to(torch.float32),
+                quantiles_tensor.to(torch.float32),
+                dim=-1,
+            )
 
             quantile_data.extend(batch_quantile_data.T.tolist())
 

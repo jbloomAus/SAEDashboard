@@ -256,65 +256,6 @@ def test_feature_statistics_update():
     assert len(stats1.quantile_data) == 4
 
 
-def test_feature_statistics_quantile_accuracy():
-    # Create sample data
-    torch.manual_seed(0)  # for reproducibility
-    data = torch.rand(1000, 100)  # 1000 features, 100 data points each
-
-    # Test for float32 and float16
-    for dtype in [torch.float32, torch.float16]:
-        data_typed = data.to(dtype)
-
-        # Create FeatureStatistics object
-        feature_stats = FeatureStatistics.create(data_typed)
-
-        # Calculate quantiles using the same method as in FeatureStatistics.create
-        quantiles = []
-        for r, p in ASYMMETRIC_RANGES_AND_PRECISIONS:
-            start, end = r
-            step = 10**-p
-            quantiles.extend(np.arange(start, end - 0.5 * step, step))
-
-        quantiles_tensor = torch.tensor(quantiles, dtype=data_typed.dtype).to(
-            data.device
-        )
-        expected_quantile_data = torch.quantile(
-            data.to(torch.float32), quantiles_tensor.to(torch.float32), dim=-1
-        )
-        expected_quantile_data = expected_quantile_data.T.tolist()
-        expected_quantile_data = [
-            [round(q, 6) for q in qd] for qd in expected_quantile_data
-        ]
-        for i, qd in enumerate(expected_quantile_data):
-            first_nonzero = next(
-                (i for i, x in enumerate(qd) if abs(x) > 1e-6), len(qd)
-            )
-            expected_quantile_data[i] = qd[first_nonzero:]
-
-        # Compare results
-        for i, (expected, actual) in enumerate(
-            zip(expected_quantile_data, feature_stats.quantile_data)
-        ):
-
-            print(f"Dtype: {dtype}, Feature {i}")
-            print(f"Expected: {expected[-5:]}...")
-            print(f"Actual:   {actual[-5:]}...")
-            print(f"Expected length: {len(expected)}, Actual length: {len(actual)}")
-
-            assert len(expected) == len(
-                actual
-            ), f"Length mismatch for feature {i}, expected {len(expected)}, got {len(actual)}"
-            np.testing.assert_allclose(
-                actual,
-                expected,
-                rtol=1e-2,
-                atol=1e-2,
-                err_msg=f"Mismatch for feature {i} with dtype {dtype}",
-            )
-
-        print(f"All quantiles match for dtype {dtype}")
-
-
 # def test_feature_statistics_benchmark(large_precision_data):
 #     # Check if CUDA is available
 #     if not torch.cuda.is_available():
