@@ -48,6 +48,9 @@ class SaeVisConfig:
         default_factory=SaeVisLayoutConfig.default_prompt_centric_layout
     )
 
+    # Additional computations
+    use_dfa: bool = False
+
     # Misc
     seed: int | None = 0
     verbose: bool = False

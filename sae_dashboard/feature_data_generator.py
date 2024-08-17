@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 
 import einops
 import numpy as np
@@ -10,12 +10,12 @@ from sae_lens.config import DTYPE_MAP as DTYPES
 from torch import Tensor, nn
 from tqdm.auto import tqdm
 
+from sae_dashboard.dfa_calculator import DFACalculator
 from sae_dashboard.sae_vis_data import SaeVisConfig
 from sae_dashboard.transformer_lens_wrapper import TransformerLensWrapper, to_resid_dir
 from sae_dashboard.utils_fns import RollingCorrCoef
 
 Arr = np.ndarray
-
 
 class FeatureDataGenerator:
     def __init__(
@@ -29,6 +29,14 @@ class FeatureDataGenerator:
         self.model = model
         self.encoder = encoder
         self.token_minibatches = self.batch_tokens(tokens)
+        self.dfa_calculator = (
+            DFACalculator(model.model, encoder) if cfg.use_dfa else None
+        )
+
+        if cfg.use_dfa:
+            assert (
+                "hook_z" in encoder.cfg.hook_name
+            ), f"DFAs are only supported for hook_z, but got {encoder.cfg.hook_name}"
 
     @torch.inference_mode()
     def batch_tokens(
@@ -66,16 +74,22 @@ class FeatureDataGenerator:
 
         for i, minibatch in enumerate(self.token_minibatches):
             minibatch.to(self.cfg.device)
-            model_acts = self.get_model_acts(i, minibatch)
+            model_activation_dict = self.get_model_acts(i, minibatch)
+            primary_acts = model_activation_dict[
+                self.model.activation_config.primary_hook_point
+            ]
 
             # Compute feature activations from this
             with FeatureMaskingContext(self.encoder, feature_indices):
-                feature_acts = self.encoder.encode(model_acts).to(
+                feature_acts = self.encoder.encode(primary_acts).to(
                     DTYPES[self.cfg.dtype]
                 )
+                
+            print(f"Minibatch shape: {minibatch.shape}")
+            print(f"feature_acts shape: {feature_acts.shape}")
 
             self.update_rolling_coefficients(
-                model_acts=model_acts,
+                model_acts=primary_acts,
                 feature_acts=feature_acts,
                 corrcoef_neurons=corrcoef_neurons,
                 corrcoef_encoder=corrcoef_encoder,
@@ -105,29 +119,64 @@ class FeatureDataGenerator:
 
     @torch.inference_mode()
     def get_model_acts(
-        self, minibatch_index: int, minibatch_tokens: torch.Tensor
-    ) -> torch.Tensor:
+        self,
+        minibatch_index: int,
+        minibatch_tokens: torch.Tensor,
+    ) -> Dict[str, torch.Tensor]:
         """
         A function that gets the model activations for a given minibatch of tokens.
         Uses np.memmap for efficient caching.
         """
         if self.cfg.cache_dir is not None:
-            cache_path = self.cfg.cache_dir / f"model_activations_{minibatch_index}.dat"
+            cache_path = self.cfg.cache_dir / f"model_activations_{minibatch_index}.npz"
             if cache_path.exists():
-                model_acts = load_tensor_memmap(cache_path)
+                activation_dict = load_tensor_dict_memmap(cache_path)
             else:
-                model_acts = self.model.forward(minibatch_tokens, return_logits=False)
-                save_tensor_memmap(model_acts, cache_path)
+                activation_dict = self.model.forward(
+                    minibatch_tokens, return_logits=False
+                )
+                save_tensor_dict_memmap(activation_dict, cache_path)
         else:
-            model_acts = self.model.forward(minibatch_tokens, return_logits=False)
+            activation_dict = self.model.forward(minibatch_tokens, return_logits=False)
 
-        if "cuda" in self.cfg.device:
-            # async copy to device
-            model_acts = model_acts.to(self.cfg.device, non_blocking=True)
-        else:
-            model_acts = model_acts.to(self.cfg.device)
+        # Move tensors to the correct device
+        for key, tensor in activation_dict.items():
+            if "cuda" in self.cfg.device:
+                # async copy to device
+                activation_dict[key] = tensor.to(self.cfg.device, non_blocking=True)
+            else:
+                activation_dict[key] = tensor.to(self.cfg.device)
 
-        return model_acts
+        return activation_dict
+
+    # @torch.inference_mode()
+    # def get_model_acts(
+    #     self,
+    #     minibatch_index: int,
+    #     minibatch_tokens: torch.Tensor,
+
+    # ) -> torch.Tensor:
+    #     """
+    #     A function that gets the model activations for a given minibatch of tokens.
+    #     Uses np.memmap for efficient caching.
+    #     """
+    #     if self.cfg.cache_dir is not None:
+    #         cache_path = self.cfg.cache_dir / f"model_activations_{minibatch_index}.dat"
+    #         if cache_path.exists():
+    #             model_acts = load_tensor_memmap(cache_path)
+    #         else:
+    #             model_acts = self.model.forward(minibatch_tokens, return_logits=False)
+    #             save_tensor_memmap(model_acts, cache_path)
+    #     else:
+    #         model_acts = self.model.forward(minibatch_tokens, return_logits=False)
+
+    #     if "cuda" in self.cfg.device:
+    #         # async copy to device
+    #         model_acts = model_acts.to(self.cfg.device, non_blocking=True)
+    #     else:
+    #         model_acts = model_acts.to(self.cfg.device)
+
+    #     return model_acts
 
     @torch.inference_mode()
     def update_rolling_coefficients(
@@ -163,6 +212,52 @@ class FeatureDataGenerator:
                 einops.rearrange(feature_acts, "batch seq feats -> feats (batch seq)"),
             )
 
+
+def pytorch_dtype_to_numpy(dtype_str: str) -> np.dtype:
+    """Convert PyTorch dtype string to NumPy dtype."""
+    dtype_map = {
+        'torch.float32': np.float32,
+        'torch.float64': np.float64,
+        'torch.float16': np.float16,
+        'torch.int32': np.int32,
+        'torch.int64': np.int64,
+        'torch.uint8': np.uint8,
+        'torch.int8': np.int8,
+        'torch.bool': np.bool_,
+    }
+    return dtype_map.get(dtype_str, np.float32)  # Default to float32 if not found
+
+def load_tensor_dict_memmap(filename: Path) -> Dict[str, torch.Tensor]:
+    loaded = np.load(filename, allow_pickle=True)
+    tensor_dict = {}
+
+    for key in loaded.files:
+        if key.endswith("_array"):
+            base_key = key[:-6]  # Remove "_array" suffix
+            array = loaded[key]
+            shape = tuple(loaded[f"{base_key}_shape"])
+            dtype_str = loaded[f"{base_key}_dtype"].item()
+            dtype = pytorch_dtype_to_numpy(dtype_str)
+
+            # Create memmap
+            memmap_file = filename.with_name(f"{filename.stem}_{base_key}.dat")
+            mm = np.memmap(memmap_file, dtype=dtype, mode="w+", shape=shape)
+            mm[:] = array
+            mm.flush()
+
+            # Load memmap into tensor
+            tensor_dict[base_key] = torch.from_numpy(mm)
+
+    return tensor_dict
+
+def save_tensor_dict_memmap(tensor_dict: Dict[str, torch.Tensor], filename: Path):
+    np_dict = {}
+    for key, tensor in tensor_dict.items():
+        np_dict[f"{key}_array"] = tensor.float().cpu().numpy()
+        np_dict[f"{key}_shape"] = tensor.shape
+        np_dict[f"{key}_dtype"] = str(tensor.dtype)  # Store as string
+
+    np.savez(filename, **np_dict)
 
 def save_tensor_memmap(tensor: torch.Tensor, filename: Path):
     array = tensor.float().cpu().numpy()

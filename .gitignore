@@ -177,7 +177,8 @@ tests/fixtures/cache_unit/
 neuronpedia_outputs/
 cached_activations/
 wandb/
-
+demo_activations_cache/
+demo_feature_dashboards.html
 
 **.safetensors
 **flamegraph.html

@@ -1,5 +1,6 @@
 import math
 import random
+import re
 from collections import defaultdict
 from typing import Iterable
 
@@ -28,8 +29,32 @@ from sae_dashboard.feature_data import FeatureData
 from sae_dashboard.feature_data_generator import FeatureDataGenerator
 from sae_dashboard.sae_vis_data import SaeVisConfig, SaeVisData
 from sae_dashboard.sequence_data_generator import SequenceDataGenerator
-from sae_dashboard.transformer_lens_wrapper import TransformerLensWrapper
+from sae_dashboard.transformer_lens_wrapper import (
+    ActivationConfig,
+    TransformerLensWrapper,
+)
 from sae_dashboard.utils_fns import FeatureStatistics
+
+
+class FeatureDataGeneratorFactory:
+    @staticmethod
+    def create(
+        cfg: SaeVisConfig,
+        model: HookedTransformer,
+        encoder: SAE,
+        tokens: Int[Tensor, "batch seq"],
+    ) -> FeatureDataGenerator:
+        """Builds a FeatureDataGenerator using the provided config and model."""
+        activation_config = ActivationConfig(
+            primary_hook_point=cfg.hook_point,
+            auxiliary_hook_points=(
+                [re.sub(r"hook_z", "hook_v", cfg.hook_point)] if cfg.use_dfa else []
+            ),
+        )
+        wrapped_model = TransformerLensWrapper(model, activation_config)
+        return FeatureDataGenerator(
+            cfg=cfg, model=wrapped_model, encoder=encoder, tokens=tokens
+        )
 
 
 class SaeVisRunner:
@@ -68,13 +93,9 @@ class SaeVisRunner:
         features_list = self.handle_features(self.cfg.features, encoder)
         feature_batches = self.get_feature_batches(features_list)
         progress = self.get_progress_bar(tokens, feature_batches, features_list)
-        model_wrapper = TransformerLensWrapper(model, self.cfg.hook_point)
 
-        feature_data_generator = FeatureDataGenerator(
-            cfg=self.cfg,
-            model=model_wrapper,
-            encoder=encoder,
-            tokens=tokens,
+        feature_data_generator = FeatureDataGeneratorFactory.create(
+            self.cfg, model, encoder, tokens
         )
 
         sequence_data_generator = SequenceDataGenerator(
