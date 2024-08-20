@@ -32,7 +32,7 @@ def test_dfa_calculation_shape(
     for feature_idx, feature_results in results.items():
         assert feature_idx in indices
         assert len(feature_results) == tokens.shape[0]  # One result per prompt
-        for prompt_idx, prompt_result in feature_results.items():
+        for _, prompt_result in feature_results.items():
             assert "dfaValues" in prompt_result
             assert "dfaTargetIndex" in prompt_result
             assert "dfaMaxValue" in prompt_result
@@ -60,7 +60,7 @@ def test_dfa_calculation_values(
     assert len(results) == 1
     feature_results = results[0]
     assert len(feature_results) == tokens.shape[0]
-    for prompt_idx, prompt_result in feature_results.items():
+    for _, prompt_result in feature_results.items():
         assert not all(v == 0 for v in prompt_result["dfaValues"])
         assert prompt_result["dfaMaxValue"] == max(prompt_result["dfaValues"])
 

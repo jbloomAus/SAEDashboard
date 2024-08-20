@@ -1,9 +1,9 @@
-from typing import Dict, List
+from typing import Dict, List, Union
 
 import einops
 import torch
 from sae_lens import SAE
-from transformer_lens import HookedTransformer
+from transformer_lens import ActivationCache, HookedTransformer
 
 
 class DFACalculator:
@@ -15,7 +15,7 @@ class DFACalculator:
 
     def calculate(
         self,
-        activations: Dict[str, torch.Tensor],
+        activations: Union[Dict[str, torch.Tensor], ActivationCache],
         layer_num: int,
         feature_indices: List[int],
         max_value_indices: torch.Tensor,

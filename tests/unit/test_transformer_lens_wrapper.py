@@ -9,12 +9,12 @@ from sae_dashboard.transformer_lens_wrapper import (
 
 
 @pytest.fixture(scope="module")
-def real_model():
+def real_model() -> HookedTransformer:
     return HookedTransformer.from_pretrained("gpt2-small")
 
 
 @pytest.fixture
-def valid_activation_config(real_model):
+def valid_activation_config(real_model: HookedTransformer) -> ActivationConfig:
     return ActivationConfig(
         primary_hook_point="blocks.5.hook_resid_post",
         auxiliary_hook_points=[
@@ -25,19 +25,23 @@ def valid_activation_config(real_model):
     )
 
 
-def test_initialization(real_model, valid_activation_config):
+def test_initialization(
+    real_model: HookedTransformer, valid_activation_config: ActivationConfig
+) -> None:
     wrapper = TransformerLensWrapper(real_model, valid_activation_config)
     assert wrapper.model == real_model
     assert wrapper.activation_config == valid_activation_config
     assert wrapper.hook_layer == 5
 
 
-def test_validate_hook_points(real_model, valid_activation_config):
+def test_validate_hook_points(
+    real_model: HookedTransformer, valid_activation_config: ActivationConfig
+) -> None:
     wrapper = TransformerLensWrapper(real_model, valid_activation_config)
     wrapper.validate_hook_points()  # This should not raise an exception
 
 
-def test_validate_hook_points_invalid(real_model):
+def test_validate_hook_points_invalid(real_model: HookedTransformer) -> None:
     invalid_config = ActivationConfig(
         primary_hook_point="blocks.15.invalid_hook",
         auxiliary_hook_points=["blocks.0.hook_resid_pre"],
@@ -46,7 +50,9 @@ def test_validate_hook_points_invalid(real_model):
         TransformerLensWrapper(real_model, invalid_config)
 
 
-def test_get_layer(real_model, valid_activation_config):
+def test_get_layer(
+    real_model: HookedTransformer, valid_activation_config: ActivationConfig
+) -> None:
     wrapper = TransformerLensWrapper(real_model, valid_activation_config)
     assert wrapper.get_layer("blocks.2.hook_mlp_out") == 2
     with pytest.raises(AssertionError):
@@ -54,7 +60,11 @@ def test_get_layer(real_model, valid_activation_config):
 
 
 @pytest.mark.parametrize("return_logits", [True, False])
-def test_forward(real_model, valid_activation_config, return_logits):
+def test_forward(
+    real_model: HookedTransformer,
+    valid_activation_config: ActivationConfig,
+    return_logits: bool,
+) -> None:
     wrapper = TransformerLensWrapper(real_model, valid_activation_config)
     tokens = torch.randint(0, real_model.cfg.d_vocab, (2, 10))
 
@@ -113,16 +123,20 @@ def test_forward(real_model, valid_activation_config, return_logits):
             ), f"{key} should be flattened to 3 dimensions"
 
 
-def test_hook_fn_store_act(real_model, valid_activation_config):
+def test_hook_fn_store_act(
+    real_model: HookedTransformer, valid_activation_config: ActivationConfig
+) -> None:
     wrapper = TransformerLensWrapper(real_model, valid_activation_config)
     activation = torch.randn(2, 10, real_model.cfg.d_model)
     hook = type("MockHook", (), {"ctx": {}})()
 
-    wrapper.hook_fn_store_act(activation, hook)
-    assert torch.all(hook.ctx["activation"] == activation)
+    wrapper.hook_fn_store_act(activation, hook)  # type: ignore
+    assert torch.all(hook.ctx["activation"] == activation)  # type: ignore
 
 
-def test_property_access(real_model, valid_activation_config):
+def test_property_access(
+    real_model: HookedTransformer, valid_activation_config: ActivationConfig
+) -> None:
     wrapper = TransformerLensWrapper(real_model, valid_activation_config)
 
     assert torch.all(wrapper.W_U == real_model.W_U)

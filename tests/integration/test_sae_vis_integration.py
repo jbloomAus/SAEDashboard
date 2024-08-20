@@ -1,3 +1,5 @@
+from typing import Callable, Tuple
+
 import pytest
 import torch
 from sae_lens import SAE, ActivationsStore
@@ -29,36 +31,41 @@ def get_tokens(
 
 
 @pytest.fixture
-def setup_test_environment():
-    # Set up a small-scale test environment
-    device = "cuda"  # Use CUDA for testing
-    model = HookedTransformer.from_pretrained("gpt2-small", device=device)
-    sae, _, _ = SAE.from_pretrained(
-        release="gpt2-small-hook-z-kk", sae_id="blocks.5.hook_z", device=device
-    )
-    sae.fold_W_dec_norm()
+def setup_test_environment() -> (
+    Callable[[], Tuple[HookedTransformer, SAE, torch.Tensor]]
+):
+    def _setup() -> Tuple[HookedTransformer, SAE, torch.Tensor]:
+        # Set up a small-scale test environment
+        device = "cuda"  # Use CUDA for testing
+        model = HookedTransformer.from_pretrained("gpt2-small", device=device)
+        sae, _, _ = SAE.from_pretrained(
+            release="gpt2-small-hook-z-kk", sae_id="blocks.5.hook_z", device=device
+        )
+        sae.fold_W_dec_norm()
 
-    # Create a small token dataset
-    activations_store = ActivationsStore.from_sae(
-        model=model,
-        sae=sae,
-        streaming=True,
-        store_batch_size_prompts=16,
-        n_batches_in_buffer=8,
-        device=device,
-    )
+        # Create a small token dataset
+        activations_store = ActivationsStore.from_sae(
+            model=model,
+            sae=sae,
+            streaming=True,
+            store_batch_size_prompts=16,
+            n_batches_in_buffer=8,
+            device=device,
+        )
 
-    token_dataset = get_tokens(activations_store, 256)
-    insert = model.to_tokens("Stalinists shriek in the ears of the police that")
-    token_dataset[0, :13] = insert[0]
+        token_dataset = get_tokens(activations_store, 256)
+        insert = model.to_tokens("Stalinists shriek in the ears of the police that")
+        token_dataset[0, :13] = insert[0]
 
-    # token_dataset = torch.randint(0, model.cfg.d_vocab, (32, 128))  # 32 prompts, 128 tokens each
+        return model, sae, token_dataset
 
-    return model, sae, token_dataset
+    return _setup
 
 
-def test_sae_vis_runner_integration(setup_test_environment):
-    model, sae, token_dataset = setup_test_environment
+def test_sae_vis_runner_integration(
+    setup_test_environment: Callable[[], Tuple[HookedTransformer, SAE, torch.Tensor]]
+):
+    model, sae, token_dataset = setup_test_environment()
 
     # Configure SaeVisConfig for testing
     test_feature_idx = list(range(64))  # Test with 16 features
@@ -80,8 +87,9 @@ def test_sae_vis_runner_integration(setup_test_environment):
         model=model,
         tokens=token_dataset,
     )
-    print(data.feature_data_dict[15].dfa_data[0])
-    print(data.feature_data_dict.keys())
+    if data.feature_data_dict[15].dfa_data:
+        print(data.feature_data_dict[15].dfa_data[0])
+        print(data.feature_data_dict.keys())
     # Verify the structure and content of the resulting SaeVisData object
     assert isinstance(data, SaeVisData)
     assert len(data.feature_data_dict) == len(test_feature_idx)
@@ -154,4 +162,5 @@ def test_sae_vis_runner_integration(setup_test_environment):
     # Check that the number of prompts in DFA data matches the input
     if feature_vis_config.use_dfa:
         for feature_data in data.feature_data_dict.values():
+            assert feature_data.dfa_data
             assert len(feature_data.dfa_data) == token_dataset.shape[0]

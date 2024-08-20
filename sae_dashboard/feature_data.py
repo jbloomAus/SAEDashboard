@@ -71,7 +71,7 @@ class FeatureData:
 
     def __post_init__(self):
         if self.dfa_data is None:
-            self.dfa_data = DFAData()
+            self.dfa_data = {}
 
     def get_component_from_config(self, config: GenericComponentConfig) -> GenericData:
         """

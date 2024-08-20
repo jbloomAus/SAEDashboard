@@ -10,6 +10,7 @@ from transformer_lens import HookedTransformer, utils
 from sae_dashboard.components import LogitsTableData, SequenceData
 from sae_dashboard.sae_vis_data import SaeVisData
 from sae_dashboard.transformer_lens_wrapper import (
+    ActivationConfig,
     TransformerLensWrapper,
     to_resid_direction,
 )
@@ -373,7 +374,7 @@ def get_prompt_data(
     )
     assert isinstance(tokens, torch.Tensor)
 
-    model_wrapped = TransformerLensWrapper(model, cfg.hook_point)
+    model_wrapped = TransformerLensWrapper(model, ActivationConfig(cfg.hook_point, []))
 
     feature_act_dir = encoder.W_enc[:, feature_idx]  # [d_in feats]
     feature_out_dir = encoder.W_dec[feature_idx]  # [feats d_in]
