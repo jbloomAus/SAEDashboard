@@ -25,7 +25,7 @@ from sae_dashboard.data_parsing_fns import (
     get_features_table_data,
     get_logits_table_data,
 )
-from sae_dashboard.feature_data import DFAData, FeatureData
+from sae_dashboard.feature_data import FeatureData
 from sae_dashboard.feature_data_generator import FeatureDataGenerator
 from sae_dashboard.sae_vis_data import SaeVisConfig, SaeVisData
 from sae_dashboard.sequence_data_generator import SequenceDataGenerator

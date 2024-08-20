@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pytest
 import torch
 from sae_lens import SAE, ActivationsStore

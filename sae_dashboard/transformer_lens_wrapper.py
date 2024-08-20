@@ -1,12 +1,12 @@
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Literal, overload
+from typing import Dict, List
 
 import torch
 import torch.nn as nn
 from jaxtyping import Float, Int
 from torch import Tensor
-from transformer_lens import HookedTransformer, utils
+from transformer_lens import HookedTransformer
 from transformer_lens.hook_points import HookPoint
 
 DTYPES = {
