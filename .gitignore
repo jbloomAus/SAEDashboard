@@ -178,6 +178,7 @@ neuronpedia_outputs/
 cached_activations/
 wandb/
 demo_activations_cache/
+test_activations_cache/
 demo_feature_dashboards.html
 
 **.safetensors

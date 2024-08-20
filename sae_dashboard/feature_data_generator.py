@@ -1,3 +1,5 @@
+import time
+from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List
 
@@ -16,6 +18,7 @@ from sae_dashboard.transformer_lens_wrapper import TransformerLensWrapper, to_re
 from sae_dashboard.utils_fns import RollingCorrCoef
 
 Arr = np.ndarray
+
 
 class FeatureDataGenerator:
     def __init__(
@@ -59,8 +62,9 @@ class FeatureDataGenerator:
         progress: list[tqdm] | None = None,  # type: ignore
     ):  # type: ignore
         # Create lists to store the feature activations & final values of the residual stream
-        all_resid_post = []
         all_feat_acts = []
+        all_dfa_results = {feature_idx: {} for feature_idx in feature_indices}
+        total_prompts = 0
 
         # Create objects to store the data for computing rolling stats
         corrcoef_neurons = RollingCorrCoef()
@@ -71,7 +75,6 @@ class FeatureDataGenerator:
         feature_resid_dir = to_resid_dir(feature_out_dir, self.model)  # [feats d_model]
 
         # ! Compute & concatenate together all feature activations & post-activation function values
-
         for i, minibatch in enumerate(self.token_minibatches):
             minibatch.to(self.cfg.device)
             model_activation_dict = self.get_model_acts(i, minibatch)
@@ -84,9 +87,6 @@ class FeatureDataGenerator:
                 feature_acts = self.encoder.encode(primary_acts).to(
                     DTYPES[self.cfg.dtype]
                 )
-                
-            print(f"Minibatch shape: {minibatch.shape}")
-            print(f"feature_acts shape: {feature_acts.shape}")
 
             self.update_rolling_coefficients(
                 model_acts=primary_acts,
@@ -97,24 +97,37 @@ class FeatureDataGenerator:
 
             # Add these to the lists (we'll eventually concat)
             all_feat_acts.append(feature_acts)
-            # all_resid_post.append(residual)
+
+            # Calculate DFA
+            if self.cfg.use_dfa and self.dfa_calculator:
+                max_value_indices = torch.argmax(feature_acts, dim=1)
+                batch_dfa_results = self.dfa_calculator.calculate(
+                    model_activation_dict,
+                    self.model.hook_layer,
+                    feature_indices,
+                    max_value_indices,
+                )
+                for feature_idx, feature_data in batch_dfa_results.items():
+                    for prompt_idx, prompt_data in feature_data.items():
+                        global_prompt_idx = total_prompts + prompt_idx
+                        all_dfa_results[feature_idx][global_prompt_idx] = prompt_data
+
+                total_prompts += len(minibatch)
 
             # Update the 1st progress bar (fwd passes & getting sequence data dominates the runtime of these computations)
             if progress is not None:
                 progress[0].update(1)
 
         all_feat_acts = torch.cat(all_feat_acts, dim=0)
-        # all_resid_post = torch.cat(
-        #     all_resid_post, dim=0
-        # )  # TODO: Check if this actually changes on each iteration and if so how to wasting effort.
 
         return (
             all_feat_acts,
-            all_resid_post,
+            torch.tensor([]),  # all_resid_post, no longer used
             feature_resid_dir,
             feature_out_dir,
             corrcoef_neurons,
             corrcoef_encoder,
+            all_dfa_results,
         )
 
     @torch.inference_mode()
@@ -216,16 +229,17 @@ class FeatureDataGenerator:
 def pytorch_dtype_to_numpy(dtype_str: str) -> np.dtype:
     """Convert PyTorch dtype string to NumPy dtype."""
     dtype_map = {
-        'torch.float32': np.float32,
-        'torch.float64': np.float64,
-        'torch.float16': np.float16,
-        'torch.int32': np.int32,
-        'torch.int64': np.int64,
-        'torch.uint8': np.uint8,
-        'torch.int8': np.int8,
-        'torch.bool': np.bool_,
+        "torch.float32": np.float32,
+        "torch.float64": np.float64,
+        "torch.float16": np.float16,
+        "torch.int32": np.int32,
+        "torch.int64": np.int64,
+        "torch.uint8": np.uint8,
+        "torch.int8": np.int8,
+        "torch.bool": np.bool_,
     }
     return dtype_map.get(dtype_str, np.float32)  # Default to float32 if not found
+
 
 def load_tensor_dict_memmap(filename: Path) -> Dict[str, torch.Tensor]:
     loaded = np.load(filename, allow_pickle=True)
@@ -250,6 +264,7 @@ def load_tensor_dict_memmap(filename: Path) -> Dict[str, torch.Tensor]:
 
     return tensor_dict
 
+
 def save_tensor_dict_memmap(tensor_dict: Dict[str, torch.Tensor], filename: Path):
     np_dict = {}
     for key, tensor in tensor_dict.items():
@@ -258,6 +273,7 @@ def save_tensor_dict_memmap(tensor_dict: Dict[str, torch.Tensor], filename: Path
         np_dict[f"{key}_dtype"] = str(tensor.dtype)  # Store as string
 
     np.savez(filename, **np_dict)
+
 
 def save_tensor_memmap(tensor: torch.Tensor, filename: Path):
     array = tensor.float().cpu().numpy()

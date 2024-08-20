@@ -102,7 +102,7 @@ class TransformerLensWrapper(nn.Module):
         def build_act_dict(hooks: List):
             for hook_point, _ in hooks:
                 # The hook functions work by storing data in model's hook context, so we pop them back out
-                print(self.model.hook_dict[hook_point].ctx.keys())
+
                 activation: Tensor = self.model.hook_dict[hook_point].ctx.pop(
                     "activation"
                 )
@@ -116,7 +116,7 @@ class TransformerLensWrapper(nn.Module):
             (point, self.hook_fn_store_act)
             for point in self.activation_config.auxiliary_hook_points
         ]
-        print(f"hooks: {hooks}")
+
         output: Tensor = self.model.run_with_hooks(
             tokens, stop_at_layer=self.hook_layer + 1, fwd_hooks=hooks
         )
@@ -180,11 +180,16 @@ def to_resid_dir(dir: Float[Tensor, "feats d_in"], model: TransformerLensWrapper
             The model, which should be a HookedTransformerWrapper or similar.
     """
     # If this SAE was trained on the residual stream or attn/mlp out, then we don't need to do anything
-    if "resid" in model.activation_config.primary_hook_point or "_out" in model.activation_config.primary_hook_point:
+    if (
+        "resid" in model.activation_config.primary_hook_point
+        or "_out" in model.activation_config.primary_hook_point
+    ):
         return dir
 
     # If it was trained on the MLP layer, then we apply the W_out map
-    elif ("pre" in model.activation_config.primary_hook_point) or ("post" in model.activation_config.primary_hook_point):
+    elif ("pre" in model.activation_config.primary_hook_point) or (
+        "post" in model.activation_config.primary_hook_point
+    ):
         return dir @ model.W_out[model.hook_layer]
 
     elif "hook_z" in model.activation_config.primary_hook_point:
