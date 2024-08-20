@@ -73,7 +73,9 @@ class FeatureDataGenerator:
 
         # Get encoder & decoder directions
         feature_out_dir = self.encoder.W_dec[feature_indices]  # [feats d_autoencoder]
-        feature_resid_dir = to_resid_direction(feature_out_dir, self.model)  # [feats d_model]
+        feature_resid_dir = to_resid_direction(
+            feature_out_dir, self.model
+        )  # [feats d_model]
 
         # ! Compute & concatenate together all feature activations & post-activation function values
         for i, minibatch in enumerate(self.token_minibatches):
@@ -210,7 +212,9 @@ def pytorch_dtype_to_numpy(dtype_str: str) -> np.dtype[Any]:
         "torch.int8": np.int8,
         "torch.bool": np.bool_,
     }
-    return np.dtype(dtype_map.get(dtype_str, np.float32))  # Default to float32 if not found
+    return np.dtype(
+        dtype_map.get(dtype_str, np.float32)
+    )  # Default to float32 if not found
 
 
 def load_tensor_dict_memmap(filename: Path) -> Dict[str, torch.Tensor]:

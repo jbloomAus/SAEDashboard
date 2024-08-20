@@ -1,4 +1,3 @@
-
 from typing import Dict, List
 
 import einops
@@ -9,6 +8,7 @@ from transformer_lens import HookedTransformer
 
 class DFACalculator:
     """Calculate DFA values for a given layer and set of feature indices."""
+
     def __init__(self, model: HookedTransformer, sae: SAE):
         self.model = model
         self.sae = sae
@@ -21,13 +21,13 @@ class DFACalculator:
         max_value_indices: torch.Tensor,
     ) -> Dict[int, Dict[int, Dict[str, List[float]]]]:
         """Calculate DFA values for a given layer and set of feature indices.
-        
+
         Args:
             activations: Dictionary of activations for the model.
             layer_num: Layer number.
             feature_indices: List of feature indices.
             max_value_indices: Tensor of max value indices.
-            
+
         Returns:
             Dictionary of DFA values for each feature index (and for each prompt).
         """
