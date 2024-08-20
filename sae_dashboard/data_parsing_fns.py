@@ -9,7 +9,10 @@ from transformer_lens import HookedTransformer, utils
 
 from sae_dashboard.components import LogitsTableData, SequenceData
 from sae_dashboard.sae_vis_data import SaeVisData
-from sae_dashboard.transformer_lens_wrapper import TransformerLensWrapper, to_resid_dir
+from sae_dashboard.transformer_lens_wrapper import (
+    TransformerLensWrapper,
+    to_resid_direction,
+)
 from sae_dashboard.utils_fns import RollingCorrCoef, TopK
 
 Arr = np.ndarray
@@ -374,7 +377,7 @@ def get_prompt_data(
 
     feature_act_dir = encoder.W_enc[:, feature_idx]  # [d_in feats]
     feature_out_dir = encoder.W_dec[feature_idx]  # [feats d_in]
-    feature_resid_dir = to_resid_dir(feature_out_dir, model_wrapped)  # [feats d_model]
+    feature_resid_dir = to_resid_direction(feature_out_dir, model_wrapped)  # [feats d_model]
     assert (
         feature_act_dir.T.shape
         == feature_out_dir.shape

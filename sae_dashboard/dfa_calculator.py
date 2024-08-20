@@ -8,6 +8,7 @@ from transformer_lens import HookedTransformer
 
 
 class DFACalculator:
+    """Calculate DFA values for a given layer and set of feature indices."""
     def __init__(self, model: HookedTransformer, sae: SAE):
         self.model = model
         self.sae = sae
@@ -18,8 +19,18 @@ class DFACalculator:
         layer_num: int,
         feature_indices: List[int],
         max_value_indices: torch.Tensor,
-    ):
-        """Calculate DFA values for a given layer and set of feature indices."""
+    ) -> Dict[int, Dict[int, Dict[str, List[float]]]]:
+        """Calculate DFA values for a given layer and set of feature indices.
+        
+        Args:
+            activations: Dictionary of activations for the model.
+            layer_num: Layer number.
+            feature_indices: List of feature indices.
+            max_value_indices: Tensor of max value indices.
+            
+        Returns:
+            Dictionary of DFA values for each feature index (and for each prompt).
+        """
         if not feature_indices:
             return {}  # Return an empty dictionary if no indices are provided
 

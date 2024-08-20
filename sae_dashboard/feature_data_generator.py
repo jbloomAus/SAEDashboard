@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import einops
 import numpy as np
@@ -12,7 +12,10 @@ from tqdm.auto import tqdm
 
 from sae_dashboard.dfa_calculator import DFACalculator
 from sae_dashboard.sae_vis_data import SaeVisConfig
-from sae_dashboard.transformer_lens_wrapper import TransformerLensWrapper, to_resid_dir
+from sae_dashboard.transformer_lens_wrapper import (
+    TransformerLensWrapper,
+    to_resid_direction,
+)
 from sae_dashboard.utils_fns import RollingCorrCoef
 
 Arr = np.ndarray
@@ -70,7 +73,7 @@ class FeatureDataGenerator:
 
         # Get encoder & decoder directions
         feature_out_dir = self.encoder.W_dec[feature_indices]  # [feats d_autoencoder]
-        feature_resid_dir = to_resid_dir(feature_out_dir, self.model)  # [feats d_model]
+        feature_resid_dir = to_resid_direction(feature_out_dir, self.model)  # [feats d_model]
 
         # ! Compute & concatenate together all feature activations & post-activation function values
         for i, minibatch in enumerate(self.token_minibatches):
@@ -160,35 +163,6 @@ class FeatureDataGenerator:
 
         return activation_dict
 
-    # @torch.inference_mode()
-    # def get_model_acts(
-    #     self,
-    #     minibatch_index: int,
-    #     minibatch_tokens: torch.Tensor,
-
-    # ) -> torch.Tensor:
-    #     """
-    #     A function that gets the model activations for a given minibatch of tokens.
-    #     Uses np.memmap for efficient caching.
-    #     """
-    #     if self.cfg.cache_dir is not None:
-    #         cache_path = self.cfg.cache_dir / f"model_activations_{minibatch_index}.dat"
-    #         if cache_path.exists():
-    #             model_acts = load_tensor_memmap(cache_path)
-    #         else:
-    #             model_acts = self.model.forward(minibatch_tokens, return_logits=False)
-    #             save_tensor_memmap(model_acts, cache_path)
-    #     else:
-    #         model_acts = self.model.forward(minibatch_tokens, return_logits=False)
-
-    #     if "cuda" in self.cfg.device:
-    #         # async copy to device
-    #         model_acts = model_acts.to(self.cfg.device, non_blocking=True)
-    #     else:
-    #         model_acts = model_acts.to(self.cfg.device)
-
-    #     return model_acts
-
     @torch.inference_mode()
     def update_rolling_coefficients(
         self,
@@ -224,7 +198,7 @@ class FeatureDataGenerator:
             )
 
 
-def pytorch_dtype_to_numpy(dtype_str: str) -> np.dtype:
+def pytorch_dtype_to_numpy(dtype_str: str) -> np.dtype[Any]:
     """Convert PyTorch dtype string to NumPy dtype."""
     dtype_map = {
         "torch.float32": np.float32,
@@ -236,7 +210,7 @@ def pytorch_dtype_to_numpy(dtype_str: str) -> np.dtype:
         "torch.int8": np.int8,
         "torch.bool": np.bool_,
     }
-    return dtype_map.get(dtype_str, np.float32)  # Default to float32 if not found
+    return np.dtype(dtype_map.get(dtype_str, np.float32))  # Default to float32 if not found
 
 
 def load_tensor_dict_memmap(filename: Path) -> Dict[str, torch.Tensor]:

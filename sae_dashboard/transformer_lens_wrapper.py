@@ -1,6 +1,6 @@
 import re
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Callable, Dict, List, Sequence, Tuple
 
 import torch
 import torch.nn as nn
@@ -54,43 +54,6 @@ class TransformerLensWrapper(nn.Module):
         ), f"Error: expecting hook_point to be 'blocks.{{layer}}.{{...}}', but got {hook_point!r}"
         return int(layer_match.group(1))
 
-    # def __init__(self, model: HookedTransformer, hook_point: str):
-    #     super().__init__()
-    #     assert (
-    #         hook_point in model.hook_dict
-    #     ), f"Error: hook_point={hook_point!r} must be in model.hook_dict"
-    #     self.model = model
-    #     self.hook_point = hook_point
-
-    #     # Get the layer (so we can do the early stopping in our forward pass)
-    #     layer_match = re.match(r"blocks\.(\d+)\.", hook_point)
-    #     assert (
-    #         layer_match
-    #     ), f"Error: expecting hook_point to be 'blocks.{{layer}}.{{...}}', but got {hook_point!r}"
-    #     self.hook_layer = int(layer_match.group(1))
-
-    #     # Get the hook names for the residual stream (final) and residual stream (immediately after hook_point)
-    #     self.hook_point_resid = utils.get_act_name("resid_post", self.hook_layer)
-    #     self.hook_point_resid_final = utils.get_act_name(
-    #         "resid_post", self.model.cfg.n_layers - 1
-    #     )
-    #     assert self.hook_point_resid in model.hook_dict
-    #     assert self.hook_point_resid_final in model.hook_dict
-
-    # @overload
-    # def forward(
-    #     self,
-    #     tokens: Tensor,
-    #     return_logits: Literal[True],
-    # ) -> tuple[Tensor, Tensor]: ...
-
-    # @overload
-    # def forward(
-    #     self,
-    #     tokens: Tensor,
-    #     return_logits: Literal[False],
-    # ) -> Tensor: ...
-
     def forward(  # type: ignore
         self,
         tokens: Int[Tensor, "batch seq"],
@@ -99,7 +62,7 @@ class TransformerLensWrapper(nn.Module):
         """Executes a forward pass, collecting specific hook point activations and optionally logit outputs"""
         activation_dict = {}
 
-        def build_act_dict(hooks: List):
+        def build_act_dict(hooks: Sequence[Tuple[str, Callable[[Tensor, HookPoint], None]]]) -> None:
             for hook_point, _ in hooks:
                 # The hook functions work by storing data in model's hook context, so we pop them back out
 
@@ -110,7 +73,7 @@ class TransformerLensWrapper(nn.Module):
                     activation = activation.flatten(-2, -1)
                 activation_dict[hook_point] = activation
 
-        hooks = [
+        hooks: List[Tuple[str, Callable[[Tensor, HookPoint], None]]] = [
             (self.activation_config.primary_hook_point, self.hook_fn_store_act)
         ] + [
             (point, self.hook_fn_store_act)
@@ -118,7 +81,7 @@ class TransformerLensWrapper(nn.Module):
         ]
 
         output: Tensor = self.model.run_with_hooks(
-            tokens, stop_at_layer=self.hook_layer + 1, fwd_hooks=hooks
+            tokens, stop_at_layer=self.hook_layer + 1, fwd_hooks=hooks #type: ignore
         )
 
         build_act_dict(hooks)
@@ -126,28 +89,6 @@ class TransformerLensWrapper(nn.Module):
         if return_logits:
             activation_dict["output"] = output
         return activation_dict
-
-        # Run with hook functions to store the activations & final value of residual stream
-        # If return_logits is False, then we compute the last residual stream value but not the logits
-        # output: Tensor = self.model.run_with_hooks(
-        #     tokens,
-        #     stop_at_layer=self.hook_layer + 1,
-        #     # stop_at_layer = (None if return_logits else self.hook_layer),
-        #     fwd_hooks=[
-        #         (self.hook_point, self.hook_fn_store_act),
-        #         (self.hook_point_resid_final, self.hook_fn_store_act),
-        #     ],
-        # )
-
-        # The hook functions work by storing data in model's hook context, so we pop them back out
-        # activation: Tensor = self.model.hook_dict[self.hook_point].ctx.pop("activation")
-
-        # if "hook_z" in self.hook_point:
-        #     activation = activation.flatten(-2, -1)
-
-        # if return_logits:
-        #     return output, activation
-        # return activation
 
     def hook_fn_store_act(self, activation: torch.Tensor, hook: HookPoint):
         hook.ctx["activation"] = activation
@@ -169,12 +110,12 @@ class TransformerLensWrapper(nn.Module):
         return self.model.W_O
 
 
-def to_resid_dir(dir: Float[Tensor, "feats d_in"], model: TransformerLensWrapper):
+def to_resid_direction(direction: Float[Tensor, "feats d_in"], model: TransformerLensWrapper):
     """
-    Takes a direction (eg. in the post-ReLU MLP activations) and returns the corresponding dir in the residual stream.
+    Takes a direction (eg. in the post-ReLU MLP activations) and returns the corresponding direction in the residual stream.
 
     Args:
-        dir:
+        direction:
             The direction in the activations, i.e. shape (feats, d_in) where d_in could be d_model, d_mlp, etc.
         model:
             The model, which should be a HookedTransformerWrapper or similar.
@@ -184,16 +125,16 @@ def to_resid_dir(dir: Float[Tensor, "feats d_in"], model: TransformerLensWrapper
         "resid" in model.activation_config.primary_hook_point
         or "_out" in model.activation_config.primary_hook_point
     ):
-        return dir
+        return direction
 
     # If it was trained on the MLP layer, then we apply the W_out map
     elif ("pre" in model.activation_config.primary_hook_point) or (
         "post" in model.activation_config.primary_hook_point
     ):
-        return dir @ model.W_out[model.hook_layer]
+        return direction @ model.W_out[model.hook_layer]
 
     elif "hook_z" in model.activation_config.primary_hook_point:
-        return dir @ model.W_O[model.hook_layer].flatten(0, 1).to(dir.dtype)
+        return direction @ model.W_O[model.hook_layer].flatten(0, 1).to(direction.dtype)
 
     # Others not yet supported
     else:
