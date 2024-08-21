@@ -700,9 +700,10 @@ class NeuronpediaRunner:
                             activation.dfa_maxValue = feature.dfa_data[
                                 sd.original_index
                             ]["dfaMaxValue"]
-                            activation.dfa_targetIndex = feature.dfa_data[
-                                sd.original_index
-                            ]["dfaTargetIndex"] - 1
+                            activation.dfa_targetIndex = (
+                                feature.dfa_data[sd.original_index]["dfaTargetIndex"]
+                                - 1
+                            )
 
                         strs = []
                         for i in range(len(sd.token_ids)):
