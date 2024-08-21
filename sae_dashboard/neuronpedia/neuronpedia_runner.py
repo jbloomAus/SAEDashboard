@@ -696,7 +696,7 @@ class NeuronpediaRunner:
                         if feature.dfa_data:
                             activation.dfa_values = feature.dfa_data[sd.original_index][
                                 "dfaValues"
-                            ]
+                            ][1:]
                             activation.dfa_maxValue = feature.dfa_data[
                                 sd.original_index
                             ]["dfaMaxValue"]

@@ -36,7 +36,7 @@ def setup_test_environment() -> (
 ):
     def _setup() -> Tuple[HookedTransformer, SAE, torch.Tensor]:
         # Set up a small-scale test environment
-        device = "cuda"  # Use CUDA for testing
+        device = "cpu"  # Use CUDA for testing
         model = HookedTransformer.from_pretrained("gpt2-small", device=device)
         sae, _, _ = SAE.from_pretrained(
             release="gpt2-small-hook-z-kk", sae_id="blocks.5.hook_z", device=device
@@ -75,7 +75,7 @@ def test_sae_vis_runner_integration(
         minibatch_size_features=32,
         minibatch_size_tokens=256,
         verbose=False,
-        device="cuda",
+        device="cpu",
         # cache_dir=Path("test_activations_cache"),
         dtype="float32",
         use_dfa=True,

@@ -186,3 +186,4 @@ demo_feature_dashboards.html
 artifacts/
 
 .vscode/settings.json
+dfa_tests.ipynb
