@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, List, Optional
 
 import numpy as np
 
@@ -43,12 +43,18 @@ class NeuronpediaDashboardActivation:
         bin_contains: float = 0,
         tokens: list[str] = [],
         values: list[float] = [],
+        dfa_values: Optional[List[float]] = None,
+        dfa_maxValue: Optional[float] = None,
+        dfa_targetIndex: Optional[int] = None,
     ):
         self.bin_min = bin_min
         self.bin_max = bin_max
         self.bin_contains = bin_contains
         self.tokens = tokens
         self.values = values
+        self.dfa_values = dfa_values
+        self.dfa_maxValue = dfa_maxValue
+        self.dfa_targetIndex = dfa_targetIndex
 
     def __eq__(self, other: Any):
         if equalish(self.bin_min, other.bin_min) is False:
@@ -71,13 +77,21 @@ class NeuronpediaDashboardActivation:
         return True
 
     def to_dict(self):
-        return {
+        res = {
             "bin_min": self.bin_min,
             "bin_max": self.bin_max,
             "bin_contains": self.bin_contains,
             "tokens": self.tokens,
             "values": self.values,
         }
+        if self.dfa_values is not None:
+            res["dfa_values"] = self.dfa_values
+        if self.dfa_maxValue is not None:
+            res["dfa_maxValue"] = self.dfa_maxValue
+        if self.dfa_targetIndex is not None:
+            res["dfa_targetIndex"] = self.dfa_targetIndex
+
+        return res
 
 
 @dataclass
@@ -108,6 +122,7 @@ class NeuronpediaDashboardFeature:
         n_tokens_in_prompt: int = 0,
         dataset: str = "",
         activations: list[dict[str, Any]] = [],
+        dfa_data: dict[int, dict[str, Any]] = {},
     ):
         self.feature_index = feature_index
         self.neuron_alignment_indices = neuron_alignment_indices
@@ -132,6 +147,7 @@ class NeuronpediaDashboardFeature:
         self.n_tokens_in_prompt = n_tokens_in_prompt
         self.dataset = dataset
         self.activations: list[NeuronpediaDashboardActivation] = []
+        self.dfa_data = dfa_data
         for activation in activations:
             self.activations.append(NeuronpediaDashboardActivation(**activation))
 
@@ -160,45 +176,7 @@ class NeuronpediaDashboardFeature:
                 f"neuron_alignment_l1 does not match: {self.neuron_alignment_l1} and {other.neuron_alignment_l1}"
             )
             return False
-        # if self.correlated_neurons_indices != other.correlated_neurons_indices:
-        #     print(
-        #         f"correlated_neurons_indices does not match: {self.correlated_neurons_indices} and {other.correlated_neurons_indices}"
-        #     )
-        #     return False
 
-        # if equalish(self.correlated_neurons_l1, other.correlated_neurons_l1) is False:
-        #     print(
-        #         f"correlated_neurons_l1 does not match: {self.correlated_neurons_l1} and {other.correlated_neurons_l1}"
-        #     )
-        #     return False
-        # if (
-        #     equalish(self.correlated_neurons_pearson, other.correlated_neurons_pearson)
-        #     is False
-        # ):
-        #     print(
-        #         f"correlated_neurons_pearson does not match: {self.correlated_neurons_pearson} and {other.correlated_neurons_pearson}"
-        #     )
-        #     return False
-        # if self.correlated_features_indices != other.correlated_features_indices:
-        #     print(
-        #         f"correlated_features_indices does not match: {self.correlated_features_indices} and {other.correlated_features_indices}"
-        #     )
-        #     return False
-        # if equalish(self.correlated_features_l1, other.correlated_features_l1) is False:
-        #     print(
-        #         f"correlated_features_l1 does not match: {self.correlated_features_l1} and {other.correlated_features_l1}"
-        #     )
-        #     return False
-        # if (
-        #     equalish(
-        #         self.correlated_features_pearson, other.correlated_features_pearson
-        #     )
-        #     is False
-        # ):
-        #     print(
-        #         f"correlated_features_pearson does not match: {self.correlated_features_pearson} and {other.correlated_features_pearson}"
-        #     )
-        #     return False
         if self.neg_str != other.neg_str:
             print(f"neg_str does not match: {self.neg_str} and {other.neg_str}")
             return False
@@ -270,6 +248,9 @@ class NeuronpediaDashboardFeature:
                     f"activation {i} does not match: {activation} and {other.activations[i]}"
                 )
                 return False
+        if self.dfa_data != other.dfa_data:
+            print(f"dfa_data does not match: {self.dfa_data} and {other.dfa_data}")
+            return False
         return True
 
     def to_dict(self):
@@ -296,36 +277,12 @@ class NeuronpediaDashboardFeature:
             "n_prompts_total": self.n_prompts_total,
             "n_tokens_in_prompt": self.n_tokens_in_prompt,
             "dataset": self.dataset,
+            "dfa_data": self.dfa_data,
             "activations": [activation.to_dict() for activation in self.activations],
         }
 
 
 # TODO: just add the NPRunnerConfig instead
-# @dataclass
-# class NeuronpediaDashboardSettings:
-
-#     def __init__(self, n_batches_to_sample_from: int = 0, n_prompt_to_select: int = 0):
-#         self.n_batches_to_sample_from = n_batches_to_sample_from
-#         self.n_prompt_to_select = n_prompt_to_select
-
-#     def __eq__(self, other: Any):
-#         if self.n_batches_to_sample_from != other.n_batches_to_sample_from:
-#             print(
-#                 f"n_batches_to_sample_from does not match: {self.n_batches_to_sample_from} and {other.n_batches_to_sample_from}"
-#             )
-#             return False
-#         if self.n_prompt_to_select != other.n_prompt_to_select:
-#             print(
-#                 f"n_prompt_to_select does not match: {self.n_prompt_to_select} and {other.n_prompt_to_select}"
-#             )
-#             return False
-#         return True
-
-#     def to_dict(self):
-#         return {
-#             "n_batches_to_sample_from": self.n_batches_to_sample_from,
-#             "n_prompt_to_select": self.n_prompt_to_select,
-#         }
 
 
 @dataclass

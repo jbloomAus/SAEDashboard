@@ -313,6 +313,7 @@ class SequenceData:
         bottom_logits:     List of the corresponding 5 changes in logits for those tokens
     """
 
+    original_index: int = 0
     token_ids: list[int] = field(default_factory=list)
     feat_acts: list[float] = field(default_factory=list)
     loss_contribution: list[float] = field(default_factory=list)
