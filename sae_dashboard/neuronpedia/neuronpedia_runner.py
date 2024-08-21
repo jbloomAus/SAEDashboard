@@ -702,7 +702,7 @@ class NeuronpediaRunner:
                             ]["dfaMaxValue"]
                             activation.dfa_targetIndex = feature.dfa_data[
                                 sd.original_index
-                            ]["dfaTargetIndex"]
+                            ]["dfaTargetIndex"] - 1
 
                         strs = []
                         for i in range(len(sd.token_ids)):
