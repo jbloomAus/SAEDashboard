@@ -2,6 +2,57 @@
 
 
 
+## v0.4.0 (2024-08-22)
+
+### Feature
+
+* feat: Refactor json writer and trigger DFA release
+
+JSON writer has been refactored for reusability and readability ([`664f487`](https://github.com/jbloomAus/SAEDashboard/commit/664f4874b585c5510d2d3dd639c5e893023f6332))
+
+### Unknown
+
+* Merge pull request #20 from jbloomAus/feature/dfa
+
+SAEVisRunner DFA Implementation ([`926ea87`](https://github.com/jbloomAus/SAEDashboard/commit/926ea87dd344548489201f68cc92b33662430813))
+
+* Refactored JSON creation from the neuronpedia runner ([`d6bb24b`](https://github.com/jbloomAus/SAEDashboard/commit/d6bb24b6d773874d8e99be4d84402d559741907b))
+
+* Update ci.yaml ([`4b2807d`](https://github.com/jbloomAus/SAEDashboard/commit/4b2807dd865904120d236b355c0ccb1680c2919e))
+
+* Fixed formatting ([`a62cc8f`](https://github.com/jbloomAus/SAEDashboard/commit/a62cc8f1bdd4c6e49b76d2d594e5a6b4b8183a8c))
+
+* Fixed target index ([`ca2668d`](https://github.com/jbloomAus/SAEDashboard/commit/ca2668da03ea4d06cdc9f198988b80e0db844316))
+
+* Corrected DFA indexing ([`d5028ae`](https://github.com/jbloomAus/SAEDashboard/commit/d5028aec875db4c03196726400c3b90b5d9d4d01))
+
+* Adding temporary testing notebook ([`98e4b2f`](https://github.com/jbloomAus/SAEDashboard/commit/98e4b2f93d300ad4e94985d8d2594739a277e0c8))
+
+* Added DFA output to neuronpedia runner ([`68eeff3`](https://github.com/jbloomAus/SAEDashboard/commit/68eeff3172b0c8637a6566c07951c28fd14a1c03))
+
+* Fixed test typehints ([`d358e6f`](https://github.com/jbloomAus/SAEDashboard/commit/d358e6f5cc37304935eed949a0b0b985ba12b94f))
+
+* Fixed formatting ([`5cb19e2`](https://github.com/jbloomAus/SAEDashboard/commit/5cb19e241051503730b6982813a6730556990c92))
+
+* Corrected typehints ([`6173fbd`](https://github.com/jbloomAus/SAEDashboard/commit/6173fbd3824b7cba58e1cf0c7ee239762ee533ce))
+
+* Removed another unused import ([`8be1572`](https://github.com/jbloomAus/SAEDashboard/commit/8be1572370b1adf341e2a650953bf17cd179808d))
+
+* Removed unused imports ([`9071210`](https://github.com/jbloomAus/SAEDashboard/commit/90712105f74b287d77a06c045e8c32fd05f2e668))
+
+* Added support for DFA calculations up to SAE Vis runner ([`4a08ffd`](https://github.com/jbloomAus/SAEDashboard/commit/4a08ffd13a8f29ff16808a20cd663c9d2d369e6a))
+
+* Added activation collection flow for DFA ([`0ebb1f3`](https://github.com/jbloomAus/SAEDashboard/commit/0ebb1f3ca61603662f4f2cc8b1341470bf75b5d1))
+
+* Merge pull request #19 from jbloomAus/fix/remove_precision_reduction
+
+Removed precision reduction option ([`a5f8df1`](https://github.com/jbloomAus/SAEDashboard/commit/a5f8df15ef8619c4d08655e777d379a05b453346))
+
+* Removed float16 option entirely from quantile calc ([`1b6a4a9`](https://github.com/jbloomAus/SAEDashboard/commit/1b6a4a93403ca2e9a869aa73600f37960090f03d))
+
+* Removed precision reduction option ([`cd03ffb`](https://github.com/jbloomAus/SAEDashboard/commit/cd03ffb182e93a42480c01408b47ebae94d4c349))
+
+
 ## v0.3.0 (2024-08-15)
 
 ### Feature
