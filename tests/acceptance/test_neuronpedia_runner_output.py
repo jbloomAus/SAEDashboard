@@ -10,7 +10,7 @@ def load_json_file(file_path: str) -> Dict[str, Any]:
 
 def test_neuronpedia_json_output():
     # Assuming the output directory is 'neuronpedia_outputs'
-    output_dir = "/root/SAEDashboard/neuronpedia_outputs/gpt2-small_gpt2-small-hook-z-kk_blocks.5.attn.hook_z"
+    output_dir = "/Users/curttigges/Projects/SAEDashboard/neuronpedia_outputs/gpt2-small_gpt2-small-hook-z-kk_blocks.5.attn.hook_z"
 
     # Find all batch files
     batch_files = [

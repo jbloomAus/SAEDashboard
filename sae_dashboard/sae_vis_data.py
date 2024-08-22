@@ -25,6 +25,8 @@ OOMs.",
     verbose="Whether to print out progress messages and other info during the data gathering process",
 )
 
+OUT_OF_RANGE_TOKEN = "<|outofrange|>"
+
 
 @dataclass_json
 @dataclass

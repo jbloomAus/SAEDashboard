@@ -1,10 +1,9 @@
 import argparse
 import json
 import os
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Dict
 
 import numpy as np
 import torch
@@ -26,12 +25,9 @@ from sae_dashboard.components_config import (
 )
 from sae_dashboard.data_writing_fns import save_feature_centric_vis
 from sae_dashboard.layout import SaeVisLayoutConfig
-from sae_dashboard.neuronpedia.neuronpedia_dashboard import (
-    NeuronpediaDashboardActivation,
-    NeuronpediaDashboardBatch,
-    NeuronpediaDashboardFeature,
-)
-from sae_dashboard.sae_vis_data import SaeVisConfig, SaeVisData
+from sae_dashboard.neuronpedia.neuronpedia_converter import NeuronpediaConverter
+from sae_dashboard.neuronpedia.neuronpedia_runner_config import NeuronpediaRunnerConfig
+from sae_dashboard.sae_vis_data import SaeVisConfig
 from sae_dashboard.sae_vis_runner import SaeVisRunner
 
 # set TOKENIZERS_PARALLELISM to false to avoid warnings
@@ -43,7 +39,7 @@ BG_COLOR_MAP = colors.LinearSegmentedColormap.from_list(
     "bg_color_map", ["white", "darkorange"]
 )
 
-DEFAULT_SPARSITY_THRESHOLD = -6
+
 DEFAULT_FALLBACK_DEVICE = "cpu"
 
 # TODO: add more anomalies here
@@ -59,62 +55,6 @@ HTML_ANOMALIES = {
     "Ċ": "\n",
     "ĉ": "\t",
 }
-
-
-class NpEncoder(json.JSONEncoder):
-    def default(self, o: Any):
-        if isinstance(o, NeuronpediaDashboardBatch):
-            return o.to_dict()
-        if isinstance(o, np.integer):
-            return int(o)
-        if isinstance(o, np.floating):
-            return float(o)
-        if isinstance(o, np.ndarray):
-            return o.tolist()
-        return super(NpEncoder, self).default(o)
-
-
-@dataclass
-class NeuronpediaRunnerConfig:
-
-    sae_set: str
-    sae_path: str
-    outputs_dir: str
-    np_set_name: Optional[str] = None
-    from_local_sae: bool = False
-    sparsity_threshold: int = DEFAULT_SPARSITY_THRESHOLD
-    huggingface_dataset_path: str = ""
-
-    # ACTIVATION STORE PARAMETERS
-    # token pars
-    n_prompts_total: int = 24576
-    n_tokens_in_prompt: int = 128
-    n_prompts_in_forward_pass: int = 32
-
-    # batching
-    n_features_at_a_time: int = 128
-    quantile_feature_batch_size: int = 64
-    start_batch: int = 0
-    end_batch: Optional[int] = None
-
-    # quantiles
-    n_quantiles: int = 5
-    top_acts_group_size: int = 20
-    quantile_group_size: int = 5
-
-    # additional calculations
-    use_dfa: bool = False
-
-    model_dtype: str = ""
-    sae_dtype: str = ""
-
-    sae_device: str | None = None
-    activation_store_device: str | None = None
-    model_device: str | None = None
-    model_n_devices: int | None = None
-    use_wandb: bool = False
-
-    shuffle_tokens: bool = True
 
 
 class NeuronpediaRunner:
@@ -298,43 +238,6 @@ class NeuronpediaRunner:
         if self.cfg.shuffle_tokens:
             all_tokens = all_tokens[torch.randperm(all_tokens.shape[0])]
         return all_tokens
-
-    def round_list(self, to_round: list[float]):
-        return list(np.round(to_round, 3))
-
-    def ensure_list(self, input_value: list[str] | str):
-        if not isinstance(input_value, list):
-            return [input_value]
-        return input_value
-
-    def to_str_tokens_safe(
-        self,
-        vocab_dict: Dict[int, str],
-        tokens: Union[int, List[int], torch.Tensor],
-    ) -> list[str] | str:
-        """
-        does to_str_tokens, except handles out of range
-        """
-        assert self.model is not None
-        vocab_max_index = self.model.cfg.d_vocab - 1
-        # Deal with the int case separately
-        if isinstance(tokens, int):
-            if tokens > vocab_max_index:
-                return OUT_OF_RANGE_TOKEN
-            return vocab_dict[tokens]
-
-        # If the tokens are a (possibly nested) list, turn them into a tensor
-        if isinstance(tokens, list):
-            tokens = torch.tensor(tokens)
-
-        # Get flattened list of tokens
-        str_tokens = [
-            (vocab_dict[t] if t <= vocab_max_index else OUT_OF_RANGE_TOKEN)
-            for t in tokens.flatten().tolist()
-        ]
-
-        # Reshape
-        return np.reshape(str_tokens, tokens.shape).tolist()
 
     def get_alive_features(self) -> list[int]:
         # skip sparsity
@@ -545,8 +448,11 @@ class NeuronpediaRunner:
                             },
                             step=feature_batch_count,
                         )
-
-                json_object = self.convert_feature_data_to_np_json(feature_data)
+                self.cfg.model_id = self.model_id
+                self.cfg.layer = self.layer
+                json_object = NeuronpediaConverter.convert_to_np_json(
+                    self.model, feature_data, self.cfg, self.vocab_dict
+                )
                 with open(
                     output_file,
                     "w",
@@ -563,180 +469,6 @@ class NeuronpediaRunner:
 
         if self.cfg.use_wandb:
             wandb.finish()
-
-    def convert_feature_data_to_np_json(self, feature_data: SaeVisData):
-
-        features_outputs: list[NeuronpediaDashboardFeature] = []
-        for _, feat_index in enumerate(feature_data.feature_data_dict.keys()):
-            feature = feature_data.feature_data_dict[feat_index]
-
-            feature_output: NeuronpediaDashboardFeature = NeuronpediaDashboardFeature()
-            feature_output.feature_index = feat_index
-
-            top10_logits = self.round_list(feature.logits_table_data.top_logits)
-            bottom10_logits = self.round_list(feature.logits_table_data.bottom_logits)
-
-            if feature.feature_tables_data:
-                feature_output.neuron_alignment_indices = (
-                    feature.feature_tables_data.neuron_alignment_indices
-                )
-                feature_output.neuron_alignment_values = self.round_list(
-                    feature.feature_tables_data.neuron_alignment_values
-                )
-                feature_output.neuron_alignment_l1 = self.round_list(
-                    feature.feature_tables_data.neuron_alignment_l1
-                )
-                feature_output.correlated_neurons_indices = (
-                    feature.feature_tables_data.correlated_neurons_indices
-                )
-                feature_output.correlated_neurons_l1 = self.round_list(
-                    feature.feature_tables_data.correlated_neurons_cossim
-                )
-                feature_output.correlated_neurons_pearson = self.round_list(
-                    feature.feature_tables_data.correlated_neurons_pearson
-                )
-                feature_output.correlated_features_indices = (
-                    feature.feature_tables_data.correlated_features_indices
-                )
-                feature_output.correlated_features_l1 = self.round_list(
-                    feature.feature_tables_data.correlated_features_cossim
-                )
-                feature_output.correlated_features_pearson = self.round_list(
-                    feature.feature_tables_data.correlated_features_pearson
-                )
-
-            feature_output.neg_str = self.ensure_list(
-                self.to_str_tokens_safe(
-                    self.vocab_dict, feature.logits_table_data.bottom_token_ids
-                )
-            )
-            feature_output.neg_values = bottom10_logits
-            feature_output.pos_str = self.ensure_list(
-                self.to_str_tokens_safe(
-                    self.vocab_dict, feature.logits_table_data.top_token_ids
-                )
-            )
-            feature_output.pos_values = top10_logits
-
-            feature_output.frac_nonzero = (
-                float(feature.acts_histogram_data.title.split(" = ")[1].split("%")[0])
-                / 100
-                if feature.acts_histogram_data.title is not None
-                else 0
-            )
-
-            freq_hist_data = feature.acts_histogram_data
-            freq_bar_values = self.round_list(freq_hist_data.bar_values)
-            feature_output.freq_hist_data_bar_values = freq_bar_values
-            feature_output.freq_hist_data_bar_heights = self.round_list(
-                freq_hist_data.bar_heights
-            )
-
-            logits_hist_data = feature.logits_histogram_data
-            feature_output.logits_hist_data_bar_heights = self.round_list(
-                logits_hist_data.bar_heights
-            )
-            feature_output.logits_hist_data_bar_values = self.round_list(
-                logits_hist_data.bar_values
-            )
-
-            # save settings so we know what we used to generate this dashboard
-            feature_output.n_prompts_total = self.cfg.n_prompts_total
-            feature_output.n_tokens_in_prompt = self.cfg.n_tokens_in_prompt
-            feature_output.dataset = self.cfg.huggingface_dataset_path
-            # if feature.dfa_data:
-            #     print(f"Writing DFA for feature {feat_index}")
-            #     feature_output.dfa_data = {}
-            #     for prompt_index, dfa_prompt_data in feature.dfa_data.items():
-            #         feature_output.dfa_data[prompt_index] = {
-            #             "dfaValues": self.round_list(dfa_prompt_data["dfaValues"]),
-            #             "dfaTargetIndex": dfa_prompt_data["dfaTargetIndex"],
-            #             "dfaMaxValue": round(dfa_prompt_data["dfaMaxValue"], 4),
-            #         }
-            # else:
-            #     print(f"DFA for feature {feat_index} is {feature.dfa_data}")
-            activations = []
-            sdbs = feature.sequence_data
-            for sgd in sdbs.seq_group_data:
-                binMin = 0
-                binMax = 0
-                binContains = 0
-                if "TOP ACTIVATIONS" in sgd.title:
-                    binMin = -1
-                    try:
-                        binMax = float(sgd.title.split(" = ")[-1])
-                    except ValueError:
-                        print(f"Error parsing top acts: {sgd.title}")
-                        binMax = 99
-                    binContains = -1
-                elif "INTERVAL" in sgd.title:
-                    try:
-                        split = sgd.title.split("<br>")
-                        firstSplit = split[0].split(" ")
-                        binMin = float(firstSplit[1])
-                        binMax = float(firstSplit[-1])
-                        secondSplit = split[1].split(" ")
-                        binContains = float(secondSplit[-1].rstrip("%")) / 100
-                    except ValueError:
-                        print(f"Error parsing interval: {sgd.title}")
-                for sd in sgd.seq_data:
-                    if (
-                        sd.top_token_ids is not None
-                        and sd.bottom_token_ids is not None
-                        and sd.top_logits is not None
-                        and sd.bottom_logits is not None
-                    ):
-                        activation: NeuronpediaDashboardActivation = (
-                            NeuronpediaDashboardActivation()
-                        )
-                        activation.bin_min = binMin
-                        activation.bin_max = binMax
-                        activation.bin_contains = binContains
-
-                        if feature.dfa_data:
-                            activation.dfa_values = feature.dfa_data[sd.original_index][
-                                "dfaValues"
-                            ][1:]
-                            activation.dfa_maxValue = feature.dfa_data[
-                                sd.original_index
-                            ]["dfaMaxValue"]
-                            activation.dfa_targetIndex = (
-                                feature.dfa_data[sd.original_index]["dfaTargetIndex"]
-                                - 1
-                            )
-
-                        strs = []
-                        for i in range(len(sd.token_ids)):
-                            strs.append(
-                                self.to_str_tokens_safe(
-                                    self.vocab_dict, sd.token_ids[i]
-                                )
-                            )
-                        activation.tokens = strs
-                        activation.values = self.round_list(sd.feat_acts)
-
-                        activations.append(activation)
-            feature_output.activations = activations
-
-            features_outputs.append(feature_output)
-
-        batch_data = NeuronpediaDashboardBatch()
-        batch_data.model_id = self.model_id
-        batch_data.layer = self.layer
-        batch_data.sae_set = (
-            self.cfg.sae_set if not self.cfg.np_set_name else self.cfg.np_set_name
-        )
-        batch_data.features = features_outputs
-
-        # no additional settings currently needed
-        # settings = NeuronpediaDashboardSettings()
-        # settings.n_batches_to_sample_from = self.cfg.n_prompts_total
-        # settings.n_prompt_to_select = self.cfg.n_prompts_total
-        # batch_data.settings = settings
-
-        json_object = json.dumps(batch_data, cls=NpEncoder)
-
-        return json_object
 
 
 def main():

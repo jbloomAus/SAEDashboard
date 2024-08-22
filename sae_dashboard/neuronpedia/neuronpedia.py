@@ -15,9 +15,11 @@ from sae_lens.toolkit.pretrained_saes import load_sparsity
 from typing_extensions import Annotated
 
 from sae_dashboard.neuronpedia.neuronpedia_runner import (
-    DEFAULT_SPARSITY_THRESHOLD,
     NeuronpediaRunner,
     NeuronpediaRunnerConfig,
+)
+from sae_dashboard.neuronpedia.neuronpedia_runner_config import (
+    DEFAULT_SPARSITY_THRESHOLD,
 )
 
 OUTPUT_DIR_BASE = Path("./neuronpedia_outputs")
