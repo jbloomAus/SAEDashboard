@@ -1,5 +1,6 @@
 import math
 import random
+import re
 from collections import defaultdict
 from typing import Iterable
 
@@ -28,8 +29,37 @@ from sae_dashboard.feature_data import FeatureData
 from sae_dashboard.feature_data_generator import FeatureDataGenerator
 from sae_dashboard.sae_vis_data import SaeVisConfig, SaeVisData
 from sae_dashboard.sequence_data_generator import SequenceDataGenerator
-from sae_dashboard.transformer_lens_wrapper import TransformerLensWrapper
+from sae_dashboard.transformer_lens_wrapper import (
+    ActivationConfig,
+    TransformerLensWrapper,
+)
 from sae_dashboard.utils_fns import FeatureStatistics
+
+
+class FeatureDataGeneratorFactory:
+    @staticmethod
+    def create(
+        cfg: SaeVisConfig,
+        model: HookedTransformer,
+        encoder: SAE,
+        tokens: Int[Tensor, "batch seq"],
+    ) -> FeatureDataGenerator:
+        """Builds a FeatureDataGenerator using the provided config and model."""
+        activation_config = ActivationConfig(
+            primary_hook_point=cfg.hook_point,
+            auxiliary_hook_points=(
+                [
+                    re.sub(r"hook_z", "hook_v", cfg.hook_point),
+                    re.sub(r"hook_z", "hook_pattern", cfg.hook_point),
+                ]
+                if cfg.use_dfa
+                else []
+            ),
+        )
+        wrapped_model = TransformerLensWrapper(model, activation_config)
+        return FeatureDataGenerator(
+            cfg=cfg, model=wrapped_model, encoder=encoder, tokens=tokens
+        )
 
 
 class SaeVisRunner:
@@ -68,13 +98,9 @@ class SaeVisRunner:
         features_list = self.handle_features(self.cfg.features, encoder)
         feature_batches = self.get_feature_batches(features_list)
         progress = self.get_progress_bar(tokens, feature_batches, features_list)
-        model_wrapper = TransformerLensWrapper(model, self.cfg.hook_point)
 
-        feature_data_generator = FeatureDataGenerator(
-            cfg=self.cfg,
-            model=model_wrapper,
-            encoder=encoder,
-            tokens=tokens,
+        feature_data_generator = FeatureDataGeneratorFactory.create(
+            self.cfg, model, encoder, tokens
         )
 
         sequence_data_generator = SequenceDataGenerator(
@@ -83,6 +109,9 @@ class SaeVisRunner:
             W_U=model.W_U,
         )
 
+        all_consolidated_dfa_results = {
+            feature_idx: {} for feature_idx in self.cfg.features
+        }
         # For each batch of features: get new data and update global data storage objects
         # TODO: We should write out json files with the results as this runs rather than storing everything in memory
         for features in feature_batches:
@@ -95,6 +124,7 @@ class SaeVisRunner:
                 feature_out_dir,
                 corrcoef_neurons,
                 corrcoef_encoder,
+                batch_dfa_results,
             ) = feature_data_generator.get_feature_data(features, progress)
 
             # Get the logits of all features (i.e. the directions this feature writes to the logit output)
@@ -105,8 +135,6 @@ class SaeVisRunner:
             ).to(self.device)
 
             # ! Get stats (including quantiles, which will be useful for the prompt-centric visualisation)
-            print(f"all_feat_acts dtype: {all_feat_acts.dtype}")
-            print(f"all_feat_acts shape: {all_feat_acts.shape}")
             feature_stats = FeatureStatistics.create(
                 data=einops.rearrange(all_feat_acts, "b s feats -> feats (b s)"),
                 batch_size=self.cfg.quantile_feature_batch_size,
@@ -128,6 +156,10 @@ class SaeVisRunner:
             )
 
             # Add all this data to the list of FeatureTablesData objects
+            if batch_dfa_results:
+                # Accumulate DFA results across feature batches
+                for feature_idx, feature_data in batch_dfa_results.items():
+                    all_consolidated_dfa_results[feature_idx].update(feature_data)
 
             for i, (feat, logit_vector) in enumerate(zip(features, logits)):
                 feature_data_dict[feat].feature_tables_data = FeatureTablesData(
@@ -188,6 +220,11 @@ class SaeVisRunner:
                         feature_resid_dir=feature_resid_dir[i],
                     )
                 )
+
+                feature_data_dict[feat].dfa_data = all_consolidated_dfa_results.get(
+                    feat, None
+                )
+
                 # Update the 2nd progress bar (fwd passes & getting sequence data dominates the runtime of these computations)
                 if progress is not None:
                     progress[1].update(1)

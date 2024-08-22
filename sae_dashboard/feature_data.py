@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Callable, Literal
+from typing import Any, Callable, List, Literal, Optional
 
 from sae_dashboard.components import (
     ActsHistogramData,
@@ -21,6 +21,13 @@ from sae_dashboard.components_config import (
 )
 from sae_dashboard.html_fns import HTML
 from sae_dashboard.layout import SaeVisLayoutConfig
+
+
+@dataclass
+class DFAData:
+    dfaValues: List[List[float]] = field(default_factory=list)
+    dfaTargetIndex: List[int] = field(default_factory=list)
+    dfaMaxValue: float = 0.0
 
 
 @dataclass
@@ -60,6 +67,11 @@ class FeatureData:
         default_factory=lambda: SequenceMultiGroupData()
     )
     prompt_data: SequenceData = field(default_factory=lambda: SequenceData())
+    dfa_data: Optional[dict[int, dict[str, Any]]] = None
+
+    def __post_init__(self):
+        if self.dfa_data is None:
+            self.dfa_data = {}
 
     def get_component_from_config(self, config: GenericComponentConfig) -> GenericData:
         """
@@ -73,6 +85,7 @@ class FeatureData:
             LogitsHistogramConfig.__name__: self.logits_histogram_data,
             SequencesConfig.__name__: self.sequence_data,
             PromptConfig.__name__: self.prompt_data,
+            # Add DFA config here if we create a specific config for it
         }
         config_class_name = config.__class__.__name__
         assert (

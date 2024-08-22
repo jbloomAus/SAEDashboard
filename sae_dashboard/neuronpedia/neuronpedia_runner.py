@@ -102,6 +102,9 @@ class NeuronpediaRunnerConfig:
     top_acts_group_size: int = 20
     quantile_group_size: int = 5
 
+    # additional calculations
+    use_dfa: bool = False
+
     model_dtype: str = ""
     sae_dtype: str = ""
 
@@ -498,7 +501,7 @@ class NeuronpediaRunner:
                         )
                     ]
                 )
-
+                print(f"DFA flag set to {self.cfg.use_dfa}")
                 feature_vis_config_gpt = SaeVisConfig(
                     hook_point=self.sae.cfg.hook_name,
                     features=features_to_process,
@@ -512,6 +515,7 @@ class NeuronpediaRunner:
                     dtype=self.cfg.sae_dtype,
                     cache_dir=self.cached_activations_dir,
                     ignore_tokens={self.model.tokenizer.pad_token_id, self.model.tokenizer.bos_token_id, self.model.tokenizer.eos_token_id},  # type: ignore
+                    use_dfa=self.cfg.use_dfa,
                 )
 
                 feature_data = SaeVisRunner(feature_vis_config_gpt).run(
@@ -640,7 +644,17 @@ class NeuronpediaRunner:
             feature_output.n_prompts_total = self.cfg.n_prompts_total
             feature_output.n_tokens_in_prompt = self.cfg.n_tokens_in_prompt
             feature_output.dataset = self.cfg.huggingface_dataset_path
-
+            # if feature.dfa_data:
+            #     print(f"Writing DFA for feature {feat_index}")
+            #     feature_output.dfa_data = {}
+            #     for prompt_index, dfa_prompt_data in feature.dfa_data.items():
+            #         feature_output.dfa_data[prompt_index] = {
+            #             "dfaValues": self.round_list(dfa_prompt_data["dfaValues"]),
+            #             "dfaTargetIndex": dfa_prompt_data["dfaTargetIndex"],
+            #             "dfaMaxValue": round(dfa_prompt_data["dfaMaxValue"], 4),
+            #         }
+            # else:
+            #     print(f"DFA for feature {feat_index} is {feature.dfa_data}")
             activations = []
             sdbs = feature.sequence_data
             for sgd in sdbs.seq_group_data:
@@ -678,6 +692,19 @@ class NeuronpediaRunner:
                         activation.bin_min = binMin
                         activation.bin_max = binMax
                         activation.bin_contains = binContains
+
+                        if feature.dfa_data:
+                            activation.dfa_values = feature.dfa_data[sd.original_index][
+                                "dfaValues"
+                            ][1:]
+                            activation.dfa_maxValue = feature.dfa_data[
+                                sd.original_index
+                            ]["dfaMaxValue"]
+                            activation.dfa_targetIndex = (
+                                feature.dfa_data[sd.original_index]["dfaTargetIndex"]
+                                - 1
+                            )
+
                         strs = []
                         for i in range(len(sd.token_ids)):
                             strs.append(

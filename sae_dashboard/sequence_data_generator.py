@@ -120,37 +120,6 @@ class SequenceDataGenerator:
             raise NotImplementedError(
                 "We are not supporting ablation experiments for now."
             )
-            # # ! (4) Compute the logit effect if this feature is ablated
-            # contribution_to_logprobs = self.direct_effect_feature_ablation_experiment(
-            #     feat_acts_pre_ablation=feat_acts_pre_ablation,
-            #     resid_post_pre_ablation=resid_post_pre_ablation,
-            #     feature_resid_dir=feature_resid_dir,
-            # )
-
-            # # ! (4A) Use this to compute the most affected tokens by this feature
-            # # The TopK function can improve efficiency by masking the features which are zero
-
-            # # ! (4B) Use this to compute the loss effect if this feature is ablated
-            # # which is just the negative of the change in logprobs
-            # (
-            #     top_contribution_to_logits,
-            #     bottom_contribution_to_logits,
-            #     loss_contribution,
-            # ) = self.get_feature_ablation_statistics(
-            #     feat_acts_pre_ablation, contribution_to_logprobs, correct_tokens
-            # )
-
-            # # ! (5) Store the results in a SequenceMultiGroupData object
-            # # Now that we've indexed everything, construct the batch of SequenceData objects
-            # sequence_multigroup_data = self.package_sequences_data(
-            #     token_ids=token_ids,
-            #     feat_acts_coloring=feat_acts_coloring,
-            #     loss_contribution=loss_contribution,
-            #     feat_logits=feat_logits,
-            #     top_contribution_to_logits=top_contribution_to_logits,
-            #     bottom_contribution_to_logits=bottom_contribution_to_logits,
-            #     indices_dict=indices_dict,
-            # )
         else:
             # ! (5) Store the results in a SequenceMultiGroupData object
             # Now that we've indexed everything, construct the batch of SequenceData objects
@@ -159,6 +128,7 @@ class SequenceDataGenerator:
                 feat_acts_coloring=feat_acts_coloring,
                 feat_logits=feat_logits,
                 indices_dict=indices_dict,
+                indices_bold=indices_bold,
             )
 
         return sequence_multigroup_data
@@ -382,6 +352,7 @@ class SequenceDataGenerator:
         feat_acts_coloring: Float[Tensor, "n_bold buf"],
         feat_logits: Float[Tensor, "d_vocab"],
         indices_dict: dict[str, Int[Tensor, "n_bold 2"]],
+        indices_bold: Int[Tensor, "n_bold"],
         loss_contribution: Float[Tensor, "n_bold 1"] | None = None,
         top_contribution_to_logits: TopK | None = None,
         bottom_contribution_to_logits: TopK | None = None,
@@ -394,35 +365,40 @@ class SequenceDataGenerator:
         feat_logits = feat_logits.cpu()
         feat_acts_coloring = feat_acts_coloring.cpu()
         token_ids = token_ids.cpu()
+        indices_bold = indices_bold.cpu()
 
         if self.cfg.perform_ablation_experiments:
-            assert isinstance(loss_contribution, torch.Tensor)
-            assert top_contribution_to_logits is not None
-            assert bottom_contribution_to_logits is not None
-            for group_idx, group_name in enumerate(indices_dict.keys()):
-                seq_data = [
-                    SequenceData(
-                        token_ids=token_ids[i].tolist(),
-                        feat_acts=[round(f, 4) for f in feat_acts_coloring[i].tolist()],
-                        loss_contribution=loss_contribution[i].tolist(),
-                        token_logits=feat_logits[token_ids[i]].tolist(),
-                        top_token_ids=top_contribution_to_logits.indices[i].tolist(),
-                        top_logits=top_contribution_to_logits.values[i].tolist(),
-                        bottom_token_ids=bottom_contribution_to_logits.indices[
-                            i
-                        ].tolist(),
-                        bottom_logits=bottom_contribution_to_logits.values[i].tolist(),
-                    )
-                    for i in range(
-                        group_sizes_cumsum[group_idx], group_sizes_cumsum[group_idx + 1]
-                    )
-                ]
-                sequence_groups_data.append(SequenceGroupData(group_name, seq_data))
+            raise NotImplementedError(
+                "We are not supporting ablation experiments for now."
+            )
+            # assert isinstance(loss_contribution, torch.Tensor)
+            # assert top_contribution_to_logits is not None
+            # assert bottom_contribution_to_logits is not None
+            # for group_idx, group_name in enumerate(indices_dict.keys()):
+            #     seq_data = [
+            #         SequenceData(
+            #             token_ids=token_ids[i].tolist(),
+            #             feat_acts=[round(f, 4) for f in feat_acts_coloring[i].tolist()],
+            #             loss_contribution=loss_contribution[i].tolist(),
+            #             token_logits=feat_logits[token_ids[i]].tolist(),
+            #             top_token_ids=top_contribution_to_logits.indices[i].tolist(),
+            #             top_logits=top_contribution_to_logits.values[i].tolist(),
+            #             bottom_token_ids=bottom_contribution_to_logits.indices[
+            #                 i
+            #             ].tolist(),
+            #             bottom_logits=bottom_contribution_to_logits.values[i].tolist(),
+            #         )
+            #         for i in range(
+            #             group_sizes_cumsum[group_idx], group_sizes_cumsum[group_idx + 1]
+            #         )
+            #     ]
+            #     sequence_groups_data.append(SequenceGroupData(group_name, seq_data))
 
         else:
             for group_idx, group_name in enumerate(indices_dict.keys()):
                 seq_data = [
                     SequenceData(
+                        original_index=int(indices_bold[i, 0].item()),
                         token_ids=token_ids[i].tolist(),
                         feat_acts=[round(f, 4) for f in feat_acts_coloring[i].tolist()],
                         token_logits=feat_logits[token_ids[i]].tolist(),
