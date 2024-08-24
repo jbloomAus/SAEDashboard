@@ -1,9 +1,12 @@
 from pathlib import Path
+import time
 from typing import Any, Dict, List
 
 import einops
 import numpy as np
 import torch
+import asyncio
+import aiofiles
 from jaxtyping import Float, Int
 from sae_lens import SAE
 from sae_lens.config import DTYPE_MAP as DTYPES
@@ -132,38 +135,96 @@ class FeatureDataGenerator:
             corrcoef_encoder,
             all_dfa_results,
         )
-
+    
     @torch.inference_mode()
     def get_model_acts(
         self,
         minibatch_index: int,
         minibatch_tokens: torch.Tensor,
     ) -> Dict[str, torch.Tensor]:
-        """
-        A function that gets the model activations for a given minibatch of tokens.
-        Uses np.memmap for efficient caching.
-        """
+        start_time = time.time()
+        cache_hit = False
+
         if self.cfg.cache_dir is not None:
-            cache_path = self.cfg.cache_dir / f"model_activations_{minibatch_index}.npz"
+            cache_path = self.cfg.cache_dir / f"model_activations_{minibatch_index}.pt"
             if cache_path.exists():
-                activation_dict = load_tensor_dict_memmap(cache_path)
+                cache_hit = True
+                load_start_time = time.time()
+                activation_dict = load_tensor_dict_torch_mmap(cache_path)
+                load_end_time = time.time()
             else:
+                compute_start_time = time.time()
                 activation_dict = self.model.forward(
                     minibatch_tokens, return_logits=False
                 )
-                save_tensor_dict_memmap(activation_dict, cache_path)
+                compute_end_time = time.time()
+                save_start_time = time.time()
+                save_tensor_dict_torch(activation_dict, cache_path)
+                save_end_time = time.time()
         else:
+            compute_start_time = time.time()
             activation_dict = self.model.forward(minibatch_tokens, return_logits=False)
+            compute_end_time = time.time()
 
-        # Move tensors to the correct device
-        for key, tensor in activation_dict.items():
-            if "cuda" in self.cfg.device:
-                # async copy to device
-                activation_dict[key] = tensor.to(self.cfg.device, non_blocking=True)
+        # Device transfer should no longer be necessary as tensors are loaded directly to GPU
+        device_transfer_time = 0
+
+        end_time = time.time()
+
+        # Log timing information
+        total_time = end_time - start_time
+        if cache_hit:
+            load_time = load_end_time - load_start_time
+            print(f"Cache hit for minibatch {minibatch_index}")
+            print(f"Load time: {load_time:.4f}s")
+        else:
+            if self.cfg.cache_dir is not None:
+                compute_time = compute_end_time - compute_start_time
+                save_time = save_end_time - save_start_time
+                print(f"Cache miss for minibatch {minibatch_index}")
+                print(f"Compute time: {compute_time:.4f}s")
+                print(f"Save time: {save_time:.4f}s")
             else:
-                activation_dict[key] = tensor.to(self.cfg.device)
+                compute_time = compute_end_time - compute_start_time
+                print(f"No caching for minibatch {minibatch_index}")
+                print(f"Compute time: {compute_time:.4f}s")
+
+        print(f"Device transfer time: {device_transfer_time:.4f}s")
+        print(f"Total time: {total_time:.4f}s")
+        print("--------------------")
 
         return activation_dict
+    # @torch.inference_mode()
+    # def get_model_acts(
+    #     self,
+    #     minibatch_index: int,
+    #     minibatch_tokens: torch.Tensor,
+    # ) -> Dict[str, torch.Tensor]:
+    #     """
+    #     A function that gets the model activations for a given minibatch of tokens.
+    #     Uses np.memmap for efficient caching.
+    #     """
+    #     if self.cfg.cache_dir is not None:
+    #         cache_path = self.cfg.cache_dir / f"model_activations_{minibatch_index}.npz"
+    #         if cache_path.exists():
+    #             activation_dict = load_tensor_dict_memmap(cache_path)
+    #         else:
+    #             activation_dict = self.model.forward(
+    #                 minibatch_tokens, return_logits=False
+    #             )
+    #             save_tensor_dict_memmap(activation_dict, cache_path)
+    #     else:
+    #         activation_dict = self.model.forward(minibatch_tokens, return_logits=False)
+
+    #     # Move tensors to the correct device
+    #     for key, tensor in activation_dict.items():
+    #         if "cuda" in self.cfg.device:
+    #             # async copy to device
+    #             activation_dict[key] = tensor.to(self.cfg.device, non_blocking=True)
+    #         else:
+    #             activation_dict[key] = tensor.to(self.cfg.device)
+
+    #     return activation_dict
 
     @torch.inference_mode()
     def update_rolling_coefficients(
@@ -249,6 +310,30 @@ def save_tensor_dict_memmap(tensor_dict: Dict[str, torch.Tensor], filename: Path
         np_dict[f"{key}_dtype"] = str(tensor.dtype)  # Store as string
 
     np.savez(filename, **np_dict)
+
+
+def save_tensor_dict_torch(tensor_dict: Dict[str, torch.Tensor], filename: Path):
+    # Convert tensors to CPU before saving
+    cpu_dict = {k: v.cpu() for k, v in tensor_dict.items()}
+    torch.save(cpu_dict, filename)
+
+def load_tensor_dict_torch_mmap(filename: Path) -> Dict[str, torch.Tensor]:
+    # Memory map the file
+    mmap = np.memmap(filename, dtype='uint8', mode='r')
+    
+    # Create a CUDA buffer and copy the memory-mapped data
+    cuda_buffer = torch.cuda.ByteStorage.from_buffer(mmap.data)
+    
+    # Load the tensor dictionary using the CUDA buffer
+    cuda_tensor = torch.ByteTensor(cuda_buffer).cuda()
+    return torch.load(cuda_tensor, map_location='mps')
+
+
+# def save_tensor_dict_torch(tensor_dict: Dict[str, torch.Tensor], filename: Path):
+#     torch.save(tensor_dict, filename)
+
+def load_tensor_dict_torch(filename: Path) -> Dict[str, torch.Tensor]:
+    return torch.load(filename, map_location=torch.device('mps'))  # Directly load to GPU
 
 
 def save_tensor_memmap(tensor: torch.Tensor, filename: Path):
