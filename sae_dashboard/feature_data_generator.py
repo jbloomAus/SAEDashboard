@@ -1,7 +1,5 @@
-
-import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Dict, List
 
 import einops
 import numpy as np
@@ -134,7 +132,7 @@ class FeatureDataGenerator:
             corrcoef_encoder,
             all_dfa_results,
         )
-    
+
     @torch.inference_mode()
     def get_model_acts(
         self,
@@ -157,7 +155,6 @@ class FeatureDataGenerator:
                 save_tensor_dict_torch(activation_dict, cache_path)
         else:
             activation_dict = self.model.forward(minibatch_tokens, return_logits=False)
-            
 
         return activation_dict
 
@@ -199,8 +196,11 @@ class FeatureDataGenerator:
 def save_tensor_dict_torch(tensor_dict: Dict[str, torch.Tensor], filename: Path):
     torch.save(tensor_dict, filename)
 
+
 def load_tensor_dict_torch(filename: Path, device: str) -> Dict[str, torch.Tensor]:
-    return torch.load(filename, map_location=torch.device(device))  # Directly load to GPU
+    return torch.load(
+        filename, map_location=torch.device(device)
+    )  # Directly load to GPU
 
 
 class FeatureMaskingContext:
