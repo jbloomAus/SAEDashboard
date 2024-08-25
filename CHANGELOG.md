@@ -2,6 +2,23 @@
 
 
 
+## v0.5.0 (2024-08-25)
+
+### Feature
+
+* feat: accelerate caching. Torch load / save faster when files are small. 
+
+Refactor/accelerate caching ([`6027d0a`](https://github.com/jbloomAus/SAEDashboard/commit/6027d0a3fc0d70908bad036a9658caa406d9f809))
+
+### Unknown
+
+* Updated formatting ([`c1ea288`](https://github.com/jbloomAus/SAEDashboard/commit/c1ea2882a17e0d1b7b28743a34fca9d0754bd8a7))
+
+* Sped up caching with native torch functions ([`230840a`](https://github.com/jbloomAus/SAEDashboard/commit/230840aea50b8b7055a6aa61961d7ac50855b763))
+
+* Increased cache loading speed ([`83fe5f4`](https://github.com/jbloomAus/SAEDashboard/commit/83fe5f4bdf1252d533f203bc3f53ea9f71880ab8))
+
+
 ## v0.4.0 (2024-08-22)
 
 ### Feature
