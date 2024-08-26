@@ -118,6 +118,9 @@ class NeuronpediaConverter:
             NeuronpediaConverter._process_feature_activations(
                 feature_output, feature_data, model, vocab_dict
             )
+            NeuronpediaConverter._process_feature_decoder_weight_dist(
+                feature_output, feature_data
+            )
 
             feature_output.n_prompts_total = np_cfg.n_prompts_total
             feature_output.n_tokens_in_prompt = np_cfg.n_tokens_in_prompt
@@ -218,6 +221,17 @@ class NeuronpediaConverter:
         feature_output.logits_hist_data_bar_values = FeatureProcessor.round_list(
             logits_hist_data.bar_values
         )
+
+    @staticmethod
+    def _process_feature_decoder_weight_dist(
+        feature_output: NeuronpediaDashboardFeature,
+        feature_data: FeatureData,
+    ) -> None:
+        """Process feature logits data and update the feature output."""
+        if feature_data.decoder_weights_data:
+            feature_output.decoder_weights_dist = (
+                feature_data.decoder_weights_data.allocation_by_head
+            )
 
     @staticmethod
     def _process_feature_activations(
