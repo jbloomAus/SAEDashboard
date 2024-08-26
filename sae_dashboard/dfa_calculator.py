@@ -12,7 +12,11 @@ class DFACalculator:
     def __init__(self, model: HookedTransformer, sae: SAE):
         self.model = model
         self.sae = sae
-        if hasattr(model.cfg, "n_key_value_heads") and model.cfg.n_key_value_heads is not None and model.cfg.n_key_value_heads < model.cfg.n_heads:
+        if (
+            hasattr(model.cfg, "n_key_value_heads")
+            and model.cfg.n_key_value_heads is not None
+            and model.cfg.n_key_value_heads < model.cfg.n_heads
+        ):
             print("Using GQA")
             self.use_gqa = True
         else:
@@ -78,7 +82,7 @@ class DFACalculator:
 
         # Calculate max values
         max_values, _ = per_src_dfa.max(dim=1)
-    
+
         results = {feature_idx: {} for feature_idx in feature_indices}
         for i in range(n_prompts):
             for j, feature_idx in enumerate(feature_indices):
