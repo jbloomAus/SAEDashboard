@@ -309,9 +309,11 @@ class NeuronpediaConverter:
             activation.dfa_values = feature_data.dfa_data[sequence.original_index][
                 "dfaValues"
             ][1:]
-            activation.dfa_maxValue = feature_data.dfa_data[sequence.original_index][
-                "dfaMaxValue"
-            ]
+            # we redo the max calc to skip the bos token
+            activation.dfa_maxValue = max(activation.dfa_values[1:])
+            # activation.dfa_maxValue = feature_data.dfa_data[sequence.original_index][
+            #     "dfaMaxValue"
+            # ]
             activation.dfa_targetIndex = (
                 feature_data.dfa_data[sequence.original_index]["dfaTargetIndex"] - 1
             )
