@@ -12,6 +12,15 @@ class DFACalculator:
     def __init__(self, model: HookedTransformer, sae: SAE):
         self.model = model
         self.sae = sae
+        if (
+            hasattr(model.cfg, "n_key_value_heads")
+            and model.cfg.n_key_value_heads is not None
+            and model.cfg.n_key_value_heads < model.cfg.n_heads
+        ):
+            print("Using GQA")
+            self.use_gqa = True
+        else:
+            self.use_gqa = False
 
     def calculate(
         self,
@@ -36,6 +45,12 @@ class DFACalculator:
 
         v = activations[f"blocks.{layer_num}.attn.hook_v"]
         attn_weights = activations[f"blocks.{layer_num}.attn.hook_pattern"]
+
+        if self.use_gqa:
+            n_query_heads = attn_weights.shape[1]
+            n_kv_heads = v.shape[2]
+            expansion_factor = n_query_heads // n_kv_heads
+            v = v.repeat_interleave(expansion_factor, dim=2)
 
         v_cat = einops.rearrange(
             v, "batch src_pos n_heads d_head -> batch src_pos (n_heads d_head)"
@@ -73,7 +88,7 @@ class DFACalculator:
         # Expand max_value_indices to match the shape of other indices
         max_value_indices_expanded = max_value_indices[:, None, :]
 
-        # Correctly index per_src_pos_dfa
+        # Index into per_src_pos_dfa
         per_src_dfa = per_src_pos_dfa[
             prompt_indices,
             max_value_indices_expanded,
