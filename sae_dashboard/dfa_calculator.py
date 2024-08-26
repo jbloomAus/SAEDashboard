@@ -145,7 +145,7 @@ class DFACalculator:
         )
 
         # Process in chunks
-        chunk_size = 64  # Adjust this based on your memory constraints
+        chunk_size = 32  # Adjust this based on your memory constraints
         for i in range(0, seq_len, chunk_size):
             chunk_end = min(i + chunk_size, seq_len)
 
