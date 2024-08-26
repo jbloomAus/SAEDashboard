@@ -125,7 +125,7 @@ class NeuronpediaDashboardFeature:
         n_tokens_in_prompt: int = 0,
         dataset: str = "",
         activations: list[dict[str, Any]] = [],
-        dfa_data: dict[int, dict[str, Any]] = {},
+        decoder_weights_dist: list[float] = [],
     ):
         self.feature_index = feature_index
         self.neuron_alignment_indices = neuron_alignment_indices
@@ -150,7 +150,7 @@ class NeuronpediaDashboardFeature:
         self.n_tokens_in_prompt = n_tokens_in_prompt
         self.dataset = dataset
         self.activations: list[NeuronpediaDashboardActivation] = []
-        self.dfa_data = dfa_data
+        self.decoder_weights_dist = decoder_weights_dist
         for activation in activations:
             self.activations.append(NeuronpediaDashboardActivation(**activation))
 
@@ -251,8 +251,10 @@ class NeuronpediaDashboardFeature:
                     f"activation {i} does not match: {activation} and {other.activations[i]}"
                 )
                 return False
-        if self.dfa_data != other.dfa_data:
-            print(f"dfa_data does not match: {self.dfa_data} and {other.dfa_data}")
+        if self.decoder_weights_dist != other.decoder_weights_dist:
+            print(
+                f"decoder_weights_dist does not match: {self.decoder_weights_dist} and {other.decoder_weights_dist}"
+            )
             return False
         return True
 
@@ -280,7 +282,7 @@ class NeuronpediaDashboardFeature:
             "n_prompts_total": self.n_prompts_total,
             "n_tokens_in_prompt": self.n_tokens_in_prompt,
             "dataset": self.dataset,
-            "dfa_data": self.dfa_data,
+            "decoder_weights_dist": self.decoder_weights_dist,
             "activations": [activation.to_dict() for activation in self.activations],
         }
 
