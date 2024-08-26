@@ -21,6 +21,7 @@ class DFACalculator:
             self.use_gqa = True
         else:
             self.use_gqa = False
+       
 
     def calculate(
         self,
