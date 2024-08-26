@@ -1,7 +1,7 @@
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, List
 
 import numpy as np
 from dataclasses_json import dataclass_json
@@ -23,6 +23,12 @@ from sae_dashboard.utils_fns import (
 )
 
 PRECISION = 4
+
+
+@dataclass
+class DecoderWeightsDistribution:
+    n_heads: int
+    allocation_by_head: List[float]
 
 
 @dataclass_json

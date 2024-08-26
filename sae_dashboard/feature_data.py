@@ -3,6 +3,7 @@ from typing import Any, Callable, List, Literal, Optional
 
 from sae_dashboard.components import (
     ActsHistogramData,
+    DecoderWeightsDistribution,
     FeatureTablesData,
     GenericData,
     LogitsHistogramData,
@@ -68,6 +69,7 @@ class FeatureData:
     )
     prompt_data: SequenceData = field(default_factory=lambda: SequenceData())
     dfa_data: Optional[dict[int, dict[str, Any]]] = None
+    decoder_weights_data: Optional[DecoderWeightsDistribution] = None
 
     def __post_init__(self):
         if self.dfa_data is None:
