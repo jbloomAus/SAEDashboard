@@ -2,6 +2,17 @@
 
 
 
+## v0.5.1 (2024-08-27)
+
+### Fix
+
+* fix: multi-gpu-tlens
+
+fix: handle multiple tlens devices ([`ed1e967`](https://github.com/jbloomAus/SAEDashboard/commit/ed1e967d44b887f4b99d2257934ca920d5c6a508))
+
+* fix: handle multiple tlens devices ([`ba5368f`](https://github.com/jbloomAus/SAEDashboard/commit/ba5368f9999f08332c153816ba5836f8a1eb9ba1))
+
+
 ## v0.5.0 (2024-08-25)
 
 ### Feature
