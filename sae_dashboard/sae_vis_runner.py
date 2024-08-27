@@ -189,7 +189,7 @@ class SaeVisRunner:
                         dtype=tokens.dtype,
                         device=tokens.device,
                     ),
-                )
+                ).to(feat_acts.device)
                 nonzero_feat_acts = feat_acts[(feat_acts > 0) & (ignore_tokens_mask)]
                 frac_nonzero = nonzero_feat_acts.numel() / feat_acts.numel()
                 feature_data_dict[feat].acts_histogram_data = (

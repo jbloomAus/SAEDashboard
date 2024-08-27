@@ -83,7 +83,9 @@ class FeatureDataGenerator:
             model_activation_dict = self.get_model_acts(i, minibatch)
             primary_acts = model_activation_dict[
                 self.model.activation_config.primary_hook_point
-            ]
+            ].to(
+                self.encoder.device
+            )  # make sure acts are on the correct device
 
             # Compute feature activations from this
             with FeatureMaskingContext(self.encoder, feature_indices):
@@ -150,11 +152,13 @@ class FeatureDataGenerator:
                 activation_dict = load_tensor_dict_torch(cache_path, self.cfg.device)
             else:
                 activation_dict = self.model.forward(
-                    minibatch_tokens, return_logits=False
+                    minibatch_tokens.to("cpu"), return_logits=False
                 )
                 save_tensor_dict_torch(activation_dict, cache_path)
         else:
-            activation_dict = self.model.forward(minibatch_tokens, return_logits=False)
+            activation_dict = self.model.forward(
+                minibatch_tokens.to("cpu"), return_logits=False
+            )
 
         return activation_dict
 
