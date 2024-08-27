@@ -181,6 +181,7 @@ class SaeVisRunner:
 
                 # Get data for feature activations histogram (including the title!)
                 feat_acts = all_feat_acts[..., i]
+                print(f"feat_acts for feature {feat}: {feat_acts.shape}")
 
                 # ignore any tokens in self.cfg.ignore_tokens
                 ignore_tokens_mask = ~torch.isin(
