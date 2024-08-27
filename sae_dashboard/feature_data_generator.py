@@ -102,9 +102,6 @@ class FeatureDataGenerator:
 
             # Add these to the lists (we'll eventually concat)
             all_feat_acts.append(feature_acts)
-            print(f"\nAdding feature activations for minibatch {i}")
-            print(f"Size of minibatch: {feature_acts.shape}")
-            print(f"Length of all_feat_acts: {len(all_feat_acts)}")
 
             # Calculate DFA
             if self.cfg.use_dfa and self.dfa_calculator:
@@ -125,15 +122,9 @@ class FeatureDataGenerator:
             # Update the 1st progress bar (fwd passes & getting sequence data dominates the runtime of these computations)
             if progress is not None:
                 progress[0].update(1)
-        print(f"Length of all_feat_acts: {len(all_feat_acts)}")
-        for i, feat_acts in enumerate(all_feat_acts):
-            if feat_acts.shape[0] != self.token_minibatches[i].shape[0]:
-                raise ValueError(
-                    f"Feature activations batch {i} has shape {feat_acts.shape}, but minibatch {i} has shape {self.token_minibatches[i].shape}"
-                )
-            #print(f"Size of feature activations batch {i}: {feat_acts.shape}")
+
+            
         all_feat_acts = torch.cat(all_feat_acts, dim=0)
-        print(f"All feature activations concatenated, shape: {all_feat_acts.shape}")
 
         return (
             all_feat_acts,
