@@ -101,6 +101,8 @@ class FeatureDataGenerator:
             # Add these to the lists (we'll eventually concat)
             all_feat_acts.append(feature_acts)
             print(f"Adding feature activations for minibatch {i}")
+            print(f"Size of minibatch: {feature_acts.shape}")
+            print(f"Length of all_feat_acts: {len(all_feat_acts)}")
 
             # Calculate DFA
             if self.cfg.use_dfa and self.dfa_calculator:
