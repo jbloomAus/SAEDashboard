@@ -100,6 +100,7 @@ class FeatureDataGenerator:
 
             # Add these to the lists (we'll eventually concat)
             all_feat_acts.append(feature_acts)
+            print(f"Adding feature activations for minibatch {i}")
 
             # Calculate DFA
             if self.cfg.use_dfa and self.dfa_calculator:
@@ -122,6 +123,7 @@ class FeatureDataGenerator:
                 progress[0].update(1)
 
         all_feat_acts = torch.cat(all_feat_acts, dim=0)
+        print(f"All feature activations concatenated, shape: {all_feat_acts.shape}")
 
         return (
             all_feat_acts,
