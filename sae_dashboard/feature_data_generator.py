@@ -130,6 +130,7 @@ class FeatureDataGenerator:
             if feat_acts.shape[0] != self.token_minibatches[i].shape[0]:
                 raise ValueError(
                     f"Feature activations batch {i} has shape {feat_acts.shape}, but minibatch {i} has shape {self.token_minibatches[i].shape}"
+                )
             #print(f"Size of feature activations batch {i}: {feat_acts.shape}")
         all_feat_acts = torch.cat(all_feat_acts, dim=0)
         print(f"All feature activations concatenated, shape: {all_feat_acts.shape}")
