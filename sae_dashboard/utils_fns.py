@@ -8,6 +8,7 @@ from typing import (
     Literal,
     Optional,
     Sequence,
+    Tuple,
     Type,
     TypeVar,
     overload,
@@ -29,6 +30,41 @@ T = TypeVar("T")
 # from rich.progress import ProgressColumn, Task # MofNCompleteColumn
 # from rich.text import Text
 # from rich.table import Column
+
+
+def has_duplicate_rows(tensor: torch.Tensor) -> bool:
+    """
+    Check if a 2D tensor has any duplicate rows, with special handling for MPS devices.
+
+    Args:
+        tensor (torch.Tensor): A 2D tensor to check for duplicate rows.
+
+    Returns:
+        bool: True if there are duplicate rows, False otherwise.
+
+    Raises:
+        ValueError: If the input tensor is not 2D.
+    """
+    if tensor.dim() != 2:
+        raise ValueError("Input tensor must be 2D")
+
+    if tensor.device.type == "mps":
+        # Alternative strategy for MPS devices
+        # Convert to CPU and use a different approach
+        tensor_cpu = tensor.cpu()
+
+        # Convert each row to a tuple (hashable) and count occurrences
+        row_tuples = [tuple(row.tolist()) for row in tensor_cpu]
+        from collections import Counter
+
+        counts = Counter(row_tuples)
+
+        # Check if any row appears more than once
+        return any(count > 1 for count in counts.values())
+    else:
+        # Original strategy for other devices
+        _, counts = torch.unique(tensor, dim=0, return_counts=True)
+        return bool(torch.any(counts > 1))
 
 
 def get_device() -> torch.device:
@@ -108,41 +144,71 @@ def sample_unique_indices(
 def random_range_indices(
     x: Float[Tensor, "batch seq"],
     k: int,
-    bounds: tuple[float, float],
-    buffer: tuple[int, int] | None = (5, -5),
+    bounds: Tuple[float, float],
+    buffer: Tuple[int, int] | None = (5, -5),
 ) -> Int[Tensor, "k 2"]:
     """
+    Efficiently select random indices within the specified range, avoiding duplicates within batches.
+
     Args:
-        x:
-            2D array of floats (these will be the values of feature activations or losses for each
-            token in our batch)
-        k:
-            Number of indices to return
-        bounds:
-            The range of values to consider (so we can get quantiles)
-        buffer:
-            Positions to avoid at the start / end of the sequence, i.e. we can include the slice buffer[0]: buffer[1]
+        x: 2D array of floats (feature activations or losses for each token in the batch)
+        k: Number of indices to return
+        bounds: The range of values to consider (for quantiles)
+        buffer: Positions to avoid at the start/end of the sequence
 
     Returns:
-        Same thing as `k_largest_indices`, but the difference is that we're using quantiles rather than top/bottom k.
+        Tensor of shape (k, 2) containing unique [batch, seq] indices within the specified bounds.
     """
     if buffer is None:
         buffer = (0, x.size(1))
 
-    # Limit x, because our indices (bolded words) shouldn't be too close to the left/right of sequence
-    x = x[:, buffer[0] : buffer[1]]
+    # Apply buffer
+    x_buffered = x[:, buffer[0] : buffer[1]]
 
-    # Creat a mask for where x is in range, and get the indices as a tensor of shape (k, 2)
-    mask = (bounds[0] <= x) & (x <= bounds[1])
-    indices = torch.stack(torch.where(mask), dim=-1)
+    # Create mask for values within bounds
+    mask = (bounds[0] <= x_buffered) & (x_buffered <= bounds[1])
 
-    # If we have more indices than we need, randomly select k of them
+    # Count valid indices per batch
+    valid_counts = mask.sum(dim=1)
 
-    if len(indices) > k:
-        indices = indices[sample_unique_indices(len(indices), k)]
+    # Calculate cumulative counts for efficient indexing
+    cumulative_counts = torch.cat(
+        [torch.tensor([0], device=x.device), valid_counts.cumsum(0)]
+    )
 
-    # Adjust indices to account for the buffer
-    return indices + torch.tensor([0, buffer[0]]).to(indices.device)
+    # Total number of valid indices
+    total_valid = cumulative_counts[-1].item()
+
+    if total_valid == 0:
+        return torch.empty((0, 2), dtype=torch.long, device=x.device)
+
+    # Determine how many indices to sample
+    k_sample = min(k, total_valid)
+
+    # Sample random indices
+    sampled_flat_indices = torch.randperm(int(total_valid), device=x.device)[:k_sample]
+
+    # Find which batch each sampled index belongs to
+    batch_indices = (
+        torch.searchsorted(cumulative_counts, sampled_flat_indices, right=True) - 1
+    )
+
+    # Calculate the index within each batch
+    # seq_indices = sampled_flat_indices - cumulative_counts[batch_indices]
+
+    # Convert seq_indices to actual sequence positions
+    actual_seq_indices = torch.arange(mask.size(1), device=x.device)[None, :].expand_as(
+        mask
+    )
+    actual_seq_indices = actual_seq_indices[mask][sampled_flat_indices]
+
+    # Combine batch and sequence indices
+    result = torch.stack([batch_indices, actual_seq_indices], dim=1)
+
+    # Adjust for buffer
+    result[:, 1] += buffer[0]
+
+    return result
 
 
 # TODO - solve the `get_decode_html_safe_fn` issue

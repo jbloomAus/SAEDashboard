@@ -221,6 +221,8 @@ class SaeVisRunner:
                     )
                 )
 
+                # insert check for duplicates
+
                 feature_data_dict[feat].dfa_data = all_consolidated_dfa_results.get(
                     feat, None
                 )

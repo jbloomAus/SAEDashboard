@@ -308,6 +308,8 @@ class NeuronpediaConverter:
         ]
         activation.values = FeatureProcessor.round_list(sequence.feat_acts)
 
+        activation.qualifying_token_index = sequence.qualifying_token_index - 1
+
         return activation
 
     @staticmethod

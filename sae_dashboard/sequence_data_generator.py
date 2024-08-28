@@ -402,6 +402,7 @@ class SequenceDataGenerator:
                         token_ids=token_ids[i].tolist(),
                         feat_acts=[round(f, 4) for f in feat_acts_coloring[i].tolist()],
                         token_logits=feat_logits[token_ids[i]].tolist(),
+                        qualifying_token_index=int(indices_bold[i, 1].item()),
                     )
                     for i in range(
                         group_sizes_cumsum[group_idx], group_sizes_cumsum[group_idx + 1]
