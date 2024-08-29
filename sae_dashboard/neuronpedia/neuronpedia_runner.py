@@ -3,11 +3,12 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Set, Tuple
 
 import numpy as np
 import torch
 import wandb
+import wandb.sdk
 from matplotlib import colors
 from sae_lens.sae import SAE
 from sae_lens.toolkit.pretrained_saes import load_sparsity
@@ -29,6 +30,7 @@ from sae_dashboard.neuronpedia.neuronpedia_converter import NeuronpediaConverter
 from sae_dashboard.neuronpedia.neuronpedia_runner_config import NeuronpediaRunnerConfig
 from sae_dashboard.sae_vis_data import SaeVisConfig
 from sae_dashboard.sae_vis_runner import SaeVisRunner
+from sae_dashboard.utils_fns import has_duplicate_rows
 
 # set TOKENIZERS_PARALLELISM to false to avoid warnings
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -219,24 +221,38 @@ class NeuronpediaRunner:
         outputs_dir.mkdir(parents=True, exist_ok=True)
         return str(outputs_dir)
 
+    def hash_tensor(self, tensor: torch.Tensor) -> Tuple[int, ...]:
+        return tuple(tensor.cpu().numpy().flatten().tolist())
+
     def generate_tokens(
         self,
         activations_store: ActivationsStore,
         n_prompts: int = 4096 * 6,
-    ):
+    ) -> torch.Tensor:
         all_tokens_list = []
+        unique_sequences: Set[Tuple[int, ...]] = set()
         pbar = tqdm(range(n_prompts // activations_store.store_batch_size_prompts))
+
         for _ in pbar:
             batch_tokens = activations_store.get_batch_tokens()
             if self.cfg.shuffle_tokens:
-                batch_tokens = batch_tokens[torch.randperm(batch_tokens.shape[0])][
-                    : batch_tokens.shape[0]
-                ]
-            all_tokens_list.append(batch_tokens)
+                batch_tokens = batch_tokens[torch.randperm(batch_tokens.shape[0])]
 
-        all_tokens = torch.cat(all_tokens_list, dim=0)
+            # Check for duplicates and only add unique sequences
+            for seq in batch_tokens:
+                seq_hash = self.hash_tensor(seq)
+                if seq_hash not in unique_sequences:
+                    unique_sequences.add(seq_hash)
+                    all_tokens_list.append(seq.unsqueeze(0))
+
+            # Early exit if we've collected enough unique sequences
+            if len(all_tokens_list) >= n_prompts:
+                break
+
+        all_tokens = torch.cat(all_tokens_list, dim=0)[:n_prompts]
         if self.cfg.shuffle_tokens:
             all_tokens = all_tokens[torch.randperm(all_tokens.shape[0])]
+
         return all_tokens
 
     def get_alive_features(self) -> list[int]:
@@ -302,6 +318,8 @@ class NeuronpediaRunner:
                 tokens,
                 tokens_file,
             )
+
+        assert not has_duplicate_rows(tokens), "Duplicate rows in tokens"
 
         return tokens
 
@@ -468,7 +486,7 @@ class NeuronpediaRunner:
                     )
 
         if self.cfg.use_wandb:
-            wandb.finish()
+            wandb.sdk.finish()
 
 
 def main():

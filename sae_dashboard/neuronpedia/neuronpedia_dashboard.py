@@ -43,6 +43,7 @@ class NeuronpediaDashboardActivation:
         bin_contains: float = 0,
         tokens: list[str] = [],
         values: list[float] = [],
+        qualifying_token_index: int = 0,
         dfa_values: Optional[List[float]] = None,
         dfa_maxValue: Optional[float] = None,
         dfa_targetIndex: Optional[int] = None,
@@ -52,6 +53,7 @@ class NeuronpediaDashboardActivation:
         self.bin_contains = bin_contains
         self.tokens = tokens
         self.values = values
+        self.qualifying_token_index = qualifying_token_index
         self.dfa_values = dfa_values
         self.dfa_maxValue = dfa_maxValue
         self.dfa_targetIndex = dfa_targetIndex
@@ -83,6 +85,7 @@ class NeuronpediaDashboardActivation:
             "bin_contains": self.bin_contains,
             "tokens": self.tokens,
             "values": self.values,
+            "qualifying_token_index": self.qualifying_token_index,
         }
         if self.dfa_values is not None:
             res["dfa_values"] = self.dfa_values

@@ -31,6 +31,41 @@ T = TypeVar("T")
 # from rich.table import Column
 
 
+def has_duplicate_rows(tensor: torch.Tensor) -> bool:
+    """
+    Check if a 2D tensor has any duplicate rows, with special handling for MPS devices.
+
+    Args:
+        tensor (torch.Tensor): A 2D tensor to check for duplicate rows.
+
+    Returns:
+        bool: True if there are duplicate rows, False otherwise.
+
+    Raises:
+        ValueError: If the input tensor is not 2D.
+    """
+    if tensor.dim() != 2:
+        raise ValueError("Input tensor must be 2D")
+
+    if tensor.device.type == "mps":
+        # Alternative strategy for MPS devices
+        # Convert to CPU and use a different approach
+        tensor_cpu = tensor.cpu()
+
+        # Convert each row to a tuple (hashable) and count occurrences
+        row_tuples = [tuple(row.tolist()) for row in tensor_cpu]
+        from collections import Counter
+
+        counts = Counter(row_tuples)
+
+        # Check if any row appears more than once
+        return any(count > 1 for count in counts.values())
+    else:
+        # Original strategy for other devices
+        _, counts = torch.unique(tensor, dim=0, return_counts=True)
+        return bool(torch.any(counts > 1))
+
+
 def get_device() -> torch.device:
     """
     Helper function to return the correct device (cuda, mps, or cpu).
@@ -124,7 +159,7 @@ def random_range_indices(
             Positions to avoid at the start / end of the sequence, i.e. we can include the slice buffer[0]: buffer[1]
 
     Returns:
-        Same thing as `k_largest_indices`, but the difference is that we're using quantiles rather than top/bottom k.
+        Same thing as k_largest_indices, but the difference is that we're using quantiles rather than top/bottom k.
     """
     if buffer is None:
         buffer = (0, x.size(1))
