@@ -8,6 +8,7 @@ from typing import Dict, Set, Tuple
 import numpy as np
 import torch
 import wandb
+import wandb.sdk
 from matplotlib import colors
 from sae_lens.sae import SAE
 from sae_lens.toolkit.pretrained_saes import load_sparsity
@@ -485,7 +486,7 @@ class NeuronpediaRunner:
                     )
 
         if self.cfg.use_wandb:
-            wandb.finish()
+            wandb.sdk.finish()
 
 
 def main():
