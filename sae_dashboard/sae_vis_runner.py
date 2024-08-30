@@ -201,8 +201,10 @@ class SaeVisRunner:
                 # Move the mask to the same device as feat_acts
                 ignore_tokens_mask = ignore_tokens_mask.to(feat_acts.device)
 
+                # set any masked positions to 0
+                masked_feat_acts = feat_acts * ignore_tokens_mask
+
                 # Apply the mask to feat_acts
-                masked_feat_acts = feat_acts[ignore_tokens_mask]
                 nonzero_feat_acts = masked_feat_acts[masked_feat_acts > 0]
                 frac_nonzero = nonzero_feat_acts.numel() / masked_feat_acts.numel()
 
@@ -225,14 +227,10 @@ class SaeVisRunner:
 
                 # ! Calculate all data for the right-hand visualisations, i.e. the sequences
 
-                # Reshape masked_feat_acts to match the original shape of feat_acts
-                masked_feat_acts_reshaped = torch.zeros_like(feat_acts)
-                masked_feat_acts_reshaped[ignore_tokens_mask] = masked_feat_acts
-
                 # Add this feature's sequence data to the list
                 feature_data_dict[feat].sequence_data = (
                     sequence_data_generator.get_sequences_data(
-                        feat_acts=masked_feat_acts_reshaped,
+                        feat_acts=masked_feat_acts,
                         feat_logits=logits[i],
                         resid_post=torch.tensor([]),  # no longer used
                         feature_resid_dir=feature_resid_dir[i],
