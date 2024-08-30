@@ -322,3 +322,42 @@ def test_simple_neuronpedia_runner_hook_z_sae():
     runner.run()
 
     assert "run_settings.json" in os.listdir(runner.cfg.outputs_dir)
+
+
+# def test_neuronpedia_runner_prefix_suffix_it_model():
+
+#     NP_OUTPUT_FOLDER = "neuronpedia_outputs/test_gemmascope_it_template"
+#     ACT_CACHE_FOLDER = "cached_activations"
+#     SAE_SET = "gemma-scope-9b-it-res-canonical"
+#     SAE_PATH = "layer_9/width_131k/canonical"
+#     NUM_FEATURES_PER_BATCH = 2
+#     NUM_BATCHES = 2
+
+#     # delete output files if present
+#     os.system(f"rm -rf {NP_OUTPUT_FOLDER}")
+#     os.system(f"rm -rf {ACT_CACHE_FOLDER}")
+
+#     # # we make two batches of 2 features each
+#     cfg = NeuronpediaRunnerConfig(
+#         sae_set=SAE_SET,
+#         sae_path=SAE_PATH,
+#         np_set_name="gemma-scope-9b-it-res-canonical",
+#         from_local_sae=False,
+#         outputs_dir=NP_OUTPUT_FOLDER,
+#         sparsity_threshold=1,
+#         n_prompts_total=5000,
+#         n_tokens_in_prompt=128,
+#         n_features_at_a_time=NUM_FEATURES_PER_BATCH,
+#         n_prompts_in_forward_pass=32,
+#         start_batch=0,
+#         end_batch=NUM_BATCHES - 1,
+#         use_wandb=True,
+#         shuffle_tokens=False,
+#         prefix_tokens=[106, 1645, 108],
+#         suffix_tokens=[107, 108],
+#     )
+
+#     runner = NeuronpediaRunner(cfg)
+#     runner.run()
+
+#     assert "run_settings.json" in os.listdir(runner.cfg.outputs_dir)
