@@ -58,7 +58,7 @@ def cfg(request: pytest.FixtureRequest, cache_path: Path) -> SaeVisConfig:
             buffer=None,  # type: ignore
             compute_buffer=True,
             n_quantiles=5,
-            top_acts_group_size=20,
+            top_acts_group_size=30,
             quantile_group_size=5,
         )
     return cfg
