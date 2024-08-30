@@ -41,6 +41,7 @@ class SaeVisConfig:
     device: str = "cpu"
     dtype: str = "float32"
     ignore_tokens: set[int] = field(default_factory=set)
+    ignore_positions: list[int] = field(default_factory=list)
 
     # Vis
     feature_centric_layout: SaeVisLayoutConfig = field(

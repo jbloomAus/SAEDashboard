@@ -182,17 +182,30 @@ class SaeVisRunner:
                 # Get data for feature activations histogram (including the title!)
                 feat_acts = all_feat_acts[..., i]
 
-                # ignore any tokens in self.cfg.ignore_tokens
-                ignore_tokens_mask = ~torch.isin(
-                    tokens,
-                    torch.tensor(
-                        list(self.cfg.ignore_tokens),
-                        dtype=tokens.dtype,
-                        device=tokens.device,
-                    ),
-                ).to(feat_acts.device)
-                nonzero_feat_acts = feat_acts[(feat_acts > 0) & (ignore_tokens_mask)]
-                frac_nonzero = nonzero_feat_acts.numel() / feat_acts.numel()
+                # Create a mask for tokens to ignore based on both ID and position
+                ignore_tokens_mask = torch.ones_like(tokens, dtype=torch.bool)
+                if self.cfg.ignore_tokens:
+                    ignore_tokens_mask &= ~torch.isin(
+                        tokens,
+                        torch.tensor(
+                            list(self.cfg.ignore_tokens),
+                            dtype=tokens.dtype,
+                            device=tokens.device,
+                        ),
+                    )
+                if self.cfg.ignore_positions:
+                    ignore_positions_mask = torch.ones_like(tokens, dtype=torch.bool)
+                    ignore_positions_mask[:, self.cfg.ignore_positions] = False
+                    ignore_tokens_mask &= ignore_positions_mask
+
+                # Move the mask to the same device as feat_acts
+                ignore_tokens_mask = ignore_tokens_mask.to(feat_acts.device)
+
+                # Apply the mask to feat_acts
+                masked_feat_acts = feat_acts[ignore_tokens_mask]
+                nonzero_feat_acts = masked_feat_acts[masked_feat_acts > 0]
+                frac_nonzero = nonzero_feat_acts.numel() / masked_feat_acts.numel()
+
                 feature_data_dict[feat].acts_histogram_data = (
                     ActsHistogramData.from_data(
                         data=nonzero_feat_acts.to(
@@ -212,10 +225,14 @@ class SaeVisRunner:
 
                 # ! Calculate all data for the right-hand visualisations, i.e. the sequences
 
+                # Reshape masked_feat_acts to match the original shape of feat_acts
+                masked_feat_acts_reshaped = torch.zeros_like(feat_acts)
+                masked_feat_acts_reshaped[ignore_tokens_mask] = masked_feat_acts
+
                 # Add this feature's sequence data to the list
                 feature_data_dict[feat].sequence_data = (
                     sequence_data_generator.get_sequences_data(
-                        feat_acts=all_feat_acts[..., i],
+                        feat_acts=masked_feat_acts_reshaped,
                         feat_logits=logits[i],
                         resid_post=torch.tensor([]),  # no longer used
                         feature_resid_dir=feature_resid_dir[i],
