@@ -106,6 +106,9 @@ def test_neuronpedia_json_output():
             assert (
                 "correlated_features_pearson" in feature
             ), f"'correlated_features_pearson' missing in feature in {batch_file}"
+            assert (
+                "decoder_weights_dist" in feature
+            ), f"'decoder_weights_dist' missing in feature in {batch_file}"
 
             # Check activations
             for activation in feature["activations"]:
