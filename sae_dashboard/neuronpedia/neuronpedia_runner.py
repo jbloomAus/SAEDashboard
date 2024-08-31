@@ -422,7 +422,7 @@ class NeuronpediaRunner:
                         )
                     ]
                 )
-                print(f"DFA flag set to {self.cfg.use_dfa}")
+
                 feature_vis_config_gpt = SaeVisConfig(
                     hook_point=self.sae.cfg.hook_name,
                     features=features_to_process,

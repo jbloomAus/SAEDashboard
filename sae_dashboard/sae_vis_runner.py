@@ -2,7 +2,7 @@ import math
 import random
 import re
 from collections import defaultdict
-from typing import Iterable
+from typing import Iterable, List, Union
 
 import einops
 import numpy as np
@@ -18,6 +18,7 @@ from transformer_lens import HookedTransformer
 
 from sae_dashboard.components import (
     ActsHistogramData,
+    DecoderWeightsDistribution,
     FeatureTablesData,
     LogitsHistogramData,
 )
@@ -220,12 +221,13 @@ class SaeVisRunner:
                         feature_resid_dir=feature_resid_dir[i],
                     )
                 )
-
-                # insert check for duplicates
-
-                feature_data_dict[feat].dfa_data = all_consolidated_dfa_results.get(
-                    feat, None
-                )
+                if self.cfg.use_dfa:
+                    feature_data_dict[feat].dfa_data = all_consolidated_dfa_results.get(
+                        feat, None
+                    )
+                    feature_data_dict[feat].decoder_weights_data = (
+                        get_decoder_weights_distribution(encoder, model, feat)[0]
+                    )
 
                 # Update the 2nd progress bar (fwd passes & getting sequence data dominates the runtime of these computations)
                 if progress is not None:
@@ -308,3 +310,30 @@ class SaeVisRunner:
             progress = None
 
         return progress
+
+
+def get_decoder_weights_distribution(
+    encoder: SAE,
+    model: HookedTransformer,
+    feature_idx: Union[int, List[int]],
+) -> List[DecoderWeightsDistribution]:
+    if not isinstance(feature_idx, list):
+        feature_idx = [feature_idx]
+
+    distribs = []
+    for feature in feature_idx:
+        att_blocks = einops.rearrange(
+            encoder.W_dec[feature, :],
+            "(n_head d_head) -> n_head d_head",
+            n_head=model.cfg.n_heads,
+        ).to("cpu")
+        decoder_weights_distribution = (
+            att_blocks.norm(dim=1) / att_blocks.norm(dim=1).sum()
+        )
+        distribs.append(
+            DecoderWeightsDistribution(
+                model.cfg.n_heads, [float(x) for x in decoder_weights_distribution]
+            )
+        )
+
+    return distribs
