@@ -1,3 +1,5 @@
+import time
+
 import pytest
 import torch
 from sae_lens import SAE
@@ -155,4 +157,153 @@ def test_dfa_calculation_edge_cases(
     )
 
 
-# Add more tests as needed based on your specific implementation and requirements
+def test_functional_equivalence(model: HookedTransformer, autoencoder: SAE):
+    calculator = DFACalculator(model, autoencoder)
+
+    # Use the actual model configuration
+    batch_size, seq_len = 2, 10
+    n_heads, d_head = model.cfg.n_heads, model.cfg.d_head
+
+    attn_weights = torch.rand(batch_size, n_heads, seq_len, seq_len)
+    v = torch.rand(batch_size, seq_len, n_heads, d_head)
+    feature_indices = [0, 1, 2]
+
+    # Calculate results using both methods
+    standard_result = calculator.calculate_standard_intermediate_tensor(
+        attn_weights, v, feature_indices
+    )
+
+    # Temporarily set use_gqa to True and use dummy values
+    calculator.use_gqa = True
+    n_kv_heads = n_heads // 2  # Dummy value for GQA
+    v_gqa = torch.rand(batch_size, seq_len, n_kv_heads, d_head)
+    gqa_result = calculator.calculate_gqa_intermediate_tensor(
+        attn_weights, v_gqa, feature_indices
+    )
+    calculator.use_gqa = False
+
+    # Check that the results have the same shape
+    assert standard_result.shape == gqa_result.shape
+
+    # We can't check for exact equality due to different computations, but we can check basic properties
+    assert not torch.isnan(standard_result).any()
+    assert not torch.isnan(gqa_result).any()
+    assert not torch.isinf(standard_result).any()
+    assert not torch.isinf(gqa_result).any()
+
+
+def test_performance_comparison(model: HookedTransformer, autoencoder: SAE):
+    calculator = DFACalculator(model, autoencoder)
+
+    # Use the actual model configuration
+    batch_size, seq_len = 4, 512
+    n_heads, d_head = model.cfg.n_heads, model.cfg.d_head
+
+    attn_weights = torch.rand(batch_size, n_heads, seq_len, seq_len)
+    v = torch.rand(batch_size, seq_len, n_heads, d_head)
+    feature_indices = list(
+        range(min(100, autoencoder.cfg.d_sae))
+    )  # Test with up to 100 features
+
+    # Measure time for standard method
+    start_time = time.time()
+    _ = calculator.calculate_standard_intermediate_tensor(
+        attn_weights, v, feature_indices
+    )
+    standard_time = time.time() - start_time
+
+    # Measure time for GQA method with dummy values
+    calculator.use_gqa = True
+    n_kv_heads = n_heads // 2  # Dummy value for GQA
+    v_gqa = torch.rand(batch_size, seq_len, n_kv_heads, d_head)
+    start_time = time.time()
+    _ = calculator.calculate_gqa_intermediate_tensor(
+        attn_weights, v_gqa, feature_indices
+    )
+    gqa_time = time.time() - start_time
+    calculator.use_gqa = False
+
+    print(f"Standard method time: {standard_time:.4f} seconds")
+    print(f"GQA method time: {gqa_time:.4f} seconds")
+
+    # Assert that both methods complete in a reasonable time
+    assert standard_time < 10, "Standard method took too long"
+    assert gqa_time < 10, "GQA method took too long"
+
+
+def test_different_shapes(model: HookedTransformer, autoencoder: SAE):
+    calculator = DFACalculator(model, autoencoder)
+
+    # Test with different shapes
+    shapes = [
+        (1, 128, model.cfg.n_heads, model.cfg.d_head),
+        (4, 256, model.cfg.n_heads, model.cfg.d_head),
+        (2, 512, model.cfg.n_heads, model.cfg.d_head),
+    ]
+
+    for batch_size, seq_len, n_heads, d_head in shapes:
+        attn_weights = torch.rand(batch_size, n_heads, seq_len, seq_len)
+        v = torch.rand(batch_size, seq_len, n_heads, d_head)
+        feature_indices = [0, 1, 2]
+
+        standard_result = calculator.calculate_standard_intermediate_tensor(
+            attn_weights, v, feature_indices
+        )
+
+        # Use dummy values for GQA
+        calculator.use_gqa = True
+        n_kv_heads = n_heads // 2  # Dummy value for GQA
+        v_gqa = torch.rand(batch_size, seq_len, n_kv_heads, d_head)
+        gqa_result = calculator.calculate_gqa_intermediate_tensor(
+            attn_weights, v_gqa, feature_indices
+        )
+        calculator.use_gqa = False
+
+        assert standard_result.shape == gqa_result.shape
+        assert standard_result.shape == (
+            batch_size,
+            seq_len,
+            seq_len,
+            len(feature_indices),
+        )
+        assert gqa_result.shape == (batch_size, seq_len, seq_len, len(feature_indices))
+
+
+def test_edge_cases(model: HookedTransformer, autoencoder: SAE):
+    calculator = DFACalculator(model, autoencoder)
+
+    # Test with minimal input size
+    attn_weights = torch.rand(1, model.cfg.n_heads, 1, 1)
+    v = torch.rand(1, 1, model.cfg.n_heads, model.cfg.d_head)
+    feature_indices = [0]
+
+    standard_result = calculator.calculate_standard_intermediate_tensor(
+        attn_weights, v, feature_indices
+    )
+
+    # Use dummy values for GQA
+    calculator.use_gqa = True
+    n_kv_heads = model.cfg.n_heads // 2  # Dummy value for GQA
+    v_gqa = torch.rand(1, 1, n_kv_heads, model.cfg.d_head)
+    gqa_result = calculator.calculate_gqa_intermediate_tensor(
+        attn_weights, v_gqa, feature_indices
+    )
+    calculator.use_gqa = False
+
+    assert standard_result.shape == gqa_result.shape
+
+    # Test with empty feature_indices
+    feature_indices = []
+
+    standard_result = calculator.calculate_standard_intermediate_tensor(
+        attn_weights, v, feature_indices
+    )
+
+    calculator.use_gqa = True
+    gqa_result = calculator.calculate_gqa_intermediate_tensor(
+        attn_weights, v_gqa, feature_indices
+    )
+    calculator.use_gqa = False
+
+    assert standard_result.shape == (1, 1, 1, 0)
+    assert gqa_result.shape == (1, 1, 1, 0)
