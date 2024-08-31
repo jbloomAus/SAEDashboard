@@ -29,7 +29,7 @@ class NeuronpediaRunnerConfig:
 
     # quantiles
     n_quantiles: int = 5
-    top_acts_group_size: int = 20
+    top_acts_group_size: int = 30
     quantile_group_size: int = 5
 
     # additional calculations
