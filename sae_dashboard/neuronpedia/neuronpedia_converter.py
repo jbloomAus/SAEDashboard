@@ -305,18 +305,26 @@ class NeuronpediaConverter:
         activation.bin_max = bin_max
         activation.bin_contains = bin_contains
 
-        if feature_data.dfa_data:
-            activation.dfa_values = feature_data.dfa_data[sequence.original_index][
-                "dfaValues"
-            ][1:]
-            # we redo the max calc to skip the bos token
-            activation.dfa_maxValue = max(activation.dfa_values[1:])
-            # activation.dfa_maxValue = feature_data.dfa_data[sequence.original_index][
-            #     "dfaMaxValue"
-            # ]
-            activation.dfa_targetIndex = (
-                feature_data.dfa_data[sequence.original_index]["dfaTargetIndex"] - 1
-            )
+        if feature_data.dfa_data is not None:
+            if sequence.original_index in feature_data.dfa_data:
+                dfa_data = feature_data.dfa_data[sequence.original_index]
+                # Round DFA values to three decimal points
+                activation.dfa_values = [
+                    round(v, 3) for v in dfa_data["dfaValues"][1:]
+                ]  # Skip BOS token
+                activation.dfa_maxValue = round(
+                    max(activation.dfa_values), 3
+                )  # Recalculate max to skip BOS token
+                activation.dfa_targetIndex = (
+                    dfa_data["dfaTargetIndex"] - 1
+                )  # Adjust for BOS token
+            else:
+                print(
+                    f"Warning: DFA data not found for sequence index {sequence.original_index}"
+                )
+                activation.dfa_values = []
+                activation.dfa_maxValue = 0
+                activation.dfa_targetIndex = -1
 
         activation.tokens = [
             FeatureProcessor.to_str_tokens_safe(model, vocab_dict, token_id)
