@@ -22,7 +22,6 @@ class DFACalculator:
         else:
             self.use_gqa = False
 
-
     def calculate(
         self,
         activations: Union[Dict[str, torch.Tensor], ActivationCache],
