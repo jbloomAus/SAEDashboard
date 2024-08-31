@@ -3,6 +3,7 @@ import random
 import re
 from collections import defaultdict
 from typing import Iterable, List, Union
+from typing import Iterable, List, Union
 
 import einops
 import numpy as np
@@ -18,6 +19,7 @@ from transformer_lens import HookedTransformer
 
 from sae_dashboard.components import (
     ActsHistogramData,
+    DecoderWeightsDistribution,
     DecoderWeightsDistribution,
     FeatureTablesData,
     LogitsHistogramData,
@@ -310,6 +312,33 @@ class SaeVisRunner:
             progress = None
 
         return progress
+
+
+def get_decoder_weights_distribution(
+    encoder: SAE,
+    model: HookedTransformer,
+    feature_idx: Union[int, List[int]],
+) -> List[DecoderWeightsDistribution]:
+    if not isinstance(feature_idx, list):
+        feature_idx = [feature_idx]
+
+    distribs = []
+    for feature in feature_idx:
+        att_blocks = einops.rearrange(
+            encoder.W_dec[feature, :],
+            "(n_head d_head) -> n_head d_head",
+            n_head=model.cfg.n_heads,
+        ).to("cpu")
+        decoder_weights_distribution = (
+            att_blocks.norm(dim=1) / att_blocks.norm(dim=1).sum()
+        )
+        distribs.append(
+            DecoderWeightsDistribution(
+                model.cfg.n_heads, [float(x) for x in decoder_weights_distribution]
+            )
+        )
+
+    return distribs
 
 
 def get_decoder_weights_distribution(
