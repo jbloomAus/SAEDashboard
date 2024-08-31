@@ -21,15 +21,7 @@ class DFACalculator:
             self.use_gqa = True
         else:
             self.use_gqa = False
-        if (
-            hasattr(model.cfg, "n_key_value_heads")
-            and model.cfg.n_key_value_heads is not None
-            and model.cfg.n_key_value_heads < model.cfg.n_heads
-        ):
-            print("Using GQA")
-            self.use_gqa = True
-        else:
-            self.use_gqa = False
+
 
     def calculate(
         self,
@@ -55,14 +47,6 @@ class DFACalculator:
         v = activations[f"blocks.{layer_num}.attn.hook_v"]
         attn_weights = activations[f"blocks.{layer_num}.attn.hook_pattern"]
 
-        if self.use_gqa:
-            per_src_pos_dfa = self.calculate_gqa_intermediate_tensor(
-                attn_weights, v, feature_indices
-            )
-        else:
-            per_src_pos_dfa = self.calculate_standard_intermediate_tensor(
-                attn_weights, v, feature_indices
-            )
         if self.use_gqa:
             per_src_pos_dfa = self.calculate_gqa_intermediate_tensor(
                 attn_weights, v, feature_indices
