@@ -79,7 +79,9 @@ def test_add_prefix_suffix_to_tokens(neuronpedia_runner: NeuronpediaRunner) -> N
     )
 
 
-def test_add_prefix_suffix_to_tokens_prepend_bos_false(neuronpedia_runner: NeuronpediaRunner) -> None:
+def test_add_prefix_suffix_to_tokens_prepend_bos_false(
+    neuronpedia_runner: NeuronpediaRunner,
+) -> None:
 
     # modify the config to add a prefix / suffix
     neuronpedia_runner.cfg.prefix_tokens = [101, 102, 103]  # Example prefix tokens
@@ -95,7 +97,7 @@ def test_add_prefix_suffix_to_tokens_prepend_bos_false(neuronpedia_runner: Neuro
     assert torch.allclose(tokens[:, -3:].cpu(), torch.tensor([104, 105, 106]))
 
     # assert the first token position is still the bos
-    assert ~torch.allclose(
+    assert not torch.allclose(
         tokens[:, 0].cpu(),
         torch.tensor(
             [neuronpedia_runner.model.to_single_token("<|endoftext|>")],
