@@ -191,7 +191,7 @@ class NeuronpediaRunner:
             device=self.cfg.activation_store_device or "cpu",
         )
         self.cached_activations_dir = Path(
-            f"./cached_activations/{self.model_id}_{self.cfg.sae_set}_{self.sae.cfg.hook_name}"
+            f"./cached_activations/{self.model_id}_{self.cfg.sae_set}_{self.sae.cfg.hook_name}_{self.sae.cfg.d_sae}"
         )
 
         # override the number of context tokens if we specified one
@@ -212,7 +212,7 @@ class NeuronpediaRunner:
         Returns:
             Path: The path to the created output directory.
         """
-        outputs_subdir = f"{self.model_id}_{self.cfg.sae_set}_{self.sae.cfg.hook_name}"
+        outputs_subdir = f"{self.model_id}_{self.cfg.sae_set}_{self.sae.cfg.hook_name}_{self.sae.cfg.d_sae}"
         outputs_dir = Path(self.cfg.outputs_dir).joinpath(outputs_subdir)
         if outputs_dir.exists() and outputs_dir.is_file():
             raise ValueError(
@@ -254,6 +254,43 @@ class NeuronpediaRunner:
             all_tokens = all_tokens[torch.randperm(all_tokens.shape[0])]
 
         return all_tokens
+
+    def add_prefix_suffix_to_tokens(self, tokens: torch.Tensor) -> torch.Tensor:
+        original_length = tokens.shape[1]
+        bos_tokens = tokens[:, 0]  # might not be if sae.cfg.prepend_bos is False
+        prefix_length = len(self.cfg.prefix_tokens) if self.cfg.prefix_tokens else 0
+        suffix_length = len(self.cfg.suffix_tokens) if self.cfg.suffix_tokens else 0
+
+        # return tokens if no prefix or suffix
+        if self.cfg.prefix_tokens is None and self.cfg.suffix_tokens is None:
+            return tokens
+
+        # Calculate how many tokens to keep from the original
+        keep_length = original_length - prefix_length - suffix_length
+
+        if keep_length <= 0:
+            raise ValueError("Prefix and suffix are too long for the given tokens.")
+
+        # Trim original tokens
+        tokens = tokens[:, : keep_length - self.sae.cfg.prepend_bos]
+
+        if self.cfg.prefix_tokens:
+            prefix = torch.tensor(self.cfg.prefix_tokens).to(tokens.device)
+            prefix_repeated = prefix.unsqueeze(0).repeat(tokens.shape[0], 1)
+            # if sae.cfg.prepend_bos, then add that before the suffix
+            if self.sae.cfg.prepend_bos:
+                bos = bos_tokens.unsqueeze(1)
+                prefix_repeated = torch.cat([bos, prefix_repeated], dim=1)
+            tokens = torch.cat([prefix_repeated, tokens], dim=1)
+
+        if self.cfg.suffix_tokens:
+            suffix = torch.tensor(self.cfg.suffix_tokens).to(tokens.device)
+            suffix_repeated = suffix.unsqueeze(0).repeat(tokens.shape[0], 1)
+            tokens = torch.cat([tokens, suffix_repeated], dim=1)
+
+        # assert length hasn't changed
+        assert tokens.shape[1] == original_length
+        return tokens
 
     def get_alive_features(self) -> list[int]:
         # skip sparsity
@@ -377,6 +414,7 @@ class NeuronpediaRunner:
 
         self.record_skipped_features()
         tokens = self.get_tokens()
+        tokens = self.add_prefix_suffix_to_tokens(tokens)
 
         del self.activations_store
 
@@ -436,6 +474,7 @@ class NeuronpediaRunner:
                     dtype=self.cfg.sae_dtype,
                     cache_dir=self.cached_activations_dir,
                     ignore_tokens={self.model.tokenizer.pad_token_id, self.model.tokenizer.bos_token_id, self.model.tokenizer.eos_token_id},  # type: ignore
+                    ignore_positions=self.cfg.ignore_positions or [],
                     use_dfa=self.cfg.use_dfa,
                 )
 

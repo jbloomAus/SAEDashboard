@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import List, Optional
 
 DEFAULT_SPARSITY_THRESHOLD = -6
 
@@ -47,3 +47,6 @@ class NeuronpediaRunnerConfig:
     use_wandb: bool = False
 
     shuffle_tokens: bool = True
+    prefix_tokens: Optional[List[int]] = None
+    suffix_tokens: Optional[List[int]] = None
+    ignore_positions: Optional[List[int]] = None
