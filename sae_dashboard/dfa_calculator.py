@@ -1,6 +1,7 @@
-from typing import Dict, List, Union
+from typing import Any, Dict, List, Union
 
 import einops
+import numpy as np
 import torch
 from sae_lens import SAE
 from transformer_lens import ActivationCache, HookedTransformer
@@ -28,20 +29,10 @@ class DFACalculator:
         layer_num: int,
         feature_indices: List[int],
         max_value_indices: torch.Tensor,
-    ) -> Dict[int, Dict[int, Dict[str, List[float]]]]:
-        """Calculate DFA values for a given layer and set of feature indices.
-
-        Args:
-            activations: Dictionary of activations for the model.
-            layer_num: Layer number.
-            feature_indices: List of feature indices.
-            max_value_indices: Tensor of max value indices.
-
-        Returns:
-            Dictionary of DFA values for each feature index (and for each prompt).
-        """
+    ) -> Dict[int, Any]:  # type: ignore
+        """Calculate DFA values for a given layer and set of feature indices."""
         if not feature_indices:
-            return {}  # Return an empty dictionary if no indices are provided
+            return {}
 
         v = activations[f"blocks.{layer_num}.attn.hook_v"]
         attn_weights = activations[f"blocks.{layer_num}.attn.hook_pattern"]
@@ -57,21 +48,12 @@ class DFACalculator:
 
         n_prompts, seq_len, _, n_features = per_src_pos_dfa.shape
 
-        # Create indices for advanced indexing
-        prompt_indices = torch.arange(n_prompts, device=per_src_pos_dfa.device)[
-            :, None, None
-        ]
-        src_pos_indices = torch.arange(seq_len, device=per_src_pos_dfa.device)[
-            None, :, None
-        ]
-        feature_indices_tensor = torch.arange(
-            n_features, device=per_src_pos_dfa.device
-        )[None, None, :]
-
-        # Expand max_value_indices to match the shape of other indices
+        # Use advanced indexing to get per_src_dfa
+        prompt_indices = torch.arange(n_prompts)[:, None, None]
+        src_pos_indices = torch.arange(seq_len)[None, :, None]
+        feature_indices_tensor = torch.arange(n_features)[None, None, :]
         max_value_indices_expanded = max_value_indices[:, None, :]
 
-        # Index into per_src_pos_dfa
         per_src_dfa = per_src_pos_dfa[
             prompt_indices,
             max_value_indices_expanded,
@@ -79,20 +61,29 @@ class DFACalculator:
             feature_indices_tensor,
         ]
 
-        # Calculate max values
         max_values, _ = per_src_dfa.max(dim=1)
 
-        results = {feature_idx: {} for feature_idx in feature_indices}
-        for i in range(n_prompts):
-            for j, feature_idx in enumerate(feature_indices):
-                dfa_values = per_src_dfa[i, :, j].tolist()
-                results[feature_idx][i] = {
-                    "dfaValues": dfa_values,
-                    "dfaTargetIndex": max_value_indices[i, j].item(),
-                    "dfaMaxValue": max_values[i, j].item(),
-                }
+        # Create a structured numpy array to hold all the data
+        dtype = np.dtype(
+            [
+                ("dfa_values", np.float32, (seq_len,)),
+                ("dfa_target_index", np.int32),
+                ("dfa_max_value", np.float32),
+            ]
+        )
+        results = np.zeros((len(feature_indices), n_prompts), dtype=dtype)
 
-        return results
+        # Fill the numpy array with data
+        results["dfa_values"] = per_src_dfa.detach().cpu().numpy().transpose(2, 0, 1)
+        results["dfa_target_index"] = max_value_indices.detach().cpu().numpy().T
+        results["dfa_max_value"] = max_values.detach().cpu().numpy().T
+
+        # Create a dictionary mapping feature indices to their respective data
+        final_results = {
+            feat_idx: results[i] for i, feat_idx in enumerate(feature_indices)
+        }
+
+        return final_results
 
     def calculate_standard_intermediate_tensor(
         self,
@@ -145,7 +136,7 @@ class DFACalculator:
         )
 
         # Process in chunks
-        chunk_size = 32  # Adjust this based on your memory constraints
+        chunk_size = 16  # Adjust this based on your memory constraints
         for i in range(0, seq_len, chunk_size):
             chunk_end = min(i + chunk_size, seq_len)
 

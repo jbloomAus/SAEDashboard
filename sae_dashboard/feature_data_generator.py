@@ -113,9 +113,19 @@ class FeatureDataGenerator:
                     max_value_indices,
                 )
                 for feature_idx, feature_data in batch_dfa_results.items():
-                    for prompt_idx, prompt_data in feature_data.items():
+                    for prompt_idx in range(feature_data.shape[0]):
                         global_prompt_idx = total_prompts + prompt_idx
-                        all_dfa_results[feature_idx][global_prompt_idx] = prompt_data
+                        all_dfa_results[feature_idx][global_prompt_idx] = {
+                            "dfaValues": feature_data[prompt_idx][
+                                "dfa_values"
+                            ].tolist(),
+                            "dfaTargetIndex": int(
+                                feature_data[prompt_idx]["dfa_target_index"]
+                            ),
+                            "dfaMaxValue": float(
+                                feature_data[prompt_idx]["dfa_max_value"]
+                            ),
+                        }
 
                 total_prompts += len(minibatch)
 

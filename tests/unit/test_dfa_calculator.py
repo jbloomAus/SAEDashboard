@@ -1,5 +1,6 @@
 import time
 
+import numpy as np
 import pytest
 import torch
 from sae_lens import SAE
@@ -33,14 +34,13 @@ def test_dfa_calculation_shape(
     assert len(results) == len(indices)  # One result per feature
     for feature_idx, feature_results in results.items():
         assert feature_idx in indices
-        assert len(feature_results) == tokens.shape[0]  # One result per prompt
-        for _, prompt_result in feature_results.items():
-            assert "dfaValues" in prompt_result
-            assert "dfaTargetIndex" in prompt_result
-            assert "dfaMaxValue" in prompt_result
-            assert (
-                len(prompt_result["dfaValues"]) == tokens.shape[1]
-            )  # Should match sequence length
+        assert feature_results.shape[0] == tokens.shape[0]  # One result per prompt
+        assert "dfa_values" in feature_results.dtype.names
+        assert "dfa_target_index" in feature_results.dtype.names
+        assert "dfa_max_value" in feature_results.dtype.names
+        assert (
+            feature_results["dfa_values"].shape[1] == tokens.shape[1]
+        )  # Should match sequence length
 
 
 def test_dfa_calculation_values(
@@ -61,10 +61,10 @@ def test_dfa_calculation_values(
 
     assert len(results) == 1
     feature_results = results[0]
-    assert len(feature_results) == tokens.shape[0]
-    for _, prompt_result in feature_results.items():
-        assert not all(v == 0 for v in prompt_result["dfaValues"])
-        assert prompt_result["dfaMaxValue"] == max(prompt_result["dfaValues"])
+    assert feature_results.shape[0] == tokens.shape[0]
+    for prompt_result in feature_results:
+        assert not np.all(prompt_result["dfa_values"] == 0)
+        assert prompt_result["dfa_max_value"] == np.max(prompt_result["dfa_values"])
 
 
 def test_dfa_calculation_multiple_features(
@@ -85,10 +85,10 @@ def test_dfa_calculation_multiple_features(
 
     assert len(results) == len(indices)
     for feature_idx, feature_results in results.items():
-        assert len(feature_results) == tokens.shape[0]
-        for prompt_idx, prompt_result in feature_results.items():
+        assert feature_results.shape[0] == tokens.shape[0]
+        for prompt_idx, prompt_result in enumerate(feature_results):
             assert (
-                prompt_result["dfaTargetIndex"]
+                prompt_result["dfa_target_index"]
                 == max_value_indices[prompt_idx, indices.index(feature_idx)].item()
             )
 
@@ -109,7 +109,9 @@ def test_dfa_calculation_different_layers(
     results_layer0 = calculator.calculate(cache, 0, indices, max_value_indices)
     results_layer1 = calculator.calculate(cache, 1, indices, max_value_indices)
 
-    assert results_layer0 != results_layer1
+    assert not np.array_equal(
+        results_layer0[0]["dfa_values"], results_layer1[0]["dfa_values"]
+    )
 
 
 def test_dfa_calculation_edge_cases(
@@ -150,10 +152,11 @@ def test_dfa_calculation_edge_cases(
     results = calculator.calculate(cache, 0, indices, max_value_indices)
     assert len(results) == len(indices)
     assert all(
-        isinstance(feature_results, dict) for feature_results in results.values()
+        isinstance(feature_results, np.ndarray) for feature_results in results.values()
     )
     assert all(
-        len(feature_results) == tokens.shape[0] for feature_results in results.values()
+        feature_results.shape[0] == tokens.shape[0]
+        for feature_results in results.values()
     )
 
 
