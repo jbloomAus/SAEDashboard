@@ -1,7 +1,7 @@
 import argparse
+import gc
 import json
 import os
-import gc
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Set, Tuple
@@ -423,7 +423,7 @@ class NeuronpediaRunner:
             for feature_batch_count, features_to_process in tqdm(
                 enumerate(feature_idx)
             ):
-                
+
                 if feature_batch_count < self.cfg.start_batch:
                     feature_batch_count = feature_batch_count + 1
                     continue
