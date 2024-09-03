@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import gc
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Set, Tuple
@@ -422,7 +423,7 @@ class NeuronpediaRunner:
             for feature_batch_count, features_to_process in tqdm(
                 enumerate(feature_idx)
             ):
-
+                
                 if feature_batch_count < self.cfg.start_batch:
                     feature_batch_count = feature_batch_count + 1
                     continue
@@ -523,7 +524,11 @@ class NeuronpediaRunner:
                         {"batch": feature_batch_count},
                         step=feature_batch_count,
                     )
-
+                # Clean up after each batch
+                del feature_data
+                gc.collect()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
         if self.cfg.use_wandb:
             wandb.sdk.finish()
 
