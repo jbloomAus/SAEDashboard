@@ -1,4 +1,5 @@
 import argparse
+import gc
 import json
 import os
 from datetime import datetime
@@ -523,7 +524,11 @@ class NeuronpediaRunner:
                         {"batch": feature_batch_count},
                         step=feature_batch_count,
                     )
-
+                # Clean up after each batch
+                del feature_data
+                gc.collect()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
         if self.cfg.use_wandb:
             wandb.sdk.finish()
 
