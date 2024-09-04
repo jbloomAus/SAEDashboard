@@ -19,18 +19,18 @@ import torch
 from dataclasses_json import dataclass_json
 from eindex import eindex
 from jaxtyping import Bool, Float, Int
+from sae_lens import ActivationsStore
 from torch import Tensor
 from tqdm import tqdm
 from transformer_lens import utils
 from transformers import PreTrainedTokenizerBase
-
-from sae_lens import ActivationsStore
 
 T = TypeVar("T")
 
 # from rich.progress import ProgressColumn, Task # MofNCompleteColumn
 # from rich.text import Text
 # from rich.table import Column
+
 
 def get_tokens(
     activations_store: ActivationsStore,
