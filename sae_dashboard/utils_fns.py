@@ -24,11 +24,30 @@ from tqdm import tqdm
 from transformer_lens import utils
 from transformers import PreTrainedTokenizerBase
 
+from sae_lens import ActivationsStore
+
 T = TypeVar("T")
 
 # from rich.progress import ProgressColumn, Task # MofNCompleteColumn
 # from rich.text import Text
 # from rich.table import Column
+
+def get_tokens(
+    activations_store: ActivationsStore,
+    n_prompts: int,
+) -> Tensor:
+    all_tokens_list = []
+    pbar = tqdm(range(n_prompts))
+    for _ in pbar:
+        batch_tokens = activations_store.get_batch_tokens()
+        batch_tokens = batch_tokens[torch.randperm(batch_tokens.shape[0])][
+            : batch_tokens.shape[0]
+        ]
+        all_tokens_list.append(batch_tokens)
+
+    all_tokens = torch.cat(all_tokens_list, dim=0)
+    all_tokens = all_tokens[torch.randperm(all_tokens.shape[0])]
+    return all_tokens
 
 
 def has_duplicate_rows(tensor: torch.Tensor) -> bool:
