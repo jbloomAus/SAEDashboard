@@ -4,18 +4,15 @@ SAEDashboard is a useful tool for visualizing and analyzing Sparse Autoencoders 
 
 ## Overview
 
-This codebase was originally designed to replicate Anthropic's sparse autoencoder visualizations, which you can see [here](https://transformer-circuits.pub/2023/monosemantic-features/vis/a1.html). SAEDashboard provides two main types of visualizations:
+This codebase was originally designed to replicate Anthropic's sparse autoencoder visualizations, which you can see [here](https://transformer-circuits.pub/2023/monosemantic-features/vis/a1.html). SAEDashboard primarily provides visualizations of the following kind:
 
-1. **Feature-centric View**: Analyze individual features, including their activations, logits, and correlations. This view is similar to the one in the Anthropic link. <img src="https://raw.githubusercontent.com/callummcdougall/computational-thread-art/master/example_images/misc/feature-vis-video.gif" width="800">
-
-2. **Prompt-centric View**: Examine how different features respond to specific prompts, allowing you to see which features fire strongest on a given prompt. <img src="https://raw.githubusercontent.com/callummcdougall/computational-thread-art/master/example_images/misc/prompt-vis-video.gif" width="800">
+**Feature-centric View**: Analyze individual features, including their activations, logits, and correlations--similar to what is shown in the Anthropic link. <img src="https://raw.githubusercontent.com/callummcdougall/computational-thread-art/master/example_images/misc/feature-vis-video.gif" width="800">
 
 ## Features
 
 - Customizable dashboards with various plots and data representations for SAE features
 - Support for any SAE in the SAELens library
 - Neuronpedia integration for hosting and comprehensive neuron analysis (note: this requires a Neuronpedia account and is currently only used internally)
-- Flexible configuration options for both visualization types
 - Ability to handle large datasets and models efficiently
 
 ## Installation
