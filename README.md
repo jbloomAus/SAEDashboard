@@ -1,6 +1,6 @@
 # SAEDashboard
 
-SAEDashboard is a powerful tool for visualizing and analyzing Sparse Autoencoders (SAEs) in neural networks. This repository is an adaptation and extension of Callum McDougal's [SAEVis](https://github.com/callummcdougall/sae_vis/tree/main), providing enhanced functionality for feature visualization and analysis as well as feature dashboard creation at scale.
+SAEDashboard is a useful tool for visualizing and analyzing Sparse Autoencoders (SAEs) in neural networks. This repository is an adaptation and extension of Callum McDougal's [SAEVis](https://github.com/callummcdougall/sae_vis/tree/main), providing enhanced functionality for feature visualization and analysis as well as feature dashboard creation at scale.
 
 ## Overview
 
@@ -139,6 +139,19 @@ To cite SAEDashboard in your research, please use the following BibTeX entry:
 ## License
 
 SAE Dashboard is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+## Acknowledgment and Citation
+
+This project is based on the work by Callum McDougall. If you use SAEDashboard in your research, please cite the original SAEVis project as well:
+
+```bibtex
+@misc{sae_vis,
+  title = {{SAE Visualizer}},
+  author = {Callum McDougall},
+  howpublished = {\url{https://github.com/callummcdougall/sae_vis}},
+  year = {2024}
+}
+```
 
 ## Contact
 
