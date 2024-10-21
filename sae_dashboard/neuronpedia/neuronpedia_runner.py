@@ -8,8 +8,6 @@ from typing import Dict, Set, Tuple
 
 import numpy as np
 import torch
-import wandb
-import wandb.sdk
 from matplotlib import colors
 from sae_lens.sae import SAE
 from sae_lens.toolkit.pretrained_saes import load_sparsity
@@ -17,6 +15,8 @@ from sae_lens.training.activations_store import ActivationsStore
 from tqdm import tqdm
 from transformer_lens import HookedTransformer
 
+import wandb
+import wandb.sdk
 from sae_dashboard.components_config import (
     ActsHistogramConfig,
     Column,
@@ -200,6 +200,9 @@ class NeuronpediaRunner:
         if self.cfg.n_tokens_in_prompt is not None:
             self.activations_store.context_size = self.cfg.n_tokens_in_prompt
 
+        # if we have additional info, add it to the outputs subdir
+        self.np_sae_id_suffix = self.cfg.np_sae_id_suffix
+
         if not os.path.exists(cfg.outputs_dir):
             os.makedirs(cfg.outputs_dir)
         self.cfg.outputs_dir = self.create_output_directory()
@@ -214,6 +217,8 @@ class NeuronpediaRunner:
             Path: The path to the created output directory.
         """
         outputs_subdir = f"{self.model_id}_{self.cfg.sae_set}_{self.sae.cfg.hook_name}_{self.sae.cfg.d_sae}"
+        if self.np_sae_id_suffix is not None:
+            outputs_subdir += f"_{self.np_sae_id_suffix}"
         outputs_dir = Path(self.cfg.outputs_dir).joinpath(outputs_subdir)
         if outputs_dir.exists() and outputs_dir.is_file():
             raise ValueError(
@@ -539,6 +544,11 @@ def main():
     parser.add_argument("--sae-path", required=True, help="Path to SAE")
     parser.add_argument("--np-set-name", required=True, help="Neuronpedia set name")
     parser.add_argument(
+        "--np-sae-id-suffix",
+        required=False,
+        help="Additional suffix on Neuronpedia for the SAE ID. Goes after the SAE Set like so: __[np-sae-id-suffix]. Used for additional l0s, training steps, etc.",
+    )
+    parser.add_argument(
         "--dataset-path", required=True, help="HuggingFace dataset path"
     )
     parser.add_argument(
@@ -588,6 +598,7 @@ def main():
         sae_set=args.sae_set,
         sae_path=args.sae_path,
         np_set_name=args.np_set_name,
+        np_sae_id_suffix=args.np_sae_id_suffix,
         from_local_sae=args.from_local_sae,
         huggingface_dataset_path=args.dataset_path,
         sae_dtype=args.sae_dtype,

@@ -1,8 +1,9 @@
 # TEST / EXAMPLE
 neuronpedia-runner \
   --sae-set="gemma-scope-2b-pt-res-canonical" \
-  --sae-path="layer_0/width_65k/canonical" \
-  --np-set-name="gemmascope-res-65k" \
+  --sae-path="layer_0/width_16k/canonical" \
+  --np-set-name="gemmascope-res-16k" \
+  --np-sae-id-suffix="l0_39" \
   --dataset-path="monology/pile-uncopyrighted" \
   --output-dir="neuronpedia_outputs/" \
   --sae_dtype="float32" \

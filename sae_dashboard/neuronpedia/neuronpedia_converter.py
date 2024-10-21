@@ -319,9 +319,9 @@ class NeuronpediaConverter:
                     dfa_data["dfaTargetIndex"] - 1
                 )  # Adjust for BOS token
             else:
-                print(
-                    f"Warning: DFA data not found for sequence index {sequence.original_index}"
-                )
+                # print(
+                #     f"Warning: DFA data not found for sequence index {sequence.original_index}"
+                # )
                 activation.dfa_values = []
                 activation.dfa_maxValue = 0
                 activation.dfa_targetIndex = -1
@@ -347,10 +347,11 @@ class NeuronpediaConverter:
         if np_cfg.model_id is not None and np_cfg.layer is not None:
             batch_data.model_id = np_cfg.model_id
             batch_data.layer = np_cfg.layer
-
         batch_data.sae_set = (
             np_cfg.sae_set if not np_cfg.np_set_name else np_cfg.np_set_name
         )
+        if np_cfg.np_sae_id_suffix is not None:
+            batch_data.sae_id_suffix = np_cfg.np_sae_id_suffix
         batch_data.features = features_outputs
 
         return batch_data

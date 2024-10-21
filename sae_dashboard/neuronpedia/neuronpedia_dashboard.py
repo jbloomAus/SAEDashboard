@@ -298,12 +298,14 @@ class NeuronpediaDashboardBatch:
         model_id: str = "",
         layer: int = 0,
         sae_set: str = "",
+        sae_id_suffix: Optional[str] = None,
         features: list[dict[str, Any]] = [],
         # settings: NeuronpediaDashboardSettings = NeuronpediaDashboardSettings(),
     ):
         self.model_id = model_id
         self.layer = layer
         self.sae_set = sae_set
+        self.sae_id_suffix = sae_id_suffix
         self.features: list[NeuronpediaDashboardFeature] = []
         for feature in features:
             self.features.append(NeuronpediaDashboardFeature(**feature))
@@ -318,6 +320,11 @@ class NeuronpediaDashboardBatch:
             return False
         if self.sae_set != other.sae_set:
             print(f"sae_set does not match: {self.sae_set} and {other.sae_set}")
+            return False
+        if self.sae_id_suffix != other.sae:
+            print(
+                f"sae_id_suffix does not match: {self.sae_id_suffix} and {other.sae_id_suffix}"
+            )
             return False
         for i, feature in enumerate(self.features):
             if feature != other.features[i]:
@@ -335,6 +342,7 @@ class NeuronpediaDashboardBatch:
             "model_id": self.model_id,
             "layer": self.layer,
             "sae_set": self.sae_set,
+            "sae_id_suffix": self.sae_id_suffix,
             "features": [feature.to_dict() for feature in self.features],
             # "settings": self.settings.to_dict(),
         }

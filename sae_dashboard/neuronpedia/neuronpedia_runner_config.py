@@ -10,6 +10,9 @@ class NeuronpediaRunnerConfig:
     sae_set: str
     sae_path: str
     outputs_dir: str
+    np_sae_id_suffix: Optional[str] = (
+        None  # this is the __[np_sae_id_suffix] after the SAE Set
+    )
     np_set_name: Optional[str] = None
     from_local_sae: bool = False
     sparsity_threshold: int = DEFAULT_SPARSITY_THRESHOLD
