@@ -2,6 +2,149 @@
 
 
 
+## v0.6.0 (2024-10-21)
+
+### Feature
+
+* feat: np sae id suffix ([`448b14e`](https://github.com/jbloomAus/SAEDashboard/commit/448b14e0b3aea8ff854a5365f164b6ce5f419f0d))
+
+### Unknown
+
+* Merge pull request #31 from jbloomAus/fix/reduce-mem
+
+fix: added mem cleanup ([`60bd716`](https://github.com/jbloomAus/SAEDashboard/commit/60bd716c7b52bb0eaea0937e097eb77ed78bd33d))
+
+* Fixed formatting ([`f1fab0c`](https://github.com/jbloomAus/SAEDashboard/commit/f1fab0c1fd5be281e2162ab3f54ffc7f4c09a1ce))
+
+* Added cleanup ([`305c46d`](https://github.com/jbloomAus/SAEDashboard/commit/305c46d7a30330bbae6893b83cb6d498c2c975f1))
+
+* Merge pull request #30 from jbloomAus/feat-mask-via-position
+
+feat: prepending/appending tokens for prompt template + feat mask via Position ([`4c60e4c`](https://github.com/jbloomAus/SAEDashboard/commit/4c60e4c834dfb5759ce55dc90d1f88768abfea0d))
+
+* add a few tests ([`96247d5`](https://github.com/jbloomAus/SAEDashboard/commit/96247d5afaf141b8b1279c17fd135240b0d8e869))
+
+* handle prefixes / suffixes and ignored positions ([`bff7fd9`](https://github.com/jbloomAus/SAEDashboard/commit/bff7fd98b09318a1b01d2bc4a06467f8afa156f9))
+
+* simplify masking ([`385b6e1`](https://github.com/jbloomAus/SAEDashboard/commit/385b6e116ecac53ad4df8585f7513c3416707d8b))
+
+* add option for ignoring tokens at particular positions ([`ed3426d`](https://github.com/jbloomAus/SAEDashboard/commit/ed3426de5cb1495c138f770eefa5f941408aa390))
+
+* Merge pull request #29 from jbloomAus/refactor/optimize-dfa-speed
+
+Sped up DFA calculation 60x ([`f992e3c`](https://github.com/jbloomAus/SAEDashboard/commit/f992e3cf116189625b3a92529cf68d6226a1221c))
+
+* Sped up DFA calculation ([`be11cd5`](https://github.com/jbloomAus/SAEDashboard/commit/be11cd5652f0f8a8ae425555666b747b9b99314e))
+
+* Added test to check for decoder weight dist (head dist) ([`f147696`](https://github.com/jbloomAus/SAEDashboard/commit/f1476967af5fee95313264ccaee668605d23b9ad))
+
+* Merge pull request #28 from jbloomAus/feature/np-topk-size-arg
+
+Feature/np topk size arg ([`c5c1365`](https://github.com/jbloomAus/SAEDashboard/commit/c5c136576609991177d3a8924b5bf75a42b66399))
+
+* Merge pull request #25 from jbloomAus/fix/dfa-for-gqa
+
+Fix/dfa for gqa ([`85c345f`](https://github.com/jbloomAus/SAEDashboard/commit/85c345f3ad8069a59be8d495242395c50381ab01))
+
+* Fixed formatting ([`48a67c7`](https://github.com/jbloomAus/SAEDashboard/commit/48a67c79247d05745d355e6a4bf380e9df20474e))
+
+* Removed redundant code from rebase ([`a71fb9d`](https://github.com/jbloomAus/SAEDashboard/commit/a71fb9dde6e880b0f4297277d27696c9d524d052))
+
+* fixed rebase ([`57ee280`](https://github.com/jbloomAus/SAEDashboard/commit/57ee28021efd3678bcd9d12d55e048c14a2f2d47))
+
+* Added tests for DFA for GQA ([`fcfac37`](https://github.com/jbloomAus/SAEDashboard/commit/fcfac37e148461e585f38fddf868ad2a32d908a8))
+
+* Removed duplicate code ([`cc00944`](https://github.com/jbloomAus/SAEDashboard/commit/cc00944855720d5b8139d4267b44c1a230ef5319))
+
+* Fixed formatting ([`50b08b4`](https://github.com/jbloomAus/SAEDashboard/commit/50b08b4eb50734afe0f085274ccaee71ec4017a4))
+
+* Removed debugging statements ([`f7b949b`](https://github.com/jbloomAus/SAEDashboard/commit/f7b949b4af6bc8ca7557bfa5fa2441fbaa0284a0))
+
+* more debug prints x3 ([`53536b0`](https://github.com/jbloomAus/SAEDashboard/commit/53536b03d624783b6b2f95b07b9318139ef0c49e))
+
+* more debug prints x2 ([`6f2c504`](https://github.com/jbloomAus/SAEDashboard/commit/6f2c504a355f9071e766fc7fa3b6aad9890572a8))
+
+* more debug prints ([`e1bef90`](https://github.com/jbloomAus/SAEDashboard/commit/e1bef90d16e8c73c9532b19a08c842757828c7ed))
+
+* temp print statements ([`fd75714`](https://github.com/jbloomAus/SAEDashboard/commit/fd75714ee4631463c1f754d68f83b9ef75eb2285))
+
+* updated ignore ([`c01062f`](https://github.com/jbloomAus/SAEDashboard/commit/c01062faecfaa132d87c56a7ba7add573c6b0f4e))
+
+* Reduced memory load of GQA DFA ([`1ae40e9`](https://github.com/jbloomAus/SAEDashboard/commit/1ae40e9d487af7e8a7b148629588ef87fdd0a6e5))
+
+* DFA will now work for models with grouped query attention ([`c66c90f`](https://github.com/jbloomAus/SAEDashboard/commit/c66c90f5d51961cafd5f13c26a94193ee38f828a))
+
+* Edited default chunk size ([`3c78bdc`](https://github.com/jbloomAus/SAEDashboard/commit/3c78bdcfda12e5873de082a7f1e631a801bd9407))
+
+* Fixed formatting ([`10a36e3`](https://github.com/jbloomAus/SAEDashboard/commit/10a36e3e8da3c7593058d3638ac3b7a32953b1b0))
+
+* Removed debugging statements and added device changes ([`0f51dd9`](https://github.com/jbloomAus/SAEDashboard/commit/0f51dd953cd214244c71e8b9156b90483ceaa2be))
+
+* more debug prints x3 ([`112ef42`](https://github.com/jbloomAus/SAEDashboard/commit/112ef4292b81a64f6168e7527ec583faa9ba20a4))
+
+* more debug prints x2 ([`ef154d6`](https://github.com/jbloomAus/SAEDashboard/commit/ef154d6044bb67d17a2aa225ddf4099ccfc16b55))
+
+* more debug prints ([`1b18d14`](https://github.com/jbloomAus/SAEDashboard/commit/1b18d141dd33e3a99c2abd5a6d195ab5142890d8))
+
+* temp print statements ([`2194d2c`](https://github.com/jbloomAus/SAEDashboard/commit/2194d2cea16856c96ace47ad5ac560f088e769b0))
+
+* Lowered default threshold ([`a49d1e5`](https://github.com/jbloomAus/SAEDashboard/commit/a49d1e5b94c8ef680448f20ded849c7752fb5131))
+
+* updated ignore ([`2067655`](https://github.com/jbloomAus/SAEDashboard/commit/20676554541d29fddd87215a47e8e94891e342ac))
+
+* Reduced memory load of GQA DFA ([`8ec1956`](https://github.com/jbloomAus/SAEDashboard/commit/8ec19566e8898413d349fe3f2e43fbff232ffa62))
+
+* DFA will now work for models with grouped query attention ([`8f3cf55`](https://github.com/jbloomAus/SAEDashboard/commit/8f3cf5532e57abc6e694fb11c5f9c7c2915215c0))
+
+* Added head attr weights functionality for when DFA is use ([`234ea32`](https://github.com/jbloomAus/SAEDashboard/commit/234ea3211ce7dbf84d101c4e8bfe844c3903b16a))
+
+* Added tests for DFA for GQA ([`3b99e36`](https://github.com/jbloomAus/SAEDashboard/commit/3b99e36c74d2c61617cfed107bee3b0eb3b63294))
+
+* Simply updated default value for top K ([`5c855fe`](https://github.com/jbloomAus/SAEDashboard/commit/5c855fec0e58a114a537590d1400eaa42dd3610c))
+
+* Testing variable topk sizes ([`79fe14b`](https://github.com/jbloomAus/SAEDashboard/commit/79fe14b840991bd1f8ada8462aeb65d72821c4aa))
+
+* Merge pull request #27 from jbloomAus/fix/resolve-duplication
+
+Removed sources of duplicate sequences ([`525bffe`](https://github.com/jbloomAus/SAEDashboard/commit/525bffee516a630c4b4f033d3971fad8c6dd5a74))
+
+* Updated location of wandb finish() ([`921da77`](https://github.com/jbloomAus/SAEDashboard/commit/921da77132a560505fa61decf287ca3833f96ec7))
+
+* Added two sets of tests for duplication checks ([`3e95ffd`](https://github.com/jbloomAus/SAEDashboard/commit/3e95ffd1dafd01deb1f7817845ccb6229fb4ae09))
+
+* Restored original random indices function as it seemed ok ([`388719b`](https://github.com/jbloomAus/SAEDashboard/commit/388719bec99b4306e81e0cdb772b9924db210774))
+
+* Removed sources of duplicate sequences ([`853306c`](https://github.com/jbloomAus/SAEDashboard/commit/853306c4e08d9ec95674fdc5c87f807019055d0d))
+
+* Removed duplicate code ([`7093773`](https://github.com/jbloomAus/SAEDashboard/commit/7093773d079cd235aea99273a1365363a5bf8b6d))
+
+* More rebasing stuff ([`59c6cd8`](https://github.com/jbloomAus/SAEDashboard/commit/59c6cd85ead287b2774aa591463d131840c7f270))
+
+* Edited default chunk size ([`7d68f9e`](https://github.com/jbloomAus/SAEDashboard/commit/7d68f9e7131b8c5558e886022625dac267f20aab))
+
+* Fixed formatting ([`4d5f38b`](https://github.com/jbloomAus/SAEDashboard/commit/4d5f38beca15f2ce05c89f83eb3e955c291f9687))
+
+* Removed debugging statements and added device changes ([`76e17c9`](https://github.com/jbloomAus/SAEDashboard/commit/76e17c91a41b5df6047baa5bcfa33d253b029d29))
+
+* more debug prints x3 ([`06535d3`](https://github.com/jbloomAus/SAEDashboard/commit/06535d3df168d92ac79d2f5a14b345c757dfd9de))
+
+* more debug prints x2 ([`26e8297`](https://github.com/jbloomAus/SAEDashboard/commit/26e8297888de066f0097e3b73245eb149bfb327f))
+
+* more debug prints ([`9ded356`](https://github.com/jbloomAus/SAEDashboard/commit/9ded356ea8c3c5dd841bf5a45ea65ae8c67935f5))
+
+* temp print statements ([`024ad57`](https://github.com/jbloomAus/SAEDashboard/commit/024ad578b65b8f3592b42b66dc6a56aeae2a3116))
+
+* Lowered default threshold ([`a3b5977`](https://github.com/jbloomAus/SAEDashboard/commit/a3b5977c0f1bb7a865f7349304a5dd8092f7c2e8))
+
+* updated ignore ([`d5d325a`](https://github.com/jbloomAus/SAEDashboard/commit/d5d325a63b3b26b890c2bab512f2a8473bdc926a))
+
+* Reduced memory load of GQA DFA ([`93eb1a9`](https://github.com/jbloomAus/SAEDashboard/commit/93eb1a9a92320d9f4645b500e22a566135918e3d))
+
+* DFA will now work for models with grouped query attention ([`6594155`](https://github.com/jbloomAus/SAEDashboard/commit/65941559bac03a3e4fb128d5327033e01f19c18d))
+
+* Added head attr weights functionality for when DFA is use ([`9312d90`](https://github.com/jbloomAus/SAEDashboard/commit/9312d901bf17e14400199c86e0284be6c750162a))
+
+
 ## v0.5.1 (2024-08-27)
 
 ### Fix
@@ -11,6 +154,30 @@
 fix: handle multiple tlens devices ([`ed1e967`](https://github.com/jbloomAus/SAEDashboard/commit/ed1e967d44b887f4b99d2257934ca920d5c6a508))
 
 * fix: handle multiple tlens devices ([`ba5368f`](https://github.com/jbloomAus/SAEDashboard/commit/ba5368f9999f08332c153816ba5836f8a1eb9ba1))
+
+### Unknown
+
+* Fixed formatting ([`ed7d3b1`](https://github.com/jbloomAus/SAEDashboard/commit/ed7d3b16a99e3e3a272e73356cc0509b2c59a292))
+
+* Removed debugging statements ([`6489d1c`](https://github.com/jbloomAus/SAEDashboard/commit/6489d1c5b52ed86cb280c237c08e10238e0d0564))
+
+* more debug prints x3 ([`5ba2b8a`](https://github.com/jbloomAus/SAEDashboard/commit/5ba2b8a69f1881b901131976c7d52f142068dbd2))
+
+* more debug prints x2 ([`e124ff9`](https://github.com/jbloomAus/SAEDashboard/commit/e124ff906ec7b37083af4e4721b9e33902146e47))
+
+* more debug prints ([`e2b0c35`](https://github.com/jbloomAus/SAEDashboard/commit/e2b0c35467e5d405abd3cca664dfd1960dbba0eb))
+
+* temp print statements ([`95df55b`](https://github.com/jbloomAus/SAEDashboard/commit/95df55b29f9250f67c5b986216e587c37f72aa9e))
+
+* Lowered default threshold ([`dc1f31a`](https://github.com/jbloomAus/SAEDashboard/commit/dc1f31a55400231e46feb58a8c100f66472baa1b))
+
+* updated ignore ([`eb0d56a`](https://github.com/jbloomAus/SAEDashboard/commit/eb0d56a9f813b9cf82742093fae00bb0ccfdac45))
+
+* Reduced memory load of GQA DFA ([`05867f1`](https://github.com/jbloomAus/SAEDashboard/commit/05867f1d0c8b5f2a5b76f3ea45ab9c87eaae9c09))
+
+* DFA will now work for models with grouped query attention ([`91a5dd1`](https://github.com/jbloomAus/SAEDashboard/commit/91a5dd17a2e567efa7d8a89d228eb7de47ae6766))
+
+* Added head attr weights functionality for when DFA is use ([`03a615f`](https://github.com/jbloomAus/SAEDashboard/commit/03a615f7c70a6f6e634845dab4051874698fac5b))
 
 
 ## v0.5.0 (2024-08-25)
