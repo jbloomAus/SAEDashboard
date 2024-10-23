@@ -2,6 +2,13 @@
 
 
 
+## v0.6.3 (2024-10-23)
+
+### Fix
+
+* fix: update cached_activations directory to include number of prompts ([`0308cb1`](https://github.com/jbloomAus/SAEDashboard/commit/0308cb146bf2eb9cee26f03d3098511d03022485))
+
+
 ## v0.6.2 (2024-10-23)
 
 ### Fix
