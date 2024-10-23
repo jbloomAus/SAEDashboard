@@ -191,13 +191,8 @@ class NeuronpediaRunner:
             n_batches_in_buffer=16,  # these don't matter
             device=self.cfg.activation_store_device or "cpu",
         )
-
-        # TODO: allow for no neuronpedia ID
-        # The reason this is here is because we need to create a unique directory for each run, and we can't currently access the SAELens ID.
-        if self.sae.cfg.neuronpedia_id is None:
-            raise ValueError("SAE does not have a neuronpedia id")
         self.cached_activations_dir = Path(
-            f"./cached_activations/{self.model_id}_{self.sae.cfg.neuronpedia_id.replace('/', '_')}_{self.sae.cfg.hook_name}_{self.sae.cfg.d_sae}"
+            f"./cached_activations/{self.model_id}_{self.cfg.sae_set}_{self.sae.cfg.hook_name}_{self.sae.cfg.d_sae}width_{self.cfg.n_prompts_total}prompts"
         )
 
         # override the number of context tokens if we specified one
