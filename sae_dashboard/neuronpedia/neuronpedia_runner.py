@@ -197,7 +197,7 @@ class NeuronpediaRunner:
         if self.sae.cfg.neuronpedia_id is None:
             raise ValueError("SAE does not have a neuronpedia id")
         self.cached_activations_dir = Path(
-            f"./cached_activations/{self.model_id}_{self.sae.cfg.neuronpedia_id.replace('/', '_')}_{self.sae.cfg.hook_name}_{self.sae.cfg.d_sae}{("_" + self.cfg.np_sae_id_suffix) if self.cfg.np_sae_id_suffix else ''}"
+            f"./cached_activations/{self.model_id}_{self.sae.cfg.neuronpedia_id.replace('/', '_')}_{self.sae.cfg.hook_name}_{self.sae.cfg.d_sae}"
         )
 
         # override the number of context tokens if we specified one
