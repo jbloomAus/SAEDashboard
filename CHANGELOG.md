@@ -2,6 +2,17 @@
 
 
 
+## v0.6.1 (2024-10-22)
+
+### Fix
+
+* fix: update saelens to v4 ([`ef1a330`](https://github.com/jbloomAus/SAEDashboard/commit/ef1a3302d0483eddb247defab5c88816850f7f63))
+
+### Unknown
+
+* Merge branch &#39;main&#39; of https://github.com/jbloomAus/SAEDashboard ([`508a74d`](https://github.com/jbloomAus/SAEDashboard/commit/508a74df8ff279716501e4179c501b5089a8d706))
+
+
 ## v0.6.0 (2024-10-21)
 
 ### Feature
