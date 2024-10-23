@@ -1,17 +1,30 @@
 import os
 import shutil
 
+from sae_lens.toolkit.pretrained_saes_directory import get_pretrained_saes_directory
+
 from sae_dashboard.neuronpedia.neuronpedia_runner import (
     NeuronpediaRunner,
     NeuronpediaRunnerConfig,
 )
 
-# python neuronpedia.py generate --sae-set=res-jb --sae-path=/opt/Gemma-2b-Residual-Stream-SAEs/gemma_2b_blocks.10.hook_resid_post_16384 --dataset-path=Skylion007/openwebtext --log-sparsity=-6 --dtype= --feat-per-batch=128 --n-prompts=24576 --n-context-tokens=128 --n-prompts-in-forward-pass=128 --resume-from-batch=0 --end-at-batch=-1
+N_PROMPTS = 32768
 
-# tuples of sae_path, np_sae_id_suffix
-sae_paths_and_np_sae_id_suffixes: list[tuple[str, str | None]] = [
-    ("layer_1/width_16k/average_l0_56", None),
-    ("layer_34/width_16k/average_l0_47", None),
+HF_DATASET_PATH = "monology/pile-uncopyrighted"
+
+SPARSITY_THRESHOLD = 1
+SAE_DTYPE = "float32"
+MODEL_DTYPE = "bfloat16"
+
+N_TOKENS_IN_PROMPT = 128
+N_PROMPTS_IN_FORWARD_PASS = 256
+NUM_FEATURES_PER_BATCH = 512
+
+list_of_saes: list[tuple[str, str]] = [
+    (
+        "blocks.19.hook_resid_post__trainer_0_step_0",
+        "gemma-2-2b/19-sae_bench-standard-res-4k__trainer_0_step_0",
+    ),
 ]
 
 
@@ -42,31 +55,34 @@ def copy_output_folder(source: str, destination: str):
     print(f"Copied {source_path} to {dest_path}")
 
 
-for sae_path, np_sae_id_suffix in sae_paths_and_np_sae_id_suffixes:
+for saelens_sae_id, saelens_np_id in list_of_saes:
+
+    directory = get_pretrained_saes_directory()
+
+    def find_saelens_release_from_neuronpedia_id(neuronpedia_id: str) -> str:
+        for release, item in directory.items():
+            for _, np_id in item.neuronpedia_id.items():
+                if np_id == neuronpedia_id:
+                    return release
+        raise ValueError(f"Neuronpedia ID {neuronpedia_id} not found")
+
+    SAELENS_RELEASE = find_saelens_release_from_neuronpedia_id(saelens_np_id)
+    print(f"SAELENS_RELEASE: {SAELENS_RELEASE}")
+
+    NP_SET_NAME = saelens_np_id.split("/")[1].split("-", 1)[
+        1
+    ]  # sae_bench-topk-res-16k__trainer_23_step_final
+    if "__" in NP_SET_NAME:
+        NP_SET_NAME, NP_SAE_ID_SUFFIX = NP_SET_NAME.rsplit("__", 1)
+    else:
+        NP_SAE_ID_SUFFIX = None
+
+    print(f"NP_SET_NAME: {NP_SET_NAME}")
+    print(f"NP_SAE_ID_SUFFIX: {NP_SAE_ID_SUFFIX}")
+
     # LOCAL PATHS
     NP_OUTPUT_FOLDER = "neuronpedia_outputs/"
     ACT_CACHE_FOLDER = "cached_activations"
-
-    # NP SET NAME
-    NP_SET_NAME = "gemmascope-mlp-16k-l0_32plus"
-    SAE_SET = "gemma-scope-9b-pt-mlp"
-    SAE_PATH = sae_path
-    NP_SAE_ID_SUFFIX = np_sae_id_suffix
-
-    # DATAEST
-    HF_DATASET_PATH = "monology/pile-uncopyrighted"
-
-    SPARSITY_THRESHOLD = 1
-
-    # IMPORTANT
-    SAE_DTYPE = "float32"
-    MODEL_DTYPE = "bfloat16"
-
-    # PERFORMANCE SETTING
-    N_PROMPTS = 24576
-    N_TOKENS_IN_PROMPT = 128
-    N_PROMPTS_IN_FORWARD_PASS = 256
-    NUM_FEATURES_PER_BATCH = 256
 
     if __name__ == "__main__":
 
@@ -76,8 +92,8 @@ for sae_path, np_sae_id_suffix in sae_paths_and_np_sae_id_suffixes:
 
         # # we make two batches of 2 features each
         cfg = NeuronpediaRunnerConfig(
-            sae_set=SAE_SET,
-            sae_path=sae_path,
+            sae_set=SAELENS_RELEASE,
+            sae_path=saelens_sae_id,
             np_sae_id_suffix=NP_SAE_ID_SUFFIX,
             np_set_name=NP_SET_NAME,
             from_local_sae=False,

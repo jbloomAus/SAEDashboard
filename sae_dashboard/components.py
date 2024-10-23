@@ -164,7 +164,8 @@ class ActsHistogramData(HistogramData):
 
         # Process colors for frequency histogram; it's darker at higher values
         bar_values_normed = [
-            (0.4 * max(self.bar_values) + 0.6 * v) / max(self.bar_values)
+            (0.4 * max(self.bar_values) + 0.6 * v)
+            / max(max(self.bar_values), 1e-6)  # avoid divide by zero
             for v in self.bar_values
         ]
         bar_colors = [bgColorMap(v) for v in bar_values_normed]
