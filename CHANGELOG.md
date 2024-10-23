@@ -2,6 +2,19 @@
 
 
 
+## v0.6.2 (2024-10-23)
+
+### Fix
+
+* fix: lint ([`3fc0e2c`](https://github.com/jbloomAus/SAEDashboard/commit/3fc0e2ccb39ed1d3e31d66ae0aba2b2b367d46aa))
+
+### Unknown
+
+* Merge branch &#39;main&#39; of https://github.com/jbloomAus/SAEDashboard ([`8f74a96`](https://github.com/jbloomAus/SAEDashboard/commit/8f74a969f48a7e0fd8de17cc983acf3886db95ef))
+
+* Fix: divide by zero, cached_activations folder name ([`1792298`](https://github.com/jbloomAus/SAEDashboard/commit/179229805ae6489d86e235240c65d26db64b5cd7))
+
+
 ## v0.6.1 (2024-10-22)
 
 ### Fix
