@@ -7,6 +7,7 @@ import torch
 from jaxtyping import Float, Int
 from sae_lens import SAE
 from sae_lens.config import DTYPE_MAP as DTYPES
+from sae_lens.sae import TopK
 from torch import Tensor, nn
 from tqdm.auto import tqdm
 
@@ -87,11 +88,20 @@ class FeatureDataGenerator:
                 self.encoder.device
             )  # make sure acts are on the correct device
 
-            # Compute feature activations from this
-            with FeatureMaskingContext(self.encoder, feature_indices):
-                feature_acts = self.encoder.encode(primary_acts).to(
+            # For TopK, compute all activations first, then select features
+            if isinstance(self.encoder.activation_fn, TopK):
+                # Get all features' activations
+                all_features_acts = self.encoder.encode(primary_acts)
+                # Then select only the features we're interested in
+                feature_acts = all_features_acts[:, :, feature_indices].to(
                     DTYPES[self.cfg.dtype]
                 )
+            else:
+                # For other activation functions, use the masking context
+                with FeatureMaskingContext(self.encoder, feature_indices):
+                    feature_acts = self.encoder.encode(primary_acts).to(
+                        DTYPES[self.cfg.dtype]
+                    )
 
             self.update_rolling_coefficients(
                 model_acts=primary_acts,
