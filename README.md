@@ -1,73 +1,155 @@
 # SAEDashboard
 
-This code is a detached fork of [SAEVis](https://github.com/callummcdougall/sae_vis/tree/main) and is a work in progress. Please bare with us while we develop it further. 
+SAEDashboard is a useful tool for visualizing and analyzing Sparse Autoencoders (SAEs) in neural networks. This repository is an adaptation and extension of Callum McDougal's [SAEVis](https://github.com/callummcdougall/sae_vis/tree/main), providing enhanced functionality for feature visualization and analysis as well as feature dashboard creation at scale.
 
-# TODO:
+## Overview
 
-- [ ] set up GPU CI server so we can test things like mult-GPU generation.
-- [ ] Profile code with multiple GPU's to improve efficiency.
-- [ ] Work out a way to parallelize feature generation accross jobs so we can get this all moving much faster. 
+This codebase was originally designed to replicate Anthropic's sparse autoencoder visualizations, which you can see [here](https://transformer-circuits.pub/2023/monosemantic-features/vis/a1.html). SAEDashboard primarily provides visualizations of features, including their activations, logits, and correlations--similar to what is shown in the Anthropic link. 
 
-
-# OLD README
-
-This codebase was designed to replicate Anthropic's sparse autoencoder visualisations, which you can see [here](https://transformer-circuits.pub/2023/monosemantic-features/vis/a1.html). The codebase provides 2 different views: a **feature-centric view** (which is like the one in the link, i.e. we look at one particular feature and see things like which tokens fire strongest on that feature) and a **prompt-centric view** (where we look at once particular prompt and see which features fire strongest on that prompt according to a variety of different metrics).
-
-Install with `pip install sae-vis`. Link to PyPI page [here](https://pypi.org/project/sae-vis/).
-
-# Features & Links
-
-**Important note** - this repo was significantly restructured in March 2024 (we'll remove this message at the end of April). The recent changes include:
-
-- The ability to view multiple features on the same page (rather than just one feature at a time)
-- D3-backed visualisations (which can do things like add lines to histograms as you hover over tokens)
-- More freedom to customize exactly what the visualisation looks like (we provide full cutomizability, rather than just being able to change certain parameters)
-
-[Here](https://drive.google.com/drive/folders/1sAF3Yv6NjVSjo4wu2Tmu8kMh8it6vhIb?usp=sharing) is a link to a Google Drive folder containing 3 files:
-
-- [**User Guide**](https://docs.google.com/document/d/1QGjDB3iFJ5Y0GGpTwibUVsvpnzctRSHRLI-0rm6wt_k/edit?usp=drive_link), which covers the basics of how to use the repo (the core essentials haven't changed much from the previous version, but there are significantly more features)
-- [**Dev Guide**](https://docs.google.com/document/d/10ctbiIskkkDc5eztqgADlvTufs7uzx5Wj8FE_y5petk/edit?usp=sharing), which we recommend for anyone who wants to understand how the repo works (and make edits to it)
-- [**Demo**](https://colab.research.google.com/drive/1oqDS35zibmL1IUQrk_OSTxdhcGrSS6yO?usp=drive_link), which is a Colab notebook that gives a few examples
-
-In the demo Colab, we show the two different types of vis which are supported by this library:
-
-1. **Feature-centric vis**, where you look at a single feature and see e.g. which sequences in a large dataset this feature fires strongest on.
-
-<!-- <img src="https://raw.githubusercontent.com/callummcdougall/computational-thread-art/master/example_images/misc/sae-snip-1B.png" width="800"> -->
 <img src="https://raw.githubusercontent.com/callummcdougall/computational-thread-art/master/example_images/misc/feature-vis-video.gif" width="800">
 
-2. **Prompt-centric vis**, where you input a custom prompt and see which features score highest on that prompt, according to a variety of possible metrics.
+## Features
 
-<!-- <img src="https://raw.githubusercontent.com/callummcdougall/computational-thread-art/master/example_images/misc/sae-snip-2.png" width="800"> -->
-<img src="https://raw.githubusercontent.com/callummcdougall/computational-thread-art/master/example_images/misc/prompt-vis-video.gif" width="800">
+- Customizable dashboards with various plots and data representations for SAE features
+- Support for any SAE in the SAELens library
+- Neuronpedia integration for hosting and comprehensive neuron analysis (note: this requires a Neuronpedia account and is currently only used internally)
+- Ability to handle large datasets and models efficiently
 
-# Citing this work
+## Installation
 
-To cite this work, you can use this bibtex citation:
+Install SAEDashboard using pip:
 
+```bash
+pip install sae-dashboard
 ```
-@misc{sae_vis,
-    title  = {{SAE Visualizer}},
-    author = {Callum McDougall},
-    howpublished    = {\url{https://github.com/callummcdougall/sae_vis}},
+
+## Quick Start
+
+Here's a basic example of how to use SAEDashboard with SaeVisRunner:
+
+```python
+from sae_lens import SAE
+from transformer_lens import HookedTransformer
+from sae_dashboard.sae_vis_data import SaeVisConfig
+from sae_dashboard.sae_vis_runner import SaeVisRunner
+
+# Load model and SAE
+model = HookedTransformer.from_pretrained("gpt2-small", device="cuda", dtype="bfloat16")
+sae, _, _ = SAE.from_pretrained(
+    release="gpt2-small-res-jb",
+    sae_id="blocks.6.hook_resid_pre",
+    device="cuda"
+)
+sae.fold_W_dec_norm()
+
+# Configure visualization
+config = SaeVisConfig(
+    hook_point=sae.cfg.hook_name,
+    features=list(range(256)),
+    minibatch_size_features=64,
+    minibatch_size_tokens=256,
+    device="cuda",
+    dtype="bfloat16"
+)
+
+# Generate data
+data = SaeVisRunner(config).run(encoder=sae, model=model, tokens=your_token_dataset)
+
+# Save feature-centric visualization
+from sae_dashboard.data_writing_fns import save_feature_centric_vis
+save_feature_centric_vis(sae_vis_data=data, filename="feature_dashboard.html")
+```
+
+For a more detailed tutorial, check out our [demo notebook](https://colab.research.google.com/drive/1oqDS35zibmL1IUQrk_OSTxdhcGrSS6yO?usp=drive_link).
+
+## Advanced Usage: Neuronpedia Runner
+
+For internal use or advanced analysis, SAEDashboard provides a Neuronpedia runner that generates data compatible with Neuronpedia. Here's a basic example:
+
+```python
+from sae_dashboard.neuronpedia.neuronpedia_runner_config import NeuronpediaRunnerConfig
+from sae_dashboard.neuronpedia.neuronpedia_runner import NeuronpediaRunner
+
+config = NeuronpediaRunnerConfig(
+    sae_set="your_sae_set",
+    sae_path="path/to/sae",
+    np_set_name="your_neuronpedia_set_name",
+    huggingface_dataset_path="dataset/path",
+    n_prompts_total=1000,
+    n_features_at_a_time=64
+)
+
+runner = NeuronpediaRunner(config)
+runner.run()
+```
+
+For more options and detailed configuration, refer to the `NeuronpediaRunnerConfig` class in the code.
+
+## Configuration Options
+
+SAEDashboard offers a wide range of configuration options for both SaeVisRunner and NeuronpediaRunner. Key options include:
+
+- `hook_point`: The layer to analyze in the model
+- `features`: List of feature indices to visualize
+- `minibatch_size_features`: Number of features to process in each batch
+- `minibatch_size_tokens`: Number of tokens to process in each forward pass
+- `device`: Computation device (e.g., "cuda", "cpu")
+- `dtype`: Data type for computations
+- `sparsity_threshold`: Threshold for feature sparsity (Neuronpedia runner)
+- `n_prompts_total`: Total number of prompts to analyze
+- `use_wandb`: Enable logging with Weights & Biases
+
+Refer to `SaeVisConfig` and `NeuronpediaRunnerConfig` for full lists of options.
+
+## Contributing
+
+This project uses [Poetry](https://python-poetry.org/) for dependency management. After cloning the repo, install dependencies with `poetry lock && poetry install`.
+
+We welcome contributions to SAEDashboard! Please follow these steps:
+
+1. Fork the repository
+2. Create a new branch for your feature
+3. Implement your changes
+4. Run tests and checks:
+   - Use `make format` to format your code
+   - Use `make check-ci` to run all checks and tests
+5. Submit a pull request
+
+Ensure your code passes all checks, including:
+- Black and Flake8 for formatting and linting
+- Pyright for type-checking
+- Pytest for tests
+
+## Citing This Work
+
+To cite SAEDashboard in your research, please use the following BibTeX entry:
+
+```bibtex
+@misc{sae_dashboard,
+    title  = {{SAE Dashboard}},
+    author = {Decode Research},
+    howpublished = {\url{https://github.com/jbloomAus/sae-dashboard}},
     year   = {2024}
 }
 ```
 
-# Contributing
+## License
 
-This project is uses [Poetry](https://python-poetry.org/) for dependency management. After cloning the repo, install dependencies with `poetry install`.
+SAE Dashboard is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
-This project uses [Ruff](https://docs.astral.sh/ruff/) for formatting and linting, [Pyright](https://github.com/microsoft/pyright) for type-checking, and [Pytest](https://docs.pytest.org/) for tests. If you submit a PR, make sure that your code passes all checks. You can run all checks with `make check-ci`.
+## Acknowledgment and Citation
 
-# Version history (recording started at `0.2.9`)
+This project is based on the work by Callum McDougall. If you use SAEDashboard in your research, please cite the original SAEVis project as well:
 
-- `0.2.9` - added table for pairwise feature correlations (not just encoder-B correlations)
-- `0.2.10` - fix some anomalous characters
-- `0.2.11` - update PyPI with longer description
-- `0.2.12` - fix height parameter of config, add videos to PyPI description
-- `0.2.13` - add to dependencies, and fix SAELens section
-- `0.2.14` - fix mistake in dependencies
-- `0.2.15` - refactor to support eventual scatterplot-based feature browser, fix `&rsquo;` HTML
-- `0.2.16` - allow disabling buffer in feature generation, fix demo notebook, fix sae-lens compatibility & type checking
-- `0.2.17` - use main branch of `sae-lens`
+```bibtex
+@misc{sae_vis,
+  title = {{SAE Visualizer}},
+  author = {Callum McDougall},
+  howpublished = {\url{https://github.com/callummcdougall/sae_vis}},
+  year = {2024}
+}
+```
+
+## Contact
+
+For questions or support, please [open an issue](https://github.com/your-username/sae-dashboard/issues) on our GitHub repository.
