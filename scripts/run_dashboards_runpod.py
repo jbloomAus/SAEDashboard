@@ -61,7 +61,7 @@ for saelens_sae_id, saelens_np_id in list_of_saes:
 
     def find_saelens_release_from_neuronpedia_id(neuronpedia_id: str) -> str:
         for release, item in directory.items():
-            for _, np_id in item.neuronpedia_id.items():
+            for _, np_id in item.neuronpedia_id.items():  # type: ignore
                 if np_id == neuronpedia_id:
                     return release
         raise ValueError(f"Neuronpedia ID {neuronpedia_id} not found")
