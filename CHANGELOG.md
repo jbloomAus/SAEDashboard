@@ -2,6 +2,27 @@
 
 
 
+## v0.6.4 (2024-10-24)
+
+### Fix
+
+* fix: Merge pull request #33 from jbloomAus/fix/topk-selection-purview
+
+Fix/topk selection purview ([`afccd5a`](https://github.com/jbloomAus/SAEDashboard/commit/afccd5aaa00d00672eb1270b258b69f0e51c046a))
+
+### Unknown
+
+* Update README.md ([`8235a9e`](https://github.com/jbloomAus/SAEDashboard/commit/8235a9e3adaea50b6b9f26f575e25a254d67a135))
+
+* updated formatting/typing ([`fb141ae`](https://github.com/jbloomAus/SAEDashboard/commit/fb141ae991261408d296286bf6777b2ec5f1f319))
+
+* Merge pull request #32 from jbloomAus/docs/readme-update
+
+docs: updated readme ([`b5e5480`](https://github.com/jbloomAus/SAEDashboard/commit/b5e54808ee05fc75e68d74ec319bf49826b45508))
+
+* TopK will now select from all latents regardless of feature batch size ([`c1f0e14`](https://github.com/jbloomAus/SAEDashboard/commit/c1f0e14dda7aa3364bfd78ca2b8c04c95b2d14b3))
+
+
 ## v0.6.3 (2024-10-23)
 
 ### Fix
@@ -40,6 +61,16 @@
 * feat: np sae id suffix ([`448b14e`](https://github.com/jbloomAus/SAEDashboard/commit/448b14e0b3aea8ff854a5365f164b6ce5f419f0d))
 
 ### Unknown
+
+* Update README.md ([`a1546fd`](https://github.com/jbloomAus/SAEDashboard/commit/a1546fdef32745cdc862a5a2dd0478e57e45320d))
+
+* Removed outdated vis type ([`b0676af`](https://github.com/jbloomAus/SAEDashboard/commit/b0676afcca0845b73a54d983eaa9d72b0e9dff05))
+
+* Update README.md ([`9b8446a`](https://github.com/jbloomAus/SAEDashboard/commit/9b8446aa47f287ba80bf0ac4a39f7c77f0492990))
+
+* Updated format ([`90e4a09`](https://github.com/jbloomAus/SAEDashboard/commit/90e4a09eedd7f428b64e58d5ca2fd1cfa658b0da))
+
+* Updated readme ([`f6819a6`](https://github.com/jbloomAus/SAEDashboard/commit/f6819a6da594673cad65c9ccd3a4f67746de796d))
 
 * Merge pull request #31 from jbloomAus/fix/reduce-mem
 
