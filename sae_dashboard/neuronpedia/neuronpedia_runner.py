@@ -25,7 +25,8 @@ from sae_dashboard.components_config import (
     LogitsTableConfig,
     SequencesConfig,
 )
-from sae_dashboard.data_writing_fns import save_feature_centric_vis
+
+# from sae_dashboard.data_writing_fns import save_feature_centric_vis
 from sae_dashboard.layout import SaeVisLayoutConfig
 from sae_dashboard.neuronpedia.neuronpedia_converter import NeuronpediaConverter
 from sae_dashboard.neuronpedia.neuronpedia_runner_config import NeuronpediaRunnerConfig
@@ -490,27 +491,27 @@ class NeuronpediaRunner:
                     tokens=tokens,
                 )
 
-                if feature_batch_count == 0:
-                    html_save_path = (
-                        f"{self.cfg.outputs_dir}/batch-{feature_batch_count}.html"
-                    )
-                    save_feature_centric_vis(
-                        sae_vis_data=feature_data,
-                        filename=html_save_path,
-                        # use only the first 10 features for the dashboard
-                        include_only=features_to_process[
-                            : max(10, len(features_to_process))
-                        ],
-                    )
+                # if feature_batch_count == 0:
+                #     html_save_path = (
+                #         f"{self.cfg.outputs_dir}/batch-{feature_batch_count}.html"
+                #     )
+                #     save_feature_centric_vis(
+                #         sae_vis_data=feature_data,
+                #         filename=html_save_path,
+                #         # use only the first 10 features for the dashboard
+                #         include_only=features_to_process[
+                #             : max(10, len(features_to_process))
+                #         ],
+                #     )
 
-                    if self.cfg.use_wandb:
-                        wandb.log(
-                            data={
-                                "batch": feature_batch_count,
-                                "dashboard": wandb.Html(open(html_save_path)),
-                            },
-                            step=feature_batch_count,
-                        )
+                #     if self.cfg.use_wandb:
+                #         wandb.log(
+                #             data={
+                #                 "batch": feature_batch_count,
+                #                 "dashboard": wandb.Html(open(html_save_path)),
+                #             },
+                #             step=feature_batch_count,
+                #         )
                 self.cfg.model_id = self.model_id
                 self.cfg.layer = self.layer
                 json_object = NeuronpediaConverter.convert_to_np_json(
@@ -619,4 +620,5 @@ def main():
 
 
 if __name__ == "__main__":
+    main()
     main()
