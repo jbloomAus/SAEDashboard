@@ -117,4 +117,4 @@ for saelens_sae_id, saelens_np_id in list_of_saes:
         runner.run()
 
         # Copy the output folder to /workspace/NP_OUTPUT_FOLDER
-        copy_output_folder(NP_OUTPUT_FOLDER, f"/workspace/{NP_OUTPUT_FOLDER}")
+        # copy_output_folder(NP_OUTPUT_FOLDER, f"/workspace/{NP_OUTPUT_FOLDER}")
