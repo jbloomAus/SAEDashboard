@@ -369,7 +369,7 @@ class NeuronpediaRunner:
 
     def get_vocab_dict(self) -> Dict[int, str]:
         # get vocab
-        vocab_dict = self.model.tokenizer.vocab  # type: ignore
+        vocab_dict: dict = self.model.tokenizer.vocab  # type: ignore
         new_vocab_dict = {}
         # Replace substrings in the keys of vocab_dict using HTML_ANOMALIES
         for k, v in vocab_dict.items():
