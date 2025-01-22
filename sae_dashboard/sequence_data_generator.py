@@ -12,6 +12,7 @@ from sae_dashboard.components import (
 )
 from sae_dashboard.components_config import SequencesConfig
 from sae_dashboard.sae_vis_data import SaeVisConfig
+from sae_dashboard.vector_vis_data import VectorVisConfig
 from sae_dashboard.utils_fns import TopK, k_largest_indices, random_range_indices
 
 Arr = np.ndarray
@@ -23,7 +24,7 @@ class SequenceDataGenerator:
 
     def __init__(
         self,
-        cfg: SaeVisConfig,
+        cfg: SaeVisConfig | VectorVisConfig,
         tokens: Int[Tensor, "batch seq"],
         W_U: Float[Tensor, "d_model d_vocab"],
     ):
