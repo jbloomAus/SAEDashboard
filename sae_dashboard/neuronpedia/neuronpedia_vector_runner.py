@@ -5,7 +5,6 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any, Dict, List, Set, Tuple
 
 import numpy as np
@@ -13,8 +12,6 @@ import torch
 import wandb
 import wandb.sdk
 from matplotlib import colors
-from sae_lens.sae import SAE
-from sae_lens.toolkit.pretrained_saes import load_sparsity
 from sae_lens.training.activations_store import ActivationsStore
 from tqdm import tqdm
 from transformer_lens import HookedTransformer
@@ -34,6 +31,7 @@ from sae_dashboard.neuronpedia.neuronpedia_converter import NeuronpediaConverter
 from sae_dashboard.neuronpedia.neuronpedia_runner_config import NeuronpediaVectorRunnerConfig
 from sae_dashboard.vector_vis_runner import VectorVisRunner
 from sae_dashboard.vector_vis_data import VectorVisConfig
+from sae_dashboard.neuronpedia.vector_set import VectorSet
 from sae_dashboard.utils_fns import has_duplicate_rows
 
 # set TOKENIZERS_PARALLELISM to false to avoid warnings
@@ -62,80 +60,10 @@ HTML_ANOMALIES = {
     "ĉ": "\t",
 }
 
-@dataclass
-class VectorSetConfig:
-    # Core vector properties
-    d_in: int
-    d_vectors: int  # Number of vectors (replaces d_sae)
-    vector_names: List[str]  # Names for each vector
-    
-    # Model/hook details
-    model_name: str
-    hook_name: str  # e.g., 'hook_resid_pre'
-    hook_layer: int
-    hook_head_index: int | None
-    prepend_bos: bool
-    
-    # Dataset details (needed for activation store)
-    context_size: int
-    dataset_path: str
-    
-    # Device/dtype settings
-    dtype: str
-    device: str
-    
-    # Optional metadata
-    model_from_pretrained_kwargs: Dict[str, Any] = field(default_factory=dict)
-
-
-class VectorSet:
-    """Class to handle probe vectors, similar to how SAE handles features"""
-    def __init__(
-        self,
-        vectors: torch.Tensor,  # [n_vectors, d_model] 
-        names: List[str],
-        hook_point: str,
-        hook_layer: int,
-        hook_head_index: int | None,
-        prepend_bos: bool,
-        device: str = "cpu",
-        dtype: str = "float32",
-        dataset_path: str = "",
-        context_size: int = 128,
-        model_name: str = "",
-        model_from_pretrained_kwargs: Dict[str, Any] = None,
-    ):
-        self.vectors = vectors.to(device=device)
-        self.names = names
-        self.hook_point = hook_point
-        self.hook_layer = hook_layer
-        self.hook_head_index = hook_head_index
-        self.prepend_bos = prepend_bos
-        
-        self.cfg = VectorSetConfig(
-            d_in=vectors.shape[1],
-            d_vectors=len(vectors),
-            vector_names=names,
-            model_name=model_name,
-            hook_name=hook_point,
-            hook_layer=hook_layer,
-            hook_head_index=hook_head_index,
-            prepend_bos=prepend_bos,
-            context_size=context_size,
-            dataset_path=dataset_path,
-            dtype=dtype,
-            device=device,
-            model_from_pretrained_kwargs=model_from_pretrained_kwargs or {}
-        )
-
-    def encode(self, acts: torch.Tensor) -> torch.Tensor:
-        """Compute dot product between activations and probe vectors"""
-        return torch.einsum('...d,nd->...n', acts, self.vectors)
-
-
 class NeuronpediaVectorRunner:
     def __init__(
         self,
+        vector_set: VectorSet,
         cfg: NeuronpediaVectorRunnerConfig,
     ):
         self.cfg = cfg
@@ -143,7 +71,7 @@ class NeuronpediaVectorRunner:
         self._setup_devices()
 
         # Load vectors and create VectorSet object
-        self.vector_set = self._load_vectors()
+        self.vector_set = vector_set
 
         # Convert vectors to specified dtype if provided
         if self.cfg.vector_dtype != "":
@@ -246,21 +174,6 @@ class NeuronpediaVectorRunner:
         self.cfg.outputs_dir = self.create_output_directory()
 
         self.vocab_dict = self.get_vocab_dict()
-
-    def _load_vectors(self) -> VectorSet:
-        """Load vectors from file and create VectorSet object"""
-        vectors = torch.load(self.cfg.vector_path)
-        names = self.cfg.vector_names or [f"vector_{i}" for i in range(len(vectors))]
-        return VectorSet(
-            vectors=vectors,
-            names=names,
-            hook_point=self.cfg.hook_point,
-            hook_layer=self.cfg.hook_layer,
-            hook_head_index=self.cfg.hook_head_index,
-            prepend_bos=self.cfg.prepend_bos,
-            device=self.cfg.vector_device or DEFAULT_FALLBACK_DEVICE,
-            dtype=self.cfg.vector_dtype,
-        )
     
     def _setup_devices(self):
         """Device setup for vector runner"""
@@ -511,7 +424,7 @@ class NeuronpediaVectorRunner:
 
                 vector_vis_config_gpt = VectorVisConfig(
                     hook_point=self.vector_set.cfg.hook_name,
-                    features=features_to_process,
+                    vector_indices=features_to_process,
                     minibatch_size_features=self.cfg.n_vectors_at_a_time,
                     minibatch_size_tokens=self.cfg.n_prompts_in_forward_pass,
                     quantile_feature_batch_size=self.cfg.quantile_vector_batch_size,

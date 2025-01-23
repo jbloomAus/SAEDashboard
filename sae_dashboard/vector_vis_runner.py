@@ -34,7 +34,7 @@ from sae_dashboard.transformer_lens_wrapper import (
     TransformerLensWrapper,
 )
 from sae_dashboard.sequence_data_generator import SequenceDataGenerator
-from sae_dashboard.neuronpedia.neuronpedia_vector_runner import VectorSet
+from sae_dashboard.neuronpedia.vector_set import VectorSet
 from sae_dashboard.utils_fns import FeatureStatistics
 
 

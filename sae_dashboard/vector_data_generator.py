@@ -11,14 +11,14 @@ from sae_lens.sae import TopK
 from torch import Tensor, nn
 from tqdm.auto import tqdm
 
-from sae_dashboard.dfa_calculator import DFACalculator
+# from sae_dashboard.dfa_calculator import DFACalculator
 from sae_dashboard.vector_vis_data import VectorVisConfig
 from sae_dashboard.transformer_lens_wrapper import (
     TransformerLensWrapper,
     to_resid_direction,
 )
 from sae_dashboard.utils_fns import RollingCorrCoef
-from sae_dashboard.neuronpedia.neuronpedia_vector_runner import VectorSet
+from sae_dashboard.neuronpedia.vector_set import VectorSet
 Arr = np.ndarray
 
 
@@ -63,8 +63,8 @@ class VectorDataGenerator:
         self,
         feature_indices: list[int],
         progress: list[tqdm] | None = None,  # type: ignore
-    ):  # type: ignore
-        # Create lists to store the feature activations & final values of the residual stream
+    ): # type: ignore
+        # Create lists to store the vector activations
         all_feat_acts = []
         all_dfa_results = {feature_idx: {} for feature_idx in feature_indices}
         total_prompts = 0
@@ -73,74 +73,58 @@ class VectorDataGenerator:
         corrcoef_neurons = RollingCorrCoef()
         corrcoef_encoder = RollingCorrCoef(indices=feature_indices, with_self=True)
 
-        # Get encoder & decoder directions
-        feature_out_dir = self.encoder.W_dec[feature_indices]  # [feats d_autoencoder]
-        feature_resid_dir = to_resid_direction(
-            feature_out_dir, self.model
-        )  # [feats d_model]
+        # Get the selected vectors
+        print(f"feature_indices: {feature_indices}")
+        feature_vectors = self.encoder.vectors[feature_indices]  # [n_vectors, d_model]
 
-        # ! Compute & concatenate together all feature activations & post-activation function values
+        
+
+        # if feature_vectors.dim() > 2:
+        #     # Remove any extra dimensions to get shape [n_vectors, d_model]
+        #     feature_vectors = feature_vectors.squeeze()
+
+        # Process each minibatch
         for i, minibatch in enumerate(self.token_minibatches):
-            minibatch.to(self.cfg.device)
+            minibatch = minibatch.to(self.cfg.device)
             model_activation_dict = self.get_model_acts(i, minibatch)
             primary_acts = model_activation_dict[
                 self.model.activation_config.primary_hook_point
-            ].to(
-                self.encoder.device
-            )  # make sure acts are on the correct device
+            ].to(self.encoder.cfg.device)
 
-            # For TopK, compute all activations first, then select features
-            if isinstance(self.encoder.activation_fn, TopK):
-                # Get all features' activations
-                all_features_acts = self.encoder.encode(primary_acts)
-                # Then select only the features we're interested in
-                feature_acts = all_features_acts[:, :, feature_indices].to(
-                    DTYPES[self.cfg.dtype]
-                )
-            else:
-                # For other activation functions, use the masking context
-                with FeatureMaskingContext(self.encoder, feature_indices):
-                    feature_acts = self.encoder.encode(primary_acts).to(
-                        DTYPES[self.cfg.dtype]
-                    )
+            # Simple dot product between activations and selected vectors
+            feature_acts = torch.einsum('...d,nd->...n', primary_acts, feature_vectors)
+            feature_acts = feature_acts.to(DTYPES[self.cfg.dtype])
 
             self.update_rolling_coefficients(
                 model_acts=primary_acts,
-                feature_acts=feature_acts,
+                feature_acts=feature_acts, 
                 corrcoef_neurons=corrcoef_neurons,
                 corrcoef_encoder=corrcoef_encoder,
             )
 
-            # Add these to the lists (we'll eventually concat)
             all_feat_acts.append(feature_acts)
 
-            # Calculate DFA
-            if self.cfg.use_dfa and self.dfa_calculator:
-                max_value_indices = torch.argmax(feature_acts, dim=1)
-                batch_dfa_results = self.dfa_calculator.calculate(
-                    model_activation_dict,
-                    self.model.hook_layer,
-                    feature_indices,
-                    max_value_indices,
-                )
-                for feature_idx, feature_data in batch_dfa_results.items():
-                    for prompt_idx in range(feature_data.shape[0]):
-                        global_prompt_idx = total_prompts + prompt_idx
-                        all_dfa_results[feature_idx][global_prompt_idx] = {
-                            "dfaValues": feature_data[prompt_idx][
-                                "dfa_values"
-                            ].tolist(),
-                            "dfaTargetIndex": int(
-                                feature_data[prompt_idx]["dfa_target_index"]
-                            ),
-                            "dfaMaxValue": float(
-                                feature_data[prompt_idx]["dfa_max_value"]
-                            ),
-                        }
+            # Calculate DFA if enabled
+            # if self.cfg.use_dfa and self.dfa_calculator:
+            #     max_value_indices = torch.argmax(feature_acts, dim=1)
+            #     batch_dfa_results = self.dfa_calculator.calculate(
+            #         model_activation_dict,
+            #         self.model.hook_layer,
+            #         feature_indices,
+            #         max_value_indices,
+            #     )
+            #     for feature_idx, feature_data in batch_dfa_results.items():
+            #         for prompt_idx in range(feature_data.shape[0]):
+            #             global_prompt_idx = total_prompts + prompt_idx
+            #             all_dfa_results[feature_idx][global_prompt_idx] = {
+            #                 "dfaValues": feature_data[prompt_idx]["dfa_values"].tolist(),
+            #                 "dfaTargetIndex": int(feature_data[prompt_idx]["dfa_target_index"]),
+            #                 "dfaMaxValue": float(feature_data[prompt_idx]["dfa_max_value"]),
+            #             }
 
-                total_prompts += len(minibatch)
+            #     total_prompts += len(minibatch)
 
-            # Update the 1st progress bar (fwd passes & getting sequence data dominates the runtime of these computations)
+            # Update progress if provided
             if progress is not None:
                 progress[0].update(1)
 
@@ -148,13 +132,14 @@ class VectorDataGenerator:
 
         return (
             all_feat_acts,
-            torch.tensor([]),  # all_resid_post, no longer used
-            feature_resid_dir,
-            feature_out_dir,
+            torch.tensor([]),  # No residual post-activation values for vectors
+            feature_vectors,   # The vectors themselves serve as the "residual direction"
+            feature_vectors,   # The vectors themselves serve as the "output direction" 
             corrcoef_neurons,
             corrcoef_encoder,
             all_dfa_results,
         )
+
 
     @torch.inference_mode()
     def get_model_acts(
@@ -227,86 +212,3 @@ def load_tensor_dict_torch(filename: Path, device: str) -> Dict[str, torch.Tenso
         filename, map_location=torch.device(device)
     )  # Directly load to GPU
 
-
-class FeatureMaskingContext:
-    def __init__(self, sae: SAE, feature_idxs: List[int]):
-        self.sae = sae
-        self.feature_idxs = feature_idxs
-        self.original_weight = {}
-
-    def __enter__(self):
-
-        ## W_dec
-        self.original_weight["W_dec"] = getattr(self.sae, "W_dec").data.clone()
-        # mask the weight
-        masked_weight = self.sae.W_dec[self.feature_idxs]
-        # set the weight
-        setattr(self.sae, "W_dec", nn.Parameter(masked_weight))
-
-        ## W_enc
-        # clone the weight.
-        self.original_weight["W_enc"] = getattr(self.sae, "W_enc").data.clone()
-        # mask the weight
-        masked_weight = self.sae.W_enc[:, self.feature_idxs]
-        # set the weight
-        setattr(self.sae, "W_enc", nn.Parameter(masked_weight))
-
-        if self.sae.cfg.architecture == "standard":
-
-            ## b_enc
-            self.original_weight["b_enc"] = getattr(self.sae, "b_enc").data.clone()
-            # mask the weight
-            masked_weight = self.sae.b_enc[self.feature_idxs]
-            # set the weight
-            setattr(self.sae, "b_enc", nn.Parameter(masked_weight))
-
-        elif self.sae.cfg.architecture == "jumprelu":
-
-            ## b_enc
-            self.original_weight["b_enc"] = getattr(self.sae, "b_enc").data.clone()
-            # mask the weight
-            masked_weight = self.sae.b_enc[self.feature_idxs]
-            # set the weight
-            setattr(self.sae, "b_enc", nn.Parameter(masked_weight))
-
-            ## threshold
-            self.original_weight["threshold"] = getattr(
-                self.sae, "threshold"
-            ).data.clone()
-            # mask the weight
-            masked_weight = self.sae.threshold[self.feature_idxs]
-            # set the weight
-            setattr(self.sae, "threshold", nn.Parameter(masked_weight))
-
-        elif self.sae.cfg.architecture == "gated":
-
-            ## b_gate
-            self.original_weight["b_gate"] = getattr(self.sae, "b_gate").data.clone()
-            # mask the weight
-            masked_weight = self.sae.b_gate[self.feature_idxs]
-            # set the weight
-            setattr(self.sae, "b_gate", nn.Parameter(masked_weight))
-
-            ## r_mag
-            self.original_weight["r_mag"] = getattr(self.sae, "r_mag").data.clone()
-            # mask the weight
-            masked_weight = self.sae.r_mag[self.feature_idxs]
-            # set the weight
-            setattr(self.sae, "r_mag", nn.Parameter(masked_weight))
-
-            ## b_mag
-            self.original_weight["b_mag"] = getattr(self.sae, "b_mag").data.clone()
-            # mask the weight
-            masked_weight = self.sae.b_mag[self.feature_idxs]
-            # set the weight
-            setattr(self.sae, "b_mag", nn.Parameter(masked_weight))
-        else:
-            raise (ValueError("Invalid architecture"))
-
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):  # type: ignore
-
-        # set everything back to normal
-        for key, value in self.original_weight.items():
-            setattr(self.sae, key, nn.Parameter(value))

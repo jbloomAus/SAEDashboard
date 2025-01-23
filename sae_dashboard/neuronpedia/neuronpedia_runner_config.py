@@ -60,7 +60,6 @@ class NeuronpediaRunnerConfig:
 class NeuronpediaVectorRunnerConfig:
     # Vector loading parameters
     outputs_dir: str  # Where to save outputs
-    vector_path: Path  # Path to saved vectors
     vector_names: Optional[List[str]] = None  # Names for each vector (optional)
 
     # Token generation parameters

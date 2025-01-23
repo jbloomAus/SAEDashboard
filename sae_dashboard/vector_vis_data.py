@@ -8,9 +8,9 @@ from rich import print as rprint
 from rich.table import Table
 from transformer_lens import HookedTransformer
 
-from sae_dashboard.neuronpedia.neuronpedia_vector_runner import VectorSet
-
+from sae_dashboard.neuronpedia.vector_set import VectorSet
 from sae_dashboard.feature_data import FeatureData
+
 from sae_dashboard.layout import SaeVisLayoutConfig
 from sae_dashboard.utils_fns import FeatureStatistics
 
@@ -203,3 +203,5 @@ class VectorVisData:
         )
 
         return self
+    
+
