@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from typing import List, Optional
-from pathlib import Path
 
 DEFAULT_SPARSITY_THRESHOLD = -6
 
@@ -66,7 +65,7 @@ class NeuronpediaVectorRunnerConfig:
     n_prompts_total: int = 24576
     n_tokens_in_prompt: int = 128
     n_prompts_in_forward_pass: int = 32
-    prepend_bos: bool = True # TODO: eventually include this in vector set export
+    prepend_bos: bool = True  # TODO: eventually include this in vector set export
 
     # Batching parameters
     n_vectors_at_a_time: int = 128  # Similar to n_features_at_a_time
@@ -91,10 +90,10 @@ class NeuronpediaVectorRunnerConfig:
     model_device: Optional[str] = None
     vector_device: Optional[str] = None
     model_n_devices: Optional[int] = None
-    
+
     # Dataset parameters
     huggingface_dataset_path: str = ""
-    
+
     # Additional settings
     use_wandb: bool = False
     shuffle_tokens: bool = True

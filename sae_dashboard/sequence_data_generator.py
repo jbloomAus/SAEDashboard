@@ -12,14 +12,14 @@ from sae_dashboard.components import (
 )
 from sae_dashboard.components_config import SequencesConfig
 from sae_dashboard.sae_vis_data import SaeVisConfig
-from sae_dashboard.vector_vis_data import VectorVisConfig
 from sae_dashboard.utils_fns import TopK, k_largest_indices, random_range_indices
+from sae_dashboard.vector_vis_data import VectorVisConfig
 
 Arr = np.ndarray
 
 
 class SequenceDataGenerator:
-    cfg: SaeVisConfig
+    cfg: SaeVisConfig | VectorVisConfig
     seq_cfg: SequencesConfig
 
     def __init__(

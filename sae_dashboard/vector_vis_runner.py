@@ -27,15 +27,15 @@ from sae_dashboard.data_parsing_fns import (
     get_logits_table_data,
 )
 from sae_dashboard.feature_data import FeatureData
-from sae_dashboard.vector_vis_data import VectorVisConfig, VectorVisData
-from sae_dashboard.vector_data_generator import VectorDataGenerator
+from sae_dashboard.neuronpedia.vector_set import VectorSet
+from sae_dashboard.sequence_data_generator import SequenceDataGenerator
 from sae_dashboard.transformer_lens_wrapper import (
     ActivationConfig,
     TransformerLensWrapper,
 )
-from sae_dashboard.sequence_data_generator import SequenceDataGenerator
-from sae_dashboard.neuronpedia.vector_set import VectorSet
 from sae_dashboard.utils_fns import FeatureStatistics
+from sae_dashboard.vector_data_generator import VectorDataGenerator
+from sae_dashboard.vector_vis_data import VectorVisConfig, VectorVisData
 
 
 class VectorDataGeneratorFactory:
@@ -74,7 +74,10 @@ class VectorVisRunner:
 
     @torch.inference_mode()
     def run(
-        self, encoder: VectorSet, model: HookedTransformer, tokens: Int[Tensor, "batch seq"]
+        self,
+        encoder: VectorSet,
+        model: HookedTransformer,
+        tokens: Int[Tensor, "batch seq"],
     ) -> VectorVisData:
         # Apply random seed
         self.set_seeds()
@@ -83,7 +86,9 @@ class VectorVisRunner:
         vector_vis_data = VectorVisData(cfg=self.cfg)
         time_logs = defaultdict(float)
 
-        vector_indices_list = self.handle_vector_indices(self.cfg.vector_indices, encoder)
+        vector_indices_list = self.handle_vector_indices(
+            self.cfg.vector_indices, encoder
+        )
         vector_batches = self.get_vector_batches(vector_indices_list)
         progress = self.get_progress_bar(tokens, vector_batches, vector_indices_list)
 
@@ -112,7 +117,7 @@ class VectorVisRunner:
                 feature_out_dir,
                 corrcoef_neurons,
                 corrcoef_encoder,
-                batch_dfa_results,
+                batch_dfa_results,  # type: ignore
             ) = vector_data_generator.get_feature_data(vector_indices, progress)
 
             # Get the logits of all features (i.e. the directions this feature writes to the logit output)
@@ -282,7 +287,9 @@ class VectorVisRunner:
         # Break up the features into batches
         vector_batches = [
             x.tolist()
-            for x in torch.tensor(vector_indices_list).split(self.cfg.minibatch_size_features)
+            for x in torch.tensor(vector_indices_list).split(
+                self.cfg.minibatch_size_features
+            )
         ]
         return vector_batches
 

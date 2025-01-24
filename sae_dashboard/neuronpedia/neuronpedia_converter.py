@@ -370,8 +370,8 @@ class NeuronpediaConverter:
                 batch_data.layer = np_cfg.layer
             # For vectors, we'll use the vector names if provided, otherwise a default name
             vector_set_name = (
-                f"vector_set_{','.join(np_cfg.vector_names)}" 
-                if np_cfg.vector_names 
+                f"vector_set_{','.join(np_cfg.vector_names)}"
+                if np_cfg.vector_names
                 else "vector_set"
             )
             batch_data.sae_set = vector_set_name

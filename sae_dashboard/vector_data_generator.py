@@ -1,24 +1,21 @@
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict
 
 import einops
 import numpy as np
 import torch
 from jaxtyping import Float, Int
-from sae_lens import SAE
 from sae_lens.config import DTYPE_MAP as DTYPES
-from sae_lens.sae import TopK
-from torch import Tensor, nn
+from torch import Tensor
 from tqdm.auto import tqdm
+
+from sae_dashboard.neuronpedia.vector_set import VectorSet
+from sae_dashboard.transformer_lens_wrapper import TransformerLensWrapper
+from sae_dashboard.utils_fns import RollingCorrCoef
 
 # from sae_dashboard.dfa_calculator import DFACalculator
 from sae_dashboard.vector_vis_data import VectorVisConfig
-from sae_dashboard.transformer_lens_wrapper import (
-    TransformerLensWrapper,
-    to_resid_direction,
-)
-from sae_dashboard.utils_fns import RollingCorrCoef
-from sae_dashboard.neuronpedia.vector_set import VectorSet
+
 Arr = np.ndarray
 
 
@@ -63,11 +60,11 @@ class VectorDataGenerator:
         self,
         feature_indices: list[int],
         progress: list[tqdm] | None = None,  # type: ignore
-    ): # type: ignore
+    ):  # type: ignore
         # Create lists to store the vector activations
         all_feat_acts = []
         all_dfa_results = {feature_idx: {} for feature_idx in feature_indices}
-        total_prompts = 0
+        # total_prompts = 0
 
         # Create objects to store the data for computing rolling stats
         corrcoef_neurons = RollingCorrCoef()
@@ -76,8 +73,6 @@ class VectorDataGenerator:
         # Get the selected vectors
         print(f"feature_indices: {feature_indices}")
         feature_vectors = self.encoder.vectors[feature_indices]  # [n_vectors, d_model]
-
-        
 
         # if feature_vectors.dim() > 2:
         #     # Remove any extra dimensions to get shape [n_vectors, d_model]
@@ -92,12 +87,12 @@ class VectorDataGenerator:
             ].to(self.encoder.cfg.device)
 
             # Simple dot product between activations and selected vectors
-            feature_acts = torch.einsum('...d,nd->...n', primary_acts, feature_vectors)
+            feature_acts = torch.einsum("...d,nd->...n", primary_acts, feature_vectors)
             feature_acts = feature_acts.to(DTYPES[self.cfg.dtype])
 
             self.update_rolling_coefficients(
                 model_acts=primary_acts,
-                feature_acts=feature_acts, 
+                feature_acts=feature_acts,
                 corrcoef_neurons=corrcoef_neurons,
                 corrcoef_encoder=corrcoef_encoder,
             )
@@ -133,13 +128,12 @@ class VectorDataGenerator:
         return (
             all_feat_acts,
             torch.tensor([]),  # No residual post-activation values for vectors
-            feature_vectors,   # The vectors themselves serve as the "residual direction"
-            feature_vectors,   # The vectors themselves serve as the "output direction" 
+            feature_vectors,  # The vectors themselves serve as the "residual direction"
+            feature_vectors,  # The vectors themselves serve as the "output direction"
             corrcoef_neurons,
             corrcoef_encoder,
             all_dfa_results,
         )
-
 
     @torch.inference_mode()
     def get_model_acts(
@@ -211,4 +205,3 @@ def load_tensor_dict_torch(filename: Path, device: str) -> Dict[str, torch.Tenso
     return torch.load(
         filename, map_location=torch.device(device)
     )  # Directly load to GPU
-

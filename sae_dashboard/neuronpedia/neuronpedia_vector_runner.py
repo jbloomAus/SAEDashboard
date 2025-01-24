@@ -1,11 +1,10 @@
 import argparse
-from dataclasses import dataclass, field
 import gc
 import json
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Set, Tuple
+from typing import Dict, Set, Tuple
 
 import numpy as np
 import torch
@@ -28,11 +27,13 @@ from sae_dashboard.components_config import (
 # from sae_dashboard.data_writing_fns import save_feature_centric_vis
 from sae_dashboard.layout import SaeVisLayoutConfig
 from sae_dashboard.neuronpedia.neuronpedia_converter import NeuronpediaConverter
-from sae_dashboard.neuronpedia.neuronpedia_runner_config import NeuronpediaVectorRunnerConfig
-from sae_dashboard.vector_vis_runner import VectorVisRunner
-from sae_dashboard.vector_vis_data import VectorVisConfig
+from sae_dashboard.neuronpedia.neuronpedia_runner_config import (
+    NeuronpediaVectorRunnerConfig,
+)
 from sae_dashboard.neuronpedia.vector_set import VectorSet
 from sae_dashboard.utils_fns import has_duplicate_rows
+from sae_dashboard.vector_vis_data import VectorVisConfig
+from sae_dashboard.vector_vis_runner import VectorVisRunner
 
 # set TOKENIZERS_PARALLELISM to false to avoid warnings
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -60,6 +61,7 @@ HTML_ANOMALIES = {
     "ĉ": "\t",
 }
 
+
 class NeuronpediaVectorRunner:
     def __init__(
         self,
@@ -76,27 +78,32 @@ class NeuronpediaVectorRunner:
         # Convert vectors to specified dtype if provided
         if self.cfg.vector_dtype != "":
             if self.cfg.vector_dtype == "float16":
-                self.vector_set.vectors = self.vector_set.vectors.to(dtype=torch.float16)
+                self.vector_set.vectors = self.vector_set.vectors.to(
+                    dtype=torch.float16
+                )
             elif self.cfg.vector_dtype == "float32":
-                self.vector_set.vectors = self.vector_set.vectors.to(dtype=torch.float32)
+                self.vector_set.vectors = self.vector_set.vectors.to(
+                    dtype=torch.float32
+                )
             elif self.cfg.vector_dtype == "bfloat16":
-                self.vector_set.vectors = self.vector_set.vectors.to(dtype=torch.bfloat16)
+                self.vector_set.vectors = self.vector_set.vectors.to(
+                    dtype=torch.bfloat16
+                )
             else:
                 raise ValueError(
                     f"Unsupported dtype: {self.cfg.vector_dtype}, we support float16, float32, bfloat16"
                 )
 
-
         # If we didn't override dtype, then use float32 as default for vectors
         if self.cfg.vector_dtype == "":
-            print("Using default vector dtype: float32") 
+            print("Using default vector dtype: float32")
             self.cfg.vector_dtype = "float32"
         else:
             print(f"Using specified vector dtype: {self.cfg.vector_dtype}")
 
         if self.cfg.model_dtype == "":
             self.cfg.model_dtype = "float32"
-        
+
         print(f"SAE Device: {self.cfg.vector_device}")
         print(f"Model Device: {self.cfg.model_device}")
         print(f"Model Num Devices: {self.cfg.model_n_devices}")
@@ -151,9 +158,9 @@ class NeuronpediaVectorRunner:
             hook_head_index=self.vector_set.hook_head_index,
             context_size=self.cfg.n_tokens_in_prompt,
             d_in=self.vector_set.cfg.d_in,
-            n_batches_in_buffer=16, # apparently this doesn't matter
+            n_batches_in_buffer=16,  # apparently this doesn't matter
             total_training_tokens=10**9,
-            store_batch_size_prompts=8, # apparently this doesn't matter either
+            store_batch_size_prompts=8,  # apparently this doesn't matter either
             train_batch_size_tokens=4096,
             prepend_bos=True,
             normalize_activations="none",
@@ -174,13 +181,13 @@ class NeuronpediaVectorRunner:
         self.cfg.outputs_dir = self.create_output_directory()
 
         self.vocab_dict = self.get_vocab_dict()
-    
+
     def _setup_devices(self):
         """Device setup for vector runner"""
-        
+
         # Get device defaults. But if we have overrides, then use those.
         device_count = 1
-        
+
         # Set correct device, use multi-GPU if we have it
         if torch.backends.mps.is_available():
             self.cfg.vector_device = self.cfg.vector_device or "mps"
@@ -190,7 +197,9 @@ class NeuronpediaVectorRunner:
         elif torch.cuda.is_available():
             device_count = torch.cuda.device_count()
             if device_count > 1:
-                self.cfg.vector_device = self.cfg.vector_device or f"cuda:{device_count - 1}"
+                self.cfg.vector_device = (
+                    self.cfg.vector_device or f"cuda:{device_count - 1}"
+                )
                 self.cfg.model_n_devices = self.cfg.model_n_devices or (
                     device_count - 1
                 )
@@ -300,7 +309,7 @@ class NeuronpediaVectorRunner:
         # Simplified batching for vectors
         n_vectors = self.vector_set.cfg.d_vectors
         vector_indices = list(range(n_vectors))
-        
+
         # Divide into batches
         n_subarrays = np.ceil(n_vectors / self.cfg.n_vectors_at_a_time).astype(int)
         batches = np.array_split(vector_indices, n_subarrays)
@@ -473,45 +482,60 @@ class NeuronpediaVectorRunner:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run Neuronpedia feature generation")
-    parser.add_argument("--sae-set", required=True, help="SAE set name")
-    parser.add_argument("--sae-path", required=True, help="Path to SAE")
-    parser.add_argument("--np-set-name", required=True, help="Neuronpedia set name")
-    parser.add_argument(
-        "--np-sae-id-suffix",
-        required=False,
-        help="Additional suffix on Neuronpedia for the SAE ID. Goes after the SAE Set like so: __[np-sae-id-suffix]. Used for additional l0s, training steps, etc.",
+    parser = argparse.ArgumentParser(
+        description="Run Neuronpedia vector feature generation"
     )
+    # Required vector loading parameters
+    parser.add_argument("--output-dir", required=True, help="Output directory")
+    parser.add_argument(
+        "--vector-names", nargs="+", help="Optional names for each vector"
+    )
+
+    # Dataset parameters
     parser.add_argument(
         "--dataset-path", required=True, help="HuggingFace dataset path"
     )
+
+    # Vector set parameters
     parser.add_argument(
-        "--sae_dtype", default="float32", help="Data type for sae computations"
+        "--vector-set-path", required=True, help="Path to the vector set JSON file"
+    )
+
+    # Token generation parameters
+    parser.add_argument(
+        "--n-prompts", type=int, default=24576, help="Total number of prompts"
     )
     parser.add_argument(
-        "--model_dtype", default="float32", help="Data type for model computations"
-    )
-    parser.add_argument(
-        "--output-dir", default="neuronpedia_outputs/", help="Output directory"
-    )
-    parser.add_argument(
-        "--sparsity-threshold", type=int, default=1, help="Sparsity threshold"
-    )
-    parser.add_argument("--n-prompts", type=int, default=128, help="Number of prompts")
-    parser.add_argument(
-        "--n-tokens-in-prompt", type=int, default=128, help="Number of tokens in prompt"
+        "--n-tokens-in-prompt",
+        type=int,
+        default=128,
+        help="Number of tokens in each prompt",
     )
     parser.add_argument(
         "--n-prompts-in-forward-pass",
         type=int,
-        default=128,
-        help="Number of prompts in forward pass",
+        default=32,
+        help="Number of prompts to process in each forward pass",
     )
     parser.add_argument(
-        "--n-features-per-batch",
+        "--no-prepend-bos",
+        action="store_false",
+        dest="prepend_bos",
+        help="Don't prepend BOS token to sequences",
+    )
+
+    # Batching parameters
+    parser.add_argument(
+        "--n-vectors-at-a-time",
         type=int,
-        default=2,
-        help="Number of features per batch",
+        default=128,
+        help="Number of vectors to process at once",
+    )
+    parser.add_argument(
+        "--quantile-vector-batch-size",
+        type=int,
+        default=64,
+        help="Batch size for quantile calculations",
     )
     parser.add_argument(
         "--start-batch", type=int, default=0, help="Starting batch number"
@@ -519,36 +543,93 @@ def main():
     parser.add_argument(
         "--end-batch", type=int, default=None, help="Ending batch number"
     )
+
+    # Device and dtype settings
+    parser.add_argument(
+        "--model-dtype", default="", help="Data type for model computations"
+    )
+    parser.add_argument(
+        "--vector-dtype", default="", help="Data type for vector computations"
+    )
+    parser.add_argument("--activation-store-device", help="Device for activation store")
+    parser.add_argument("--model-device", help="Device for model")
+    parser.add_argument("--vector-device", help="Device for vector operations")
+    parser.add_argument(
+        "--model-n-devices", type=int, help="Number of devices for model"
+    )
+
+    # Quantile parameters
+    parser.add_argument(
+        "--n-quantiles", type=int, default=5, help="Number of quantiles"
+    )
+    parser.add_argument(
+        "--top-acts-group-size",
+        type=int,
+        default=30,
+        help="Group size for top activations",
+    )
+    parser.add_argument(
+        "--quantile-group-size", type=int, default=5, help="Group size for quantiles"
+    )
+
+    # Additional settings
+    parser.add_argument("--use-dfa", action="store_true", help="Use DFA calculations")
     parser.add_argument(
         "--use-wandb", action="store_true", help="Use Weights & Biases for logging"
     )
     parser.add_argument(
-        "--from-local-sae", action="store_true", help="Load SAE from local path"
+        "--no-shuffle-tokens",
+        action="store_false",
+        dest="shuffle_tokens",
+        help="Don't shuffle tokens",
+    )
+    parser.add_argument(
+        "--prefix-tokens", type=int, nargs="+", help="Tokens to prefix to each sequence"
+    )
+    parser.add_argument(
+        "--suffix-tokens", type=int, nargs="+", help="Tokens to append to each sequence"
+    )
+    parser.add_argument(
+        "--ignore-positions",
+        type=int,
+        nargs="+",
+        help="Positions to ignore in sequences",
     )
 
     args = parser.parse_args()
 
     cfg = NeuronpediaVectorRunnerConfig(
-        sae_set=args.sae_set,
-        sae_path=args.sae_path,
-        np_set_name=args.np_set_name,
-        np_sae_id_suffix=args.np_sae_id_suffix,
-        from_local_sae=args.from_local_sae,
-        huggingface_dataset_path=args.dataset_path,
-        sae_dtype=args.sae_dtype,
-        model_dtype=args.model_dtype,
         outputs_dir=args.output_dir,
-        sparsity_threshold=args.sparsity_threshold,
+        vector_names=args.vector_names,
         n_prompts_total=args.n_prompts,
         n_tokens_in_prompt=args.n_tokens_in_prompt,
         n_prompts_in_forward_pass=args.n_prompts_in_forward_pass,
-        n_features_at_a_time=args.n_features_per_batch,
+        prepend_bos=args.prepend_bos,
+        n_vectors_at_a_time=args.n_vectors_at_a_time,
+        quantile_vector_batch_size=args.quantile_vector_batch_size,
         start_batch=args.start_batch,
         end_batch=args.end_batch,
+        use_dfa=args.use_dfa,
+        n_quantiles=args.n_quantiles,
+        top_acts_group_size=args.top_acts_group_size,
+        quantile_group_size=args.quantile_group_size,
+        model_dtype=args.model_dtype,
+        vector_dtype=args.vector_dtype,
+        activation_store_device=args.activation_store_device,
+        model_device=args.model_device,
+        vector_device=args.vector_device,
+        model_n_devices=args.model_n_devices,
+        huggingface_dataset_path=args.dataset_path,
         use_wandb=args.use_wandb,
+        shuffle_tokens=args.shuffle_tokens,
+        prefix_tokens=args.prefix_tokens,
+        suffix_tokens=args.suffix_tokens,
+        ignore_positions=args.ignore_positions,
     )
 
-    runner = NeuronpediaVectorRunner(cfg)
+    # Note: You'll need to pass a VectorSet instance here
+    vector_set = VectorSet.load(args.vector_set_path)
+    runner = NeuronpediaVectorRunner(vector_set=vector_set, cfg=cfg)
     runner.run()
 
 
