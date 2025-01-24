@@ -73,14 +73,16 @@ class VectorSet:
         )
 
     @classmethod
-    def from_json(cls, 
-                json_path: str | Path, 
-                d_model: int,
-                hook_point: str,
-                hook_layer: int,
-                model_name: str,
-                names: List[str] | None = None,
-                **kwargs) -> "VectorSet":
+    def from_json(
+        cls, 
+        json_path: str | Path, 
+        d_model: int,
+        hook_point: str,
+        hook_layer: int,
+        model_name: str,
+        names: List[str] | None = None,
+        **kwargs
+    ) -> "VectorSet":
         """Load vectors from a JSON file where they're stored as 1D arrays
         
         Args:
