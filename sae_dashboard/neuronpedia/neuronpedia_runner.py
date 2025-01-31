@@ -16,6 +16,7 @@ from sae_lens.toolkit.pretrained_saes import load_sparsity
 from sae_lens.training.activations_store import ActivationsStore
 from tqdm import tqdm
 from transformer_lens import HookedTransformer
+from transformers import AutoModelForCausalLM
 
 from sae_dashboard.components_config import (
     ActsHistogramConfig,
@@ -175,10 +176,19 @@ class NeuronpediaRunner:
         # Initialize Model
         self.model_id = self.sae.cfg.model_name
         self.layer = self.sae.cfg.hook_layer
+        # If custom HF model path is provided, load it first
+        hf_model = None
+        if self.cfg.hf_model_path:
+            print(f"Loading custom HF model from: {self.cfg.hf_model_path}")
+            hf_model = AutoModelForCausalLM.from_pretrained(
+                self.cfg.hf_model_path,
+            )
+
         self.model = HookedTransformer.from_pretrained(
             model_name=self.model_id,
             device=self.cfg.model_device,
             n_devices=self.cfg.model_n_devices or 1,
+            hf_model=hf_model,  # Pass the custom model if provided
             **sae_from_pretrained_kwargs,
             dtype=self.cfg.model_dtype,
         )
@@ -592,6 +602,12 @@ def main():
     parser.add_argument(
         "--from-local-sae", action="store_true", help="Load SAE from local path"
     )
+    parser.add_argument(
+        "--hf-model-path",
+        type=str,
+        default=None,
+        help="Optional: Path to custom HuggingFace model to use instead of default weights",
+    )
 
     args = parser.parse_args()
 
@@ -613,6 +629,7 @@ def main():
         start_batch=args.start_batch,
         end_batch=args.end_batch,
         use_wandb=args.use_wandb,
+        hf_model_path=args.hf_model_path,
     )
 
     runner = NeuronpediaRunner(cfg)
