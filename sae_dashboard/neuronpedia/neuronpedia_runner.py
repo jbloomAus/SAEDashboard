@@ -382,7 +382,7 @@ class NeuronpediaRunner:
         vocab_dict = self.model.tokenizer.vocab  # type: ignore
         new_vocab_dict = {}
         # Replace substrings in the keys of vocab_dict using HTML_ANOMALIES
-        for k, v in vocab_dict.items():
+        for k, v in vocab_dict.items():  # type: ignore
             modified_key = k
             for anomaly in HTML_ANOMALIES:
                 modified_key = modified_key.replace(anomaly, HTML_ANOMALIES[anomaly])
