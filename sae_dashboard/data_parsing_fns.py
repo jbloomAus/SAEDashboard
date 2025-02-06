@@ -389,10 +389,10 @@ def get_prompt_data(
 
     # ! Define hook functions to cache all the info required for feature ablation, then run those hook fns
     resid_post, act_post = model_wrapped(tokens, return_logits=False)
-    resid_post: Tensor = resid_post.squeeze(0)
-    feat_acts = encoder.get_feature_acts_subset(act_post, feature_idx).squeeze(
+    resid_post: Tensor = resid_post.squeeze(0)  # type: ignore
+    feat_acts = encoder.get_feature_acts_subset(act_post, feature_idx).squeeze(  # type: ignore
         0
-    )  # [seq feats]
+    )  # [seq feats]  # type: ignore
 
     # ! Use the data we've collected to make the scores_dict and update the sae_vis_data
     scores_dict = parse_prompt_data(

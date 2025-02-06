@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 import numpy as np
 from transformer_lens import HookedTransformer
@@ -10,8 +10,12 @@ from sae_dashboard.neuronpedia.neuronpedia_dashboard import (
     NeuronpediaDashboardBatch,
     NeuronpediaDashboardFeature,
 )
-from sae_dashboard.neuronpedia.neuronpedia_runner_config import NeuronpediaRunnerConfig
+from sae_dashboard.neuronpedia.neuronpedia_runner_config import (
+    NeuronpediaRunnerConfig,
+    NeuronpediaVectorRunnerConfig,
+)
 from sae_dashboard.sae_vis_data import SaeVisData
+from sae_dashboard.vector_vis_data import VectorVisData
 
 
 class NpEncoder(json.JSONEncoder):
@@ -74,8 +78,8 @@ class NeuronpediaConverter:
     @staticmethod
     def convert_to_np_json(
         model: HookedTransformer,
-        sae_data: SaeVisData,
-        np_cfg: NeuronpediaRunnerConfig,
+        vis_data: Union[SaeVisData, VectorVisData],
+        np_cfg: Union[NeuronpediaRunnerConfig, NeuronpediaVectorRunnerConfig],
         vocab_dict: Dict[int, str],
     ) -> str:
         """
@@ -89,8 +93,13 @@ class NeuronpediaConverter:
         Returns:
             str: JSON string representation of the feature data.
         """
+        if isinstance(vis_data, VectorVisData):
+            data_dict = vis_data.vector_data_dict
+        else:  # SaeVisData
+            data_dict = vis_data.feature_data_dict
+
         features_outputs = NeuronpediaConverter._process_features(
-            model, sae_data, np_cfg, vocab_dict
+            model, data_dict, np_cfg, vocab_dict
         )
         batch_data = NeuronpediaConverter._create_batch_data(np_cfg, features_outputs)
         return json.dumps(batch_data, cls=NpEncoder)
@@ -98,13 +107,13 @@ class NeuronpediaConverter:
     @staticmethod
     def _process_features(
         model: HookedTransformer,
-        sae_data: SaeVisData,
-        np_cfg: NeuronpediaRunnerConfig,
+        data_dict: Dict[int, FeatureData],  # Update to use data_dict directly
+        np_cfg: Union[NeuronpediaRunnerConfig, NeuronpediaVectorRunnerConfig],
         vocab_dict: Dict[int, str],
     ) -> List[NeuronpediaDashboardFeature]:
         """Process all features and create NeuronpediaDashboardFeature objects."""
         features_outputs = []
-        for feature_index, feature_data in sae_data.feature_data_dict.items():
+        for feature_index, feature_data in data_dict.items():
             feature_output = NeuronpediaDashboardFeature()
             feature_output.feature_index = feature_index
 
@@ -338,20 +347,35 @@ class NeuronpediaConverter:
 
     @staticmethod
     def _create_batch_data(
-        np_cfg: NeuronpediaRunnerConfig,
+        np_cfg: Union[NeuronpediaRunnerConfig, NeuronpediaVectorRunnerConfig],
         features_outputs: List[NeuronpediaDashboardFeature],
     ) -> NeuronpediaDashboardBatch:
         """Create a NeuronpediaDashboardBatch object from processed features."""
         batch_data = NeuronpediaDashboardBatch()
 
-        if np_cfg.model_id is not None and np_cfg.layer is not None:
-            batch_data.model_id = np_cfg.model_id
-            batch_data.layer = np_cfg.layer
-        batch_data.sae_set = (
-            np_cfg.sae_set if not np_cfg.np_set_name else np_cfg.np_set_name
-        )
-        if np_cfg.np_sae_id_suffix is not None:
-            batch_data.sae_id_suffix = np_cfg.np_sae_id_suffix
-        batch_data.features = features_outputs
+        if isinstance(np_cfg, NeuronpediaRunnerConfig):
+            # Handle SAE case
+            if np_cfg.model_id is not None and np_cfg.layer is not None:
+                batch_data.model_id = np_cfg.model_id
+                batch_data.layer = np_cfg.layer
+            batch_data.sae_set = (
+                np_cfg.sae_set if not np_cfg.np_set_name else np_cfg.np_set_name
+            )
+            if np_cfg.np_sae_id_suffix is not None:
+                batch_data.sae_id_suffix = np_cfg.np_sae_id_suffix
+        else:
+            # Handle Vector case
+            if np_cfg.model_id is not None and np_cfg.layer is not None:
+                batch_data.model_id = np_cfg.model_id
+                batch_data.layer = np_cfg.layer
+            # For vectors, we'll use the vector names if provided, otherwise a default name
+            vector_set_name = (
+                f"vector_set_{','.join(np_cfg.vector_names)}"
+                if np_cfg.vector_names
+                else "vector_set"
+            )
+            batch_data.sae_set = vector_set_name
+            # No sae_id_suffix needed for vectors
 
+        batch_data.features = features_outputs
         return batch_data
