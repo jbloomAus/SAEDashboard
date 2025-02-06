@@ -54,6 +54,8 @@ class NeuronpediaRunnerConfig:
     suffix_tokens: Optional[List[int]] = None
     ignore_positions: Optional[List[int]] = None
 
+    hf_model_path: Optional[str] = None
+
 
 @dataclass
 class NeuronpediaVectorRunnerConfig:
