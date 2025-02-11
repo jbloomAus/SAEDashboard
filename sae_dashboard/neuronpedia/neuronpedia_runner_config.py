@@ -77,6 +77,7 @@ class NeuronpediaVectorRunnerConfig:
 
     # additional calculations
     use_dfa: bool = False
+    include_original_vectors_in_output: bool = False
 
     # Quantile parameters for activation analysis
     n_quantiles: int = 5

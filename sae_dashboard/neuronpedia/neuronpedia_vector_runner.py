@@ -456,8 +456,17 @@ class NeuronpediaVectorRunner:
 
                 self.cfg.model_id = self.model_id
                 self.cfg.layer = self.layer
+                # add the original vectors if include_original_vectors_in_output is True
                 json_object = NeuronpediaConverter.convert_to_np_json(
-                    self.model, vector_data, self.cfg, self.vocab_dict
+                    self.model,
+                    vector_data,
+                    self.cfg,
+                    self.vocab_dict,
+                    (
+                        self.vector_set.vectors
+                        if self.cfg.include_original_vectors_in_output
+                        else None
+                    ),
                 )
                 with open(
                     output_file,

@@ -126,6 +126,7 @@ class NeuronpediaDashboardFeature:
         dataset: str = "",
         activations: list[dict[str, Any]] = [],
         decoder_weights_dist: list[float] = [],
+        vector: list[float] = [],
     ):
         self.feature_index = feature_index
         self.neuron_alignment_indices = neuron_alignment_indices
@@ -151,6 +152,7 @@ class NeuronpediaDashboardFeature:
         self.dataset = dataset
         self.activations: list[NeuronpediaDashboardActivation] = []
         self.decoder_weights_dist = decoder_weights_dist
+        self.vector = vector
         for activation in activations:
             self.activations.append(NeuronpediaDashboardActivation(**activation))
 
@@ -284,6 +286,7 @@ class NeuronpediaDashboardFeature:
             "dataset": self.dataset,
             "decoder_weights_dist": self.decoder_weights_dist,
             "activations": [activation.to_dict() for activation in self.activations],
+            "vector": self.vector,
         }
 
 
