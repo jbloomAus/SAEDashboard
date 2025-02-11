@@ -23,6 +23,7 @@ Install SAEDashboard using pip:
 pip install sae-dashboard
 ```
 
+
 ## Quick Start
 
 Here's a basic example of how to use SAEDashboard with SaeVisRunner:
