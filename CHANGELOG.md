@@ -2,6 +2,19 @@
 
 
 
+## v0.6.6 (2025-02-11)
+
+### Fix
+
+* fix: run_settings.json should properly log model_id and layer ([`2e661d9`](https://github.com/jbloomAus/SAEDashboard/commit/2e661d95f30bc28e7d818bbd67de931a334d837f))
+
+### Unknown
+
+* Merge pull request #40 from jbloomAus/run_settings_fix
+
+fix: run_settings.json should properly log model_id and layer ([`f3bde39`](https://github.com/jbloomAus/SAEDashboard/commit/f3bde395843720674d4c60e21bc2453d958ff402))
+
+
 ## v0.6.5 (2025-02-11)
 
 ### Fix
