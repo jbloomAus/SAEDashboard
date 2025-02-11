@@ -1,7 +1,8 @@
 import json
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
+import torch
 from transformer_lens import HookedTransformer
 
 from sae_dashboard.feature_data import FeatureData
@@ -81,6 +82,7 @@ class NeuronpediaConverter:
         vis_data: Union[SaeVisData, VectorVisData],
         np_cfg: Union[NeuronpediaRunnerConfig, NeuronpediaVectorRunnerConfig],
         vocab_dict: Dict[int, str],
+        original_vectors: Optional[torch.Tensor] = None,
     ) -> str:
         """
         Convert SaeVisData to Neuronpedia JSON format.
@@ -99,7 +101,7 @@ class NeuronpediaConverter:
             data_dict = vis_data.feature_data_dict
 
         features_outputs = NeuronpediaConverter._process_features(
-            model, data_dict, np_cfg, vocab_dict
+            model, data_dict, np_cfg, vocab_dict, original_vectors
         )
         batch_data = NeuronpediaConverter._create_batch_data(np_cfg, features_outputs)
         return json.dumps(batch_data, cls=NpEncoder)
@@ -110,6 +112,7 @@ class NeuronpediaConverter:
         data_dict: Dict[int, FeatureData],  # Update to use data_dict directly
         np_cfg: Union[NeuronpediaRunnerConfig, NeuronpediaVectorRunnerConfig],
         vocab_dict: Dict[int, str],
+        original_vectors: Optional[torch.Tensor] = None,
     ) -> List[NeuronpediaDashboardFeature]:
         """Process all features and create NeuronpediaDashboardFeature objects."""
         features_outputs = []
@@ -134,6 +137,9 @@ class NeuronpediaConverter:
             feature_output.n_prompts_total = np_cfg.n_prompts_total
             feature_output.n_tokens_in_prompt = np_cfg.n_tokens_in_prompt
             feature_output.dataset = np_cfg.huggingface_dataset_path
+
+            if original_vectors is not None:
+                feature_output.vector = original_vectors[feature_index].tolist()
 
             features_outputs.append(feature_output)
         return features_outputs
