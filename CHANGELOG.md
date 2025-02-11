@@ -2,6 +2,49 @@
 
 
 
+## v0.6.5 (2025-02-11)
+
+### Fix
+
+* fix: Force Build ([`2e4979c`](https://github.com/jbloomAus/SAEDashboard/commit/2e4979c07ad8bcd2760ee0981ee415d17fef2e5a))
+
+### Unknown
+
+* Merge pull request #39 from jbloomAus/allow_vector_output
+
+feat: allow outputting raw vector in neuronpedia outputs ([`1444786`](https://github.com/jbloomAus/SAEDashboard/commit/14447862418b18d112053a7af8810b049400089a))
+
+* remove debug log ([`6efeb6c`](https://github.com/jbloomAus/SAEDashboard/commit/6efeb6c1976dea8374800e7625d63a14a3b6438d))
+
+* allow outputting vector ([`4c6cb35`](https://github.com/jbloomAus/SAEDashboard/commit/4c6cb35752317db9f22476d26dc1bab7e4d6e511))
+
+* Merge pull request #37 from jbloomAus/feature/vector-dashboards
+
+Feature/vector dashboards ([`64c44a9`](https://github.com/jbloomAus/SAEDashboard/commit/64c44a9c11b2dce26b030d5e7bbf782ef90a2985))
+
+* typing ([`09aeeab`](https://github.com/jbloomAus/SAEDashboard/commit/09aeeabb4c0f45f4bdabb884f683208eb7073142))
+
+* Fixed missing parameter ([`a91d9f5`](https://github.com/jbloomAus/SAEDashboard/commit/a91d9f5dc8c65249c032dc4088aead4364bc42e9))
+
+* Fixed parameterization and formatting ([`1956fbc`](https://github.com/jbloomAus/SAEDashboard/commit/1956fbc0ab6e4200d771ad4b504946ff81707969))
+
+* Renamed demo notebook, some cleanup ([`6a486a5`](https://github.com/jbloomAus/SAEDashboard/commit/6a486a5834377823f380f59cafcbc3debbdcc3ed))
+
+* Working pipeline flow ([`fdb2292`](https://github.com/jbloomAus/SAEDashboard/commit/fdb2292ad84b083246fdf3be2820e0b31168dce2))
+
+* First draft of vector vis pipeline ([`4351ef9`](https://github.com/jbloomAus/SAEDashboard/commit/4351ef938a82d2b5e5a37391c236791cc23b41e5))
+
+* Merge pull request #38 from jbloomAus/feature/hf-model-override
+
+enable passing custom HF model to replace model weights ([`5d98417`](https://github.com/jbloomAus/SAEDashboard/commit/5d98417877c2cfe52bb09ddada0b4b53849b344a))
+
+* enable passing custom HF model to replace model weights ([`b2d6ae5`](https://github.com/jbloomAus/SAEDashboard/commit/b2d6ae5446fb79f4662bcdac6030cb6072b09b60))
+
+* Don&#39;t copy to output folder by default ([`4dbde12`](https://github.com/jbloomAus/SAEDashboard/commit/4dbde1214d49eaaf9b591f083f34e57c8c0c1dbd))
+
+* Don&#39;t save html file for NP outputs ([`a160bff`](https://github.com/jbloomAus/SAEDashboard/commit/a160bff204b7464d2de00e3f80c255123d11171b))
+
+
 ## v0.6.4 (2024-10-24)
 
 ### Fix
