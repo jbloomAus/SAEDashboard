@@ -175,7 +175,9 @@ class NeuronpediaRunner:
 
         # Initialize Model
         self.model_id = self.sae.cfg.model_name
+        self.cfg.model_id = self.model_id
         self.layer = self.sae.cfg.hook_layer
+        self.cfg.layer = self.layer
         # If custom HF model path is provided, load it first
         hf_model = None
         if self.cfg.hf_model_path:
