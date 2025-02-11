@@ -138,7 +138,9 @@ class NeuronpediaVectorRunner:
 
         # Initialize Model
         self.model_id = self.vector_set.cfg.model_name
+        self.cfg.model_id = self.model_id
         self.layer = self.vector_set.cfg.hook_layer
+        self.cfg.layer = self.layer
         self.model = HookedTransformer.from_pretrained(
             model_name=self.model_id,
             device=self.cfg.model_device,
