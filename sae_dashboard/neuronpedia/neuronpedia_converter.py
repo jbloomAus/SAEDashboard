@@ -383,7 +383,5 @@ class NeuronpediaConverter:
             batch_data.sae_set = vector_set_name
             # No sae_id_suffix needed for vectors
 
-        print("FEATURES OUTPUTS: ")
-        print(features_outputs[0].vector)
         batch_data.features = features_outputs
         return batch_data
