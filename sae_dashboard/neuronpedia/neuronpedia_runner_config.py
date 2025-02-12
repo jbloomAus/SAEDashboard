@@ -68,6 +68,7 @@ class NeuronpediaVectorRunnerConfig:
     n_tokens_in_prompt: int = 128
     n_prompts_in_forward_pass: int = 32
     prepend_bos: bool = True  # TODO: eventually include this in vector set export
+    prepend_chat_template_text: Optional[str] = None
 
     # Batching parameters
     n_vectors_at_a_time: int = 128  # Similar to n_features_at_a_time
@@ -78,7 +79,7 @@ class NeuronpediaVectorRunnerConfig:
     # additional calculations
     use_dfa: bool = False
     include_original_vectors_in_output: bool = False
-
+    activation_thresholds: Optional[dict[int, float | int]] = None
     # Quantile parameters for activation analysis
     n_quantiles: int = 5
     top_acts_group_size: int = 30
