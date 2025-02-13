@@ -1,7 +1,7 @@
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Optional
 
 from dataclasses_json import dataclass_json
 from rich import print as rprint
@@ -42,6 +42,7 @@ class VectorVisConfig:
     dtype: str = "float32"
     ignore_tokens: set[int] = field(default_factory=set)
     ignore_positions: list[int] = field(default_factory=list)
+    ignore_thresholds: Optional[dict[int, float | int]] = None
 
     # Vis
     feature_centric_layout: SaeVisLayoutConfig = field(

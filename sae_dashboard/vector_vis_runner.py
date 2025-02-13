@@ -193,6 +193,15 @@ class VectorVisRunner:
                 # Move the mask to the same device as feat_acts
                 ignore_tokens_mask = ignore_tokens_mask.to(feat_acts.device)
 
+                if (
+                    self.cfg.ignore_thresholds
+                    and vector_idx in self.cfg.ignore_thresholds
+                ):
+                    # the ignore_thresholds is a dict mapping vector indices to thresholds
+                    ignore_tokens_mask &= (
+                        feat_acts >= self.cfg.ignore_thresholds[vector_idx]
+                    )
+
                 # set any masked positions to 0
                 masked_feat_acts = feat_acts * ignore_tokens_mask
 
