@@ -18,7 +18,6 @@ This codebase was originally designed to replicate Anthropic's sparse autoencode
 ## Installation
 
 Install SAEDashboard using pip:
-
 ```bash
 pip install sae-dashboard
 ```
