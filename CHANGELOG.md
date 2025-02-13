@@ -2,6 +2,25 @@
 
 
 
+## v0.6.7 (2025-02-13)
+
+### Fix
+
+* fix: force build ([`9b96ac5`](https://github.com/jbloomAus/SAEDashboard/commit/9b96ac57e0b23c1a4cc73fbd9fd855ab0961cce7))
+
+### Unknown
+
+* Merge pull request #41 from jbloomAus/prepend_chat_template
+
+feat: Prepend chat template and activation threshold ([`c7347fa`](https://github.com/jbloomAus/SAEDashboard/commit/c7347faa7d1c800dae398ee8dbded53afced9aa4))
+
+* add example ([`9ab42d6`](https://github.com/jbloomAus/SAEDashboard/commit/9ab42d66a2a3e445b300bf83f677f143da3fecd9))
+
+* proper &#39;activation threshold&#39; ([`a6d7c1c`](https://github.com/jbloomAus/SAEDashboard/commit/a6d7c1c8ca4a1ec46676298c4661f623bada9049))
+
+* prepend chat template text ([`c8829a1`](https://github.com/jbloomAus/SAEDashboard/commit/c8829a14d6351b5cfd52af927942af5c6897db60))
+
+
 ## v0.6.6 (2025-02-11)
 
 ### Fix
