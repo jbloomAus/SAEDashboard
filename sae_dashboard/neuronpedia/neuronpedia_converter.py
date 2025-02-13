@@ -101,7 +101,11 @@ class NeuronpediaConverter:
             data_dict = vis_data.feature_data_dict
 
         features_outputs = NeuronpediaConverter._process_features(
-            model, data_dict, np_cfg, vocab_dict, original_vectors
+            model,
+            data_dict,
+            np_cfg,
+            vocab_dict,
+            original_vectors,
         )
         batch_data = NeuronpediaConverter._create_batch_data(np_cfg, features_outputs)
         return json.dumps(batch_data, cls=NpEncoder)
@@ -277,6 +281,7 @@ class NeuronpediaConverter:
                         feature_data,
                         model,
                         vocab_dict,
+                        feature_output.feature_index,
                     )
                     activations.append(activation)
 
@@ -313,6 +318,8 @@ class NeuronpediaConverter:
         feature_data: FeatureData,
         model: HookedTransformer,
         vocab_dict: Dict[int, str],
+        feature_index: int,
+        activation_thresholds: Optional[dict[int, float | int]] = None,
     ) -> NeuronpediaDashboardActivation:
         """Create a NeuronpediaDashboardActivation object from sequence data."""
         activation = NeuronpediaDashboardActivation()
@@ -346,6 +353,11 @@ class NeuronpediaConverter:
             for token_id in sequence.token_ids
         ]
         activation.values = FeatureProcessor.round_list(sequence.feat_acts)
+        if activation_thresholds is not None:
+            threshold = activation_thresholds[feature_index]
+            activation.values = [
+                v if v >= threshold else 0.0 for v in activation.values
+            ]
 
         activation.qualifying_token_index = sequence.qualifying_token_index - 1
 

@@ -248,6 +248,20 @@ class NeuronpediaVectorRunner:
         unique_sequences: Set[Tuple[int, ...]] = set()
         pbar = tqdm(range(n_prompts // activations_store.store_batch_size_prompts))
 
+        prepend_tokens = None
+        if (
+            self.cfg.prepend_chat_template_text is not None
+            and self.model.tokenizer is not None
+        ):
+            print(
+                f"Prepending chat template text: {self.cfg.prepend_chat_template_text}"
+            )
+            prepend_tokens = torch.tensor(
+                self.model.tokenizer(
+                    self.cfg.prepend_chat_template_text, add_special_tokens=False
+                ).input_ids
+            ).to(activations_store.device)
+
         for _ in pbar:
             batch_tokens = activations_store.get_batch_tokens()
             if self.cfg.shuffle_tokens:
@@ -258,7 +272,16 @@ class NeuronpediaVectorRunner:
                 seq_hash = self.hash_tensor(seq)
                 if seq_hash not in unique_sequences:
                     unique_sequences.add(seq_hash)
-                    all_tokens_list.append(seq.unsqueeze(0))
+                    # if we prepend chat template text, then we need to remove the BOS token from the sequence
+                    if prepend_tokens is not None:
+                        all_tokens_list.append(
+                            torch.cat(
+                                [prepend_tokens.unsqueeze(0), seq[1:].unsqueeze(0)],
+                                dim=1,
+                            )[:, : activations_store.context_size]
+                        )
+                    else:
+                        all_tokens_list.append(seq.unsqueeze(0))
 
             # Early exit if we've collected enough unique sequences
             if len(all_tokens_list) >= n_prompts:
@@ -447,6 +470,7 @@ class NeuronpediaVectorRunner:
                     cache_dir=self.cached_activations_dir,
                     ignore_tokens={self.model.tokenizer.pad_token_id, self.model.tokenizer.bos_token_id, self.model.tokenizer.eos_token_id},  # type: ignore
                     ignore_positions=self.cfg.ignore_positions or [],
+                    ignore_thresholds=self.cfg.activation_thresholds,
                     use_dfa=self.cfg.use_dfa,
                 )
 
