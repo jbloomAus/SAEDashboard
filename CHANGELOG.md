@@ -2,6 +2,19 @@
 
 
 
+## v0.6.8 (2025-02-15)
+
+### Fix
+
+* fix: prepended chat template text should not be in activations ([`f3c20ee`](https://github.com/jbloomAus/SAEDashboard/commit/f3c20eec31976db48c1f1d37aabd077e068f66ac))
+
+### Unknown
+
+* Merge pull request #42 from jbloomAus/prepend_text_fix
+
+fix: prepended chat template text should not be in activations ([`eea0b83`](https://github.com/jbloomAus/SAEDashboard/commit/eea0b830e97e791571986cf1ccae1605606ddb4f))
+
+
 ## v0.6.7 (2025-02-13)
 
 ### Fix
