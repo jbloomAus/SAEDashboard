@@ -261,6 +261,7 @@ class NeuronpediaVectorRunner:
                     self.cfg.prepend_chat_template_text, add_special_tokens=False
                 ).input_ids
             ).to(activations_store.device)
+            self.prepend_tokens_length = prepend_tokens.shape[0]
 
         for _ in pbar:
             batch_tokens = activations_store.get_batch_tokens()
@@ -278,7 +279,9 @@ class NeuronpediaVectorRunner:
                             torch.cat(
                                 [prepend_tokens.unsqueeze(0), seq[1:].unsqueeze(0)],
                                 dim=1,
-                            )[:, : activations_store.context_size]
+                            )[
+                                :, : activations_store.context_size
+                            ]  # trim it back to the context size
                         )
                     else:
                         all_tokens_list.append(seq.unsqueeze(0))
@@ -411,7 +414,8 @@ class NeuronpediaVectorRunner:
         tokens = self.get_tokens()
         tokens = self.add_prefix_suffix_to_tokens(tokens)
 
-        del self.activations_store
+        if self.activations_store is not None:
+            del self.activations_store
 
         with torch.no_grad():
             for feature_batch_count, features_to_process in tqdm(
@@ -455,6 +459,16 @@ class NeuronpediaVectorRunner:
                         )
                     ]
                 )
+
+                if self.prepend_tokens_length is not None:
+                    if self.cfg.ignore_positions is not None:
+                        self.cfg.ignore_positions.extend(
+                            range(self.prepend_tokens_length)
+                        )
+                    else:
+                        self.cfg.ignore_positions = list(
+                            range(self.prepend_tokens_length)
+                        )
 
                 vector_vis_config_gpt = VectorVisConfig(
                     hook_point=self.vector_set.cfg.hook_name,
