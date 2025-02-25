@@ -11,7 +11,8 @@ from rich.align import Align
 from rich.panel import Panel
 from sae_lens.analysis.neuronpedia_integration import NanAndInfReplacer
 from sae_lens.sae import SAE
-from sae_lens.toolkit.pretrained_saes import load_sparsity
+
+# from sae_lens.toolkit.pretrained_saes import load_sparsity
 from typing_extensions import Annotated
 
 from sae_dashboard.neuronpedia.neuronpedia_runner import (
@@ -271,15 +272,16 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
         num_alive = sparse_autoencoder.cfg.d_sae
         num_dead = 0
     else:
-        sparsity = load_sparsity(sae_path_string)
+        print("Warning: Log sparsity is not supported currently, setting all to alive.")
+        # sparsity = load_sparsity(sae_path_string)
         # convert sparsity to logged sparsity if it's not
         # TODO: standardize the sparsity file format
-        if len(sparsity) > 0 and sparsity[0] >= 0:
-            sparsity = torch.log10(sparsity + 1e-10)
-        sparsity = sparsity.to(device)
-        alive_indexes = (sparsity > log_sparsity).nonzero(as_tuple=True)[0].tolist()
-        num_alive = len(alive_indexes)
-        num_dead = sparse_autoencoder.cfg.d_sae - num_alive
+        # if len(sparsity) > 0 and sparsity[0] >= 0:
+        #     sparsity = torch.log10(sparsity + 1e-10)
+        # sparsity = sparsity.to(device)
+        # alive_indexes = (sparsity > log_sparsity).nonzero(as_tuple=True)[0].tolist()
+        num_alive = sparse_autoencoder.cfg.d_sae
+        num_dead = 0
 
     num_batches = math.ceil(sparse_autoencoder.cfg.d_sae / feat_per_batch)
     if end_at_batch >= num_batches:
@@ -483,4 +485,5 @@ def upload(
 
 
 if __name__ == "__main__":
+    app()
     app()
