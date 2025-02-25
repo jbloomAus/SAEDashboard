@@ -2,6 +2,25 @@
 
 
 
+## v0.6.9 (2025-02-25)
+
+### Fix
+
+* fix: Merge pull request #44 from jbloomAus/update_saelens
+
+fix: don&#39;t use sparsity ([`f30a19b`](https://github.com/jbloomAus/SAEDashboard/commit/f30a19b9cb42f15302848c31ddf1d14462209a42))
+
+* fix: don&#39;t use sparsity ([`d5ba79b`](https://github.com/jbloomAus/SAEDashboard/commit/d5ba79bbf3d51cbc67e276297d18d85add9d33e7))
+
+* fix: update SAELens version and remove unsupported load_sparsity ([`63192ba`](https://github.com/jbloomAus/SAEDashboard/commit/63192ba7d9de7afae9cb67f65db2e79a39b898c6))
+
+### Unknown
+
+* Merge pull request #43 from jbloomAus/update_saelens
+
+fix: update SAELens version and remove unsupported load_sparsity ([`c083723`](https://github.com/jbloomAus/SAEDashboard/commit/c083723237090165725e587f8bdb8f01338394b4))
+
+
 ## v0.6.8 (2025-02-15)
 
 ### Fix
