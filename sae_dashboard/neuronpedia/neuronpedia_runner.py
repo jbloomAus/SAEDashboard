@@ -12,7 +12,6 @@ import wandb
 import wandb.sdk
 from matplotlib import colors
 from sae_lens.sae import SAE
-from sae_lens.toolkit.pretrained_saes import load_sparsity
 from sae_lens.training.activations_store import ActivationsStore
 from tqdm import tqdm
 from transformer_lens import HookedTransformer
@@ -313,22 +312,25 @@ class NeuronpediaRunner:
 
     def get_alive_features(self) -> list[int]:
         # skip sparsity
-        if self.cfg.sparsity_threshold == 1:
-            print("Skipping sparsity because sparsity_threshold was set to 1")
-            target_feature_indexes = list(range(self.sae.cfg.d_sae))
-        else:
-            # if we have feature sparsity, then use it to only generate outputs for non-dead features
-            self.target_feature_indexes: list[int] = []
-            sparsity = load_sparsity(self.cfg.sae_path)
-            # convert sparsity to logged sparsity if it's not
-            # TODO: standardize the sparsity file format
-            if len(sparsity) > 0 and sparsity[0] >= 0:
-                sparsity = torch.log10(sparsity + 1e-10)
-            target_feature_indexes = (
-                (sparsity > self.cfg.sparsity_threshold)
-                .nonzero(as_tuple=True)[0]
-                .tolist()
-            )
+        target_feature_indexes = list(range(self.sae.cfg.d_sae))
+        print("Warning: Sparsity option is not implemented, running all features.")
+        # TODO: post-refactor the load_sparsity no longer exists
+        # if self.cfg.sparsity_threshold == 1:
+        #     print("Skipping sparsity because sparsity_threshold was set to 1")
+        #     target_feature_indexes = list(range(self.sae.cfg.d_sae))
+        # else:
+        #     # if we have feature sparsity, then use it to only generate outputs for non-dead features
+        #     self.target_feature_indexes: list[int] = []
+        #     # sparsity = load_sparsity(self.cfg.sae_path)
+        #     # convert sparsity to logged sparsity if it's not
+        #     # TODO: standardize the sparsity file format
+        #     # if len(sparsity) > 0 and sparsity[0] >= 0:
+        #     #     sparsity = torch.log10(sparsity + 1e-10)
+        #     # target_feature_indexes = (
+        #     #     (sparsity > self.cfg.sparsity_threshold)
+        #     #     .nonzero(as_tuple=True)[0]
+        #     #     .tolist()
+        #     # )
         return target_feature_indexes
 
     def get_feature_batches(self):
@@ -639,5 +641,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
     main()
