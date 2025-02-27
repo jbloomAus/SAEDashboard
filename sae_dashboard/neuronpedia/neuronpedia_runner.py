@@ -154,7 +154,7 @@ class NeuronpediaRunner:
         # get the sae's cfg and check if it has from pretrained kwargs
         # with open(f"{self.cfg.sae_path}/cfg.json", "r") as f:
         sae_cfg_json = self.sae.cfg.to_dict()
-        sae_from_pretrained_kwargs = sae_cfg_json.get("from_pretrained_kwargs", {})
+        sae_from_pretrained_kwargs = sae_cfg_json.get("model_from_pretrained_kwargs", {})
         print("SAE Config on disk:")
         print(json.dumps(sae_cfg_json, indent=2))
         if sae_from_pretrained_kwargs != {}:
