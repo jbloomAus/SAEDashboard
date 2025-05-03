@@ -1,3 +1,4 @@
+# %%
 import os
 
 from sae_dashboard.neuronpedia.neuronpedia_runner import (
@@ -9,12 +10,12 @@ from sae_dashboard.neuronpedia.neuronpedia_runner import (
 
 
 NP_OUTPUT_FOLDER = "neuronpedia_outputs/"
-ACT_CACHE_FOLDER = "cached_activations"
-NP_SET_NAME = "gemmascope-res-65k"
-SAE_SET = "gemma-scope-2b-pt-res-canonical"
-SAE_PATH = "layer_0/width_65k/canonical"
-NUM_FEATURES_PER_BATCH = 2
-NUM_BATCHES = 2
+ACT_CACHE_FOLDER = "cached_activations_2"
+NP_SET_NAME = "google/gemma-2-2b"
+SAE_SET = "gemma-scope-2b-pt-transcoders"
+SAE_PATH = "layer_15/width_16k/average_l0_8"
+NUM_FEATURES_PER_BATCH = 10
+NUM_BATCHES = 10
 HF_DATASET_PATH = "monology/pile-uncopyrighted"
 
 
@@ -26,11 +27,12 @@ MODEL_DTYPE = "bfloat16"
 
 # PERFORMANCE SETTING
 # N_PROMPTS = 24576
-N_PROMPTS = 128
+N_PROMPTS = 4096
 N_TOKENS_IN_PROMPT = 128
 N_PROMPTS_IN_FORWARD_PASS = 128
 
 
+# %%
 if __name__ == "__main__":
 
     # delete output files if present
@@ -77,3 +79,5 @@ if __name__ == "__main__":
 #   --start-batch=0 \
 #   --end-batch=6 \
 #   --use-wandb
+
+# %%
