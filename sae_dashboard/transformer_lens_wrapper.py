@@ -63,7 +63,7 @@ class TransformerLensWrapper(nn.Module):
         activation_dict = {}
 
         def build_act_dict(
-            hooks: Sequence[Tuple[str, Callable[[Tensor, HookPoint], None]]]
+            hooks: Sequence[Tuple[str, Callable[[Tensor, HookPoint], None]]],
         ) -> None:
             for hook_point, _ in hooks:
                 # The hook functions work by storing data in model's hook context, so we pop them back out
@@ -128,6 +128,7 @@ def to_resid_direction(
     if (
         "resid" in model.activation_config.primary_hook_point
         or "_out" in model.activation_config.primary_hook_point
+        or "hook_mlp_in" in model.activation_config.primary_hook_point
     ):
         return direction
 

@@ -50,11 +50,11 @@ DEFAULT_FALLBACK_DEVICE = "cpu"
 HTML_ANOMALIES = {
     "âĢĶ": "—",
     "âĢĵ": "–",
-    "âĢľ": "“",
-    "âĢĿ": "”",
-    "âĢĺ": "‘",
-    "âĢĻ": "’",
-    "âĢĭ": " ",  # TODO: this is actually zero width space
+    "âĢľ": "\u201c",  # “
+    "âĢĿ": "\u201d",  # ”
+    "âĢĺ": "\u2018",  # ‘
+    "âĢĻ": "\u2019",  # ’
+    "âĢĭ": " ",  # zero-width space becomes normal space
     "Ġ": " ",
     "Ċ": "\n",
     "ĉ": "\t",
@@ -96,30 +96,41 @@ class NeuronpediaRunner:
             self.cfg.model_n_devices = self.cfg.model_n_devices or 1
             self.cfg.activation_store_device = self.cfg.activation_store_device or "cpu"
 
-        # Initialize SAE, defaulting to SAE dtype unless we override
-        if self.cfg.from_local_sae:
-            self.sae = SAE.load_from_pretrained(
-                path=self.cfg.sae_path,
-                device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
-                dtype=self.cfg.sae_dtype if self.cfg.sae_dtype != "" else None,
-            )
+        # Initialize SAE or Transcoder, defaulting to SAE dtype unless we override
+        if self.cfg.use_transcoder:
+            # Dynamically import to avoid dependency issues when Transcoder isn't used
+            try:
+                from sae_lens.transcoder import Transcoder  # type: ignore
+            except ImportError as e:
+                raise ImportError(
+                    "Transcoder class not found in sae_lens. Install a version of sae_lens that provides Transcoder or disable --use-transcoder."
+                ) from e
+
+            if self.cfg.from_local_sae:
+                self.sae = Transcoder.load_from_pretrained(  # type: ignore
+                    path=self.cfg.sae_path,
+                    device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
+                    dtype=self.cfg.sae_dtype if self.cfg.sae_dtype != "" else None,
+                )
+            else:
+                self.sae, _, _ = Transcoder.from_pretrained(  # type: ignore
+                    release=self.cfg.sae_set,
+                    sae_id=self.cfg.sae_path,
+                    device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
+                )
         else:
-            self.sae, _, _ = SAE.from_pretrained(
-                release=self.cfg.sae_set,
-                sae_id=self.cfg.sae_path,
-                device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
-            )
-            if self.cfg.sae_dtype != "":
-                if self.cfg.sae_dtype == "float16":
-                    self.sae.to(dtype=torch.float16)
-                elif self.cfg.sae_dtype == "float32":
-                    self.sae.to(dtype=torch.float32)
-                elif self.cfg.sae_dtype == "bfloat16":
-                    self.sae.to(dtype=torch.bfloat16)
-                else:
-                    raise ValueError(
-                        f"Unsupported dtype: {self.cfg.sae_dtype}, we support float16, float32, bfloat16"
-                    )
+            if self.cfg.from_local_sae:
+                self.sae = SAE.load_from_pretrained(
+                    path=self.cfg.sae_path,
+                    device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
+                    dtype=self.cfg.sae_dtype if self.cfg.sae_dtype != "" else None,
+                )
+            else:
+                self.sae, _, _ = SAE.from_pretrained(
+                    release=self.cfg.sae_set,
+                    sae_id=self.cfg.sae_path,
+                    device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
+                )
 
         # If we didn't override dtype, then use the SAE's dtype
         if self.cfg.sae_dtype == "":
@@ -154,7 +165,9 @@ class NeuronpediaRunner:
         # get the sae's cfg and check if it has from pretrained kwargs
         # with open(f"{self.cfg.sae_path}/cfg.json", "r") as f:
         sae_cfg_json = self.sae.cfg.to_dict()
-        sae_from_pretrained_kwargs = sae_cfg_json.get("model_from_pretrained_kwargs", {})
+        sae_from_pretrained_kwargs = sae_cfg_json.get(
+            "model_from_pretrained_kwargs", {}
+        )
         print("SAE Config on disk:")
         print(json.dumps(sae_cfg_json, indent=2))
         if sae_from_pretrained_kwargs != {}:
@@ -193,6 +206,13 @@ class NeuronpediaRunner:
             **sae_from_pretrained_kwargs,
             dtype=self.cfg.model_dtype,
         )
+
+        # Ensure MLP-in hooks are computed if needed (important for most Transcoders)
+        if (
+            self.cfg.use_transcoder or "hook_mlp_in" in self.sae.cfg.hook_name
+        ) and hasattr(self.model, "set_use_hook_mlp_in"):
+            # TransformerLens models 1.12+ support this flag
+            self.model.set_use_hook_mlp_in(True)
 
         # Initialize Activations Store
         self.activations_store = ActivationsStore.from_sae(
@@ -612,6 +632,11 @@ def main():
         default=None,
         help="Optional: Path to custom HuggingFace model to use instead of default weights",
     )
+    parser.add_argument(
+        "--use-transcoder",
+        action="store_true",
+        help="If set, load a Transcoder instead of a standard SAE",
+    )
 
     args = parser.parse_args()
 
@@ -634,6 +659,7 @@ def main():
         end_batch=args.end_batch,
         use_wandb=args.use_wandb,
         hf_model_path=args.hf_model_path,
+        use_transcoder=args.use_transcoder,
     )
 
     runner = NeuronpediaRunner(cfg)
