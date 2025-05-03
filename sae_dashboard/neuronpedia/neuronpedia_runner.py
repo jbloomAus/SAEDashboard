@@ -50,11 +50,11 @@ DEFAULT_FALLBACK_DEVICE = "cpu"
 HTML_ANOMALIES = {
     "âĢĶ": "—",
     "âĢĵ": "–",
-    "âĢľ": "\u201c",  # “
-    "âĢĿ": "\u201d",  # ”
-    "âĢĺ": "\u2018",  # ‘
-    "âĢĻ": "\u2019",  # ’
-    "âĢĭ": " ",  # zero-width space becomes normal space
+    "âĢľ": "“",
+    "âĢĿ": "”",
+    "âĢĺ": "‘",
+    "âĢĻ": "’",
+    "âĢĭ": " ",  # TODO: this is actually zero width space
     "Ġ": " ",
     "Ċ": "\n",
     "ĉ": "\t",
