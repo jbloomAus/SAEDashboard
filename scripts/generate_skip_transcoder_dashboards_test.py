@@ -12,7 +12,7 @@ NP_OUTPUT_FOLDER = "neuronpedia_outputs_skip_tc/"
 ACT_CACHE_FOLDER = "cached_activations_skip_tc"
 NP_SET_NAME = "skip-transcoder-Llama-3.2-1B-131k-nobos-relu"
 SAE_SET = "llama-3.2-1b-relu-skip-transcoders"  # Adjust to your actual HF release name
-SAE_PATH = "blocks.9.hook_resid_mid"  # Adjust to your actual SkipTranscoder ID
+SAE_PATH = "blocks.11.hook_resid_mid"  # Adjust to your actual SkipTranscoder ID
 NUM_FEATURES_PER_BATCH = 10
 NUM_BATCHES = 10
 HF_DATASET_PATH = "monology/pile-uncopyrighted"
@@ -27,7 +27,7 @@ MODEL_DTYPE = "bfloat16"
 # N_PROMPTS = 24576
 N_PROMPTS = 4096
 N_TOKENS_IN_PROMPT = 128
-N_PROMPTS_IN_FORWARD_PASS = 32
+N_PROMPTS_IN_FORWARD_PASS = 128
 
 
 # %%
