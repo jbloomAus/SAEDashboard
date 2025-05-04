@@ -97,7 +97,35 @@ class NeuronpediaRunner:
             self.cfg.activation_store_device = self.cfg.activation_store_device or "cpu"
 
         # Initialize SAE or Transcoder, defaulting to SAE dtype unless we override
-        if self.cfg.use_transcoder:
+        if self.cfg.use_skip_transcoder:
+            # Dynamically import to avoid dependency issues when Transcoder isn't used
+            try:
+                from sae_lens.transcoder import SkipTranscoder  # type: ignore
+            except ImportError as e:
+                raise ImportError(
+                    "SkipTranscoder class not found in sae_lens. Install a version of sae_lens that provides it or disable --use-skip-transcoder."
+                ) from e
+            LoaderClass = SkipTranscoder
+            loader_kwargs = {}
+            # TODO: Check if SkipTranscoder supports local loading via path= kwarg
+            # if self.cfg.from_local_sae:
+            #     loader_kwargs["path"] = self.cfg.sae_path
+            # else:
+            loader_kwargs["release"] = self.cfg.sae_set
+            loader_kwargs["sae_id"] = self.cfg.sae_path
+
+            self.sae, _, _ = LoaderClass.from_pretrained(  # type: ignore
+                device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE, **loader_kwargs
+            )
+            # SkipTranscoder doesn't directly support dtype override in from_pretrained, apply after
+            if self.cfg.sae_dtype:
+                try:
+                    dtype_torch = getattr(torch, self.cfg.sae_dtype)
+                    self.sae.to(dtype=dtype_torch)
+                except AttributeError:
+                    raise ValueError(f"Invalid sae_dtype: {self.cfg.sae_dtype}")
+
+        elif self.cfg.use_transcoder:
             # Dynamically import to avoid dependency issues when Transcoder isn't used
             try:
                 from sae_lens.transcoder import Transcoder  # type: ignore
@@ -105,32 +133,50 @@ class NeuronpediaRunner:
                 raise ImportError(
                     "Transcoder class not found in sae_lens. Install a version of sae_lens that provides Transcoder or disable --use-transcoder."
                 ) from e
+            LoaderClass = Transcoder
 
             if self.cfg.from_local_sae:
-                self.sae = Transcoder.load_from_pretrained(  # type: ignore
+                # Transcoder might not have load_from_pretrained, use from_pretrained
+                self.sae, _, _ = LoaderClass.from_pretrained(  # type: ignore
                     path=self.cfg.sae_path,
                     device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
-                    dtype=self.cfg.sae_dtype if self.cfg.sae_dtype != "" else None,
+                    # dtype=self.cfg.sae_dtype if self.cfg.sae_dtype != "" else None, # Dtype applied after
                 )
             else:
-                self.sae, _, _ = Transcoder.from_pretrained(  # type: ignore
+                self.sae, _, _ = LoaderClass.from_pretrained(  # type: ignore
                     release=self.cfg.sae_set,
                     sae_id=self.cfg.sae_path,
                     device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
                 )
+            # Apply dtype override after loading for Transcoder as well
+            if self.cfg.sae_dtype:
+                try:
+                    dtype_torch = getattr(torch, self.cfg.sae_dtype)
+                    self.sae.to(dtype=dtype_torch)
+                except AttributeError:
+                    raise ValueError(f"Invalid sae_dtype: {self.cfg.sae_dtype}")
         else:
+            LoaderClass = SAE
             if self.cfg.from_local_sae:
-                self.sae = SAE.load_from_pretrained(
+                self.sae = LoaderClass.load_from_pretrained(
                     path=self.cfg.sae_path,
                     device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
                     dtype=self.cfg.sae_dtype if self.cfg.sae_dtype != "" else None,
                 )
             else:
-                self.sae, _, _ = SAE.from_pretrained(
+                self.sae, _, _ = LoaderClass.from_pretrained(
                     release=self.cfg.sae_set,
                     sae_id=self.cfg.sae_path,
                     device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
                 )
+            # Apply dtype override for standard SAE if specified
+            if self.cfg.sae_dtype and not self.cfg.from_local_sae:
+                # load_from_pretrained handles dtype for local, from_pretrained needs manual application
+                try:
+                    dtype_torch = getattr(torch, self.cfg.sae_dtype)
+                    self.sae.to(dtype=dtype_torch)
+                except AttributeError:
+                    raise ValueError(f"Invalid sae_dtype: {self.cfg.sae_dtype}")
 
         # If we didn't override dtype, then use the SAE's dtype
         if self.cfg.sae_dtype == "":
@@ -637,6 +683,11 @@ def main():
         action="store_true",
         help="If set, load a Transcoder instead of a standard SAE",
     )
+    parser.add_argument(
+        "--use-skip-transcoder",
+        action="store_true",
+        help="If set, load a SkipTranscoder instead of a Transcoder/SAE",
+    )
 
     args = parser.parse_args()
 
@@ -660,6 +711,7 @@ def main():
         use_wandb=args.use_wandb,
         hf_model_path=args.hf_model_path,
         use_transcoder=args.use_transcoder,
+        use_skip_transcoder=args.use_skip_transcoder,
     )
 
     runner = NeuronpediaRunner(cfg)
