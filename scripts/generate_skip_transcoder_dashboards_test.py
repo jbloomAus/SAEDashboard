@@ -12,7 +12,7 @@ NP_OUTPUT_FOLDER = "neuronpedia_outputs_skip_tc/"
 ACT_CACHE_FOLDER = "cached_activations_skip_tc"
 NP_SET_NAME = "skip-transcoder-Llama-3.2-1B-131k-nobos-relu"
 SAE_SET = "llama-3.2-1b-relu-skip-transcoders"  # Adjust to your actual HF release name
-SAE_PATH = "blocks.11.hook_resid_mid"  # Adjust to your actual SkipTranscoder ID
+SAE_PATH = "blocks.9.hook_resid_mid"  # Adjust to your actual SkipTranscoder ID
 NUM_FEATURES_PER_BATCH = 10
 NUM_BATCHES = 10
 HF_DATASET_PATH = "monology/pile-uncopyrighted"
@@ -52,12 +52,12 @@ if __name__ == "__main__":
         n_tokens_in_prompt=N_TOKENS_IN_PROMPT,
         n_prompts_in_forward_pass=N_PROMPTS_IN_FORWARD_PASS,
         n_features_at_a_time=NUM_FEATURES_PER_BATCH,
-        start_batch=0,
+        start_batch=190,
         use_wandb=True,
         # Enable SkipTranscoder loading
         use_skip_transcoder=True,
         # TESTING ONLY
-        end_batch=6,
+        end_batch=210,
     )
 
     runner = NeuronpediaRunner(cfg)
