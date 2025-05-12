@@ -98,7 +98,7 @@ class NeuronpediaRunner:
 
         # Initialize SAE, defaulting to SAE dtype unless we override
         if self.cfg.from_local_sae:
-            self.sae = SAE.load_from_pretrained(
+            self.sae = SAE.load_from_disk(
                 path=self.cfg.sae_path,
                 device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
                 dtype=self.cfg.sae_dtype if self.cfg.sae_dtype != "" else None,
@@ -154,7 +154,9 @@ class NeuronpediaRunner:
         # get the sae's cfg and check if it has from pretrained kwargs
         # with open(f"{self.cfg.sae_path}/cfg.json", "r") as f:
         sae_cfg_json = self.sae.cfg.to_dict()
-        sae_from_pretrained_kwargs = sae_cfg_json.get("model_from_pretrained_kwargs", {})
+        sae_from_pretrained_kwargs = sae_cfg_json.get(
+            "model_from_pretrained_kwargs", {}
+        )
         print("SAE Config on disk:")
         print(json.dumps(sae_cfg_json, indent=2))
         if sae_from_pretrained_kwargs != {}:
