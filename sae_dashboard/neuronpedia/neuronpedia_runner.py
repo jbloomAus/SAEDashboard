@@ -98,7 +98,7 @@ class NeuronpediaRunner:
 
         # Initialize SAE, defaulting to SAE dtype unless we override
         if self.cfg.from_local_sae:
-            self.sae = SAE.load_from_pretrained(
+            self.sae = SAE.load_from_pretrained(  # type: ignore
                 path=self.cfg.sae_path,
                 device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
                 dtype=self.cfg.sae_dtype if self.cfg.sae_dtype != "" else None,
@@ -493,9 +493,9 @@ class NeuronpediaRunner:
                     dtype=self.cfg.sae_dtype,
                     cache_dir=self.cached_activations_dir,
                     ignore_tokens={
-                        self.model.tokenizer.pad_token_id,
-                        self.model.tokenizer.bos_token_id,
-                        self.model.tokenizer.eos_token_id,
+                        self.model.tokenizer.pad_token_id,  # type: ignore
+                        self.model.tokenizer.bos_token_id,  # type: ignore
+                        self.model.tokenizer.eos_token_id,  # type: ignore
                     },  # type: ignore
                     ignore_positions=self.cfg.ignore_positions or [],
                     use_dfa=self.cfg.use_dfa,

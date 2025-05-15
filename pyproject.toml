@@ -53,6 +53,7 @@ reportUnnecessaryComparison = "none"
 reportConstantRedefinition = "none"
 reportUnknownLambdaType = "none"
 reportPrivateUsage = "none"
+reportPrivateImportUsage = "none"
 
 [build-system]
 requires = ["poetry-core"]
