@@ -32,7 +32,6 @@ N_PROMPTS_IN_FORWARD_PASS = 128
 
 
 if __name__ == "__main__":
-
     # delete output files if present
     os.system(f"rm -rf {NP_OUTPUT_FOLDER}")
     os.system(f"rm -rf {ACT_CACHE_FOLDER}")

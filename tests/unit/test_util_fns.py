@@ -112,7 +112,7 @@ def test_TopK_without_mask_smallest():
 
 
 def test_feature_statistics_batched_vs_unbatched(
-    large_precision_data: tuple[torch.Tensor, torch.dtype]
+    large_precision_data: tuple[torch.Tensor, torch.dtype],
 ):
     data, dtype = large_precision_data
 

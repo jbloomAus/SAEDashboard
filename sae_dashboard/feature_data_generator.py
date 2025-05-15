@@ -234,7 +234,6 @@ class FeatureMaskingContext:
         self.original_weight = {}
 
     def __enter__(self):
-
         ## W_dec
         self.original_weight["W_dec"] = getattr(self.sae, "W_dec").data.clone()
         # mask the weight
@@ -251,7 +250,6 @@ class FeatureMaskingContext:
         setattr(self.sae, "W_enc", nn.Parameter(masked_weight))
 
         if self.sae.cfg.architecture == "standard":
-
             ## b_enc
             self.original_weight["b_enc"] = getattr(self.sae, "b_enc").data.clone()
             # mask the weight
@@ -260,7 +258,6 @@ class FeatureMaskingContext:
             setattr(self.sae, "b_enc", nn.Parameter(masked_weight))
 
         elif self.sae.cfg.architecture == "jumprelu":
-
             ## b_enc
             self.original_weight["b_enc"] = getattr(self.sae, "b_enc").data.clone()
             # mask the weight
@@ -278,7 +275,6 @@ class FeatureMaskingContext:
             setattr(self.sae, "threshold", nn.Parameter(masked_weight))
 
         elif self.sae.cfg.architecture == "gated":
-
             ## b_gate
             self.original_weight["b_gate"] = getattr(self.sae, "b_gate").data.clone()
             # mask the weight
@@ -305,7 +301,6 @@ class FeatureMaskingContext:
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):  # type: ignore
-
         # set everything back to normal
         for key, value in self.original_weight.items():
             setattr(self.sae, key, nn.Parameter(value))

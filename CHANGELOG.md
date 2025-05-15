@@ -2,6 +2,113 @@
 
 
 
+## v0.6.9 (2025-02-25)
+
+### Fix
+
+* fix: Merge pull request #44 from jbloomAus/update_saelens
+
+fix: don&#39;t use sparsity ([`f30a19b`](https://github.com/jbloomAus/SAEDashboard/commit/f30a19b9cb42f15302848c31ddf1d14462209a42))
+
+* fix: don&#39;t use sparsity ([`d5ba79b`](https://github.com/jbloomAus/SAEDashboard/commit/d5ba79bbf3d51cbc67e276297d18d85add9d33e7))
+
+* fix: update SAELens version and remove unsupported load_sparsity ([`63192ba`](https://github.com/jbloomAus/SAEDashboard/commit/63192ba7d9de7afae9cb67f65db2e79a39b898c6))
+
+### Unknown
+
+* Merge pull request #43 from jbloomAus/update_saelens
+
+fix: update SAELens version and remove unsupported load_sparsity ([`c083723`](https://github.com/jbloomAus/SAEDashboard/commit/c083723237090165725e587f8bdb8f01338394b4))
+
+
+## v0.6.8 (2025-02-15)
+
+### Fix
+
+* fix: prepended chat template text should not be in activations ([`f3c20ee`](https://github.com/jbloomAus/SAEDashboard/commit/f3c20eec31976db48c1f1d37aabd077e068f66ac))
+
+### Unknown
+
+* Merge pull request #42 from jbloomAus/prepend_text_fix
+
+fix: prepended chat template text should not be in activations ([`eea0b83`](https://github.com/jbloomAus/SAEDashboard/commit/eea0b830e97e791571986cf1ccae1605606ddb4f))
+
+
+## v0.6.7 (2025-02-13)
+
+### Fix
+
+* fix: force build ([`9b96ac5`](https://github.com/jbloomAus/SAEDashboard/commit/9b96ac57e0b23c1a4cc73fbd9fd855ab0961cce7))
+
+### Unknown
+
+* Merge pull request #41 from jbloomAus/prepend_chat_template
+
+feat: Prepend chat template and activation threshold ([`c7347fa`](https://github.com/jbloomAus/SAEDashboard/commit/c7347faa7d1c800dae398ee8dbded53afced9aa4))
+
+* add example ([`9ab42d6`](https://github.com/jbloomAus/SAEDashboard/commit/9ab42d66a2a3e445b300bf83f677f143da3fecd9))
+
+* proper &#39;activation threshold&#39; ([`a6d7c1c`](https://github.com/jbloomAus/SAEDashboard/commit/a6d7c1c8ca4a1ec46676298c4661f623bada9049))
+
+* prepend chat template text ([`c8829a1`](https://github.com/jbloomAus/SAEDashboard/commit/c8829a14d6351b5cfd52af927942af5c6897db60))
+
+
+## v0.6.6 (2025-02-11)
+
+### Fix
+
+* fix: run_settings.json should properly log model_id and layer ([`2e661d9`](https://github.com/jbloomAus/SAEDashboard/commit/2e661d95f30bc28e7d818bbd67de931a334d837f))
+
+### Unknown
+
+* Merge pull request #40 from jbloomAus/run_settings_fix
+
+fix: run_settings.json should properly log model_id and layer ([`f3bde39`](https://github.com/jbloomAus/SAEDashboard/commit/f3bde395843720674d4c60e21bc2453d958ff402))
+
+
+## v0.6.5 (2025-02-11)
+
+### Fix
+
+* fix: Force Build ([`2e4979c`](https://github.com/jbloomAus/SAEDashboard/commit/2e4979c07ad8bcd2760ee0981ee415d17fef2e5a))
+
+### Unknown
+
+* Merge pull request #39 from jbloomAus/allow_vector_output
+
+feat: allow outputting raw vector in neuronpedia outputs ([`1444786`](https://github.com/jbloomAus/SAEDashboard/commit/14447862418b18d112053a7af8810b049400089a))
+
+* remove debug log ([`6efeb6c`](https://github.com/jbloomAus/SAEDashboard/commit/6efeb6c1976dea8374800e7625d63a14a3b6438d))
+
+* allow outputting vector ([`4c6cb35`](https://github.com/jbloomAus/SAEDashboard/commit/4c6cb35752317db9f22476d26dc1bab7e4d6e511))
+
+* Merge pull request #37 from jbloomAus/feature/vector-dashboards
+
+Feature/vector dashboards ([`64c44a9`](https://github.com/jbloomAus/SAEDashboard/commit/64c44a9c11b2dce26b030d5e7bbf782ef90a2985))
+
+* typing ([`09aeeab`](https://github.com/jbloomAus/SAEDashboard/commit/09aeeabb4c0f45f4bdabb884f683208eb7073142))
+
+* Fixed missing parameter ([`a91d9f5`](https://github.com/jbloomAus/SAEDashboard/commit/a91d9f5dc8c65249c032dc4088aead4364bc42e9))
+
+* Fixed parameterization and formatting ([`1956fbc`](https://github.com/jbloomAus/SAEDashboard/commit/1956fbc0ab6e4200d771ad4b504946ff81707969))
+
+* Renamed demo notebook, some cleanup ([`6a486a5`](https://github.com/jbloomAus/SAEDashboard/commit/6a486a5834377823f380f59cafcbc3debbdcc3ed))
+
+* Working pipeline flow ([`fdb2292`](https://github.com/jbloomAus/SAEDashboard/commit/fdb2292ad84b083246fdf3be2820e0b31168dce2))
+
+* First draft of vector vis pipeline ([`4351ef9`](https://github.com/jbloomAus/SAEDashboard/commit/4351ef938a82d2b5e5a37391c236791cc23b41e5))
+
+* Merge pull request #38 from jbloomAus/feature/hf-model-override
+
+enable passing custom HF model to replace model weights ([`5d98417`](https://github.com/jbloomAus/SAEDashboard/commit/5d98417877c2cfe52bb09ddada0b4b53849b344a))
+
+* enable passing custom HF model to replace model weights ([`b2d6ae5`](https://github.com/jbloomAus/SAEDashboard/commit/b2d6ae5446fb79f4662bcdac6030cb6072b09b60))
+
+* Don&#39;t copy to output folder by default ([`4dbde12`](https://github.com/jbloomAus/SAEDashboard/commit/4dbde1214d49eaaf9b591f083f34e57c8c0c1dbd))
+
+* Don&#39;t save html file for NP outputs ([`a160bff`](https://github.com/jbloomAus/SAEDashboard/commit/a160bff204b7464d2de00e3f80c255123d11171b))
+
+
 ## v0.6.4 (2024-10-24)
 
 ### Fix
