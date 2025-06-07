@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, Union
 
 import einops
 import numpy as np
@@ -18,8 +18,12 @@ from sae_dashboard.transformer_lens_wrapper import (
     to_resid_direction,
 )
 from sae_dashboard.utils_fns import RollingCorrCoef
+from transformer_lens.hook_points import HookPoint
 
 Arr = np.ndarray
+
+# Hook z is not always present, so we'll use a more general type hint
+ActivationLocation = Union[HookPoint, str]
 
 
 class FeatureDataGenerator:
@@ -45,12 +49,13 @@ class FeatureDataGenerator:
 
     @torch.inference_mode()
     def batch_tokens(
-        self, tokens: Int[Tensor, "batch seq"]
+        self, tokens: Int[Tensor, "batch seq"]  # (512, 128)
     ) -> list[Int[Tensor, "batch seq"]]:
-        # Get tokens into minibatches, for the fwd pass
+        # print(f"DEBUG FeatureDataGenerator.batch_tokens: tokens.shape = {tokens.shape}, self.cfg.minibatch_size_tokens = {self.cfg.minibatch_size_tokens}") # DEBUG PRINT
         token_minibatches = (
             (tokens,)
-            if self.cfg.minibatch_size_tokens is None
+            if self.cfg.minibatch_size_tokens
+            is None  # self.cfg here is SaeVisConfig.minibatch_size_tokens
             else tokens.split(self.cfg.minibatch_size_tokens)
         )
         token_minibatches = [tok.to(self.cfg.device) for tok in token_minibatches]
@@ -81,6 +86,7 @@ class FeatureDataGenerator:
         # ! Compute & concatenate together all feature activations & post-activation function values
         for i, minibatch in enumerate(self.token_minibatches):
             minibatch.to(self.cfg.device)
+            # print(f"DEBUG FeatureDataGenerator (inside loop iter {i}): minibatch.shape = {minibatch.shape}") # DEBUG PRINT
             model_activation_dict = self.get_model_acts(i, minibatch)
             primary_acts = model_activation_dict[
                 self.model.activation_config.primary_hook_point
@@ -102,6 +108,8 @@ class FeatureDataGenerator:
                     feature_acts = self.encoder.encode(primary_acts).to(
                         DTYPES[self.cfg.dtype]
                     )
+
+            # print(f"DEBUG FeatureDataGenerator (inside loop): feature_acts.shape = {feature_acts.shape}") # DEBUG PRINT
 
             self.update_rolling_coefficients(
                 model_acts=primary_acts,
@@ -144,6 +152,8 @@ class FeatureDataGenerator:
                 progress[0].update(1)
 
         all_feat_acts = torch.cat(all_feat_acts, dim=0)
+
+        # print(f"DEBUG FeatureDataGenerator: all_feat_acts.shape before return = {all_feat_acts.shape}") # DEBUG PRINT
 
         return (
             all_feat_acts,
@@ -228,84 +238,64 @@ def load_tensor_dict_torch(filename: Path, device: str) -> Dict[str, torch.Tenso
 
 
 class FeatureMaskingContext:
-    def __init__(self, sae: SAE, feature_idxs: List[int]):
+    """Context manager for temporarily masking encoder weights to focus on specific features."""
+
+    def __init__(self, sae: SAE, feature_idxs: list[int]):
         self.sae = sae
         self.feature_idxs = feature_idxs
-        self.original_weight = {}
+        self.original_weight: dict[str, Union[Tensor, nn.Parameter, None]] = {}
 
     def __enter__(self):
+        # W_enc is [d_in, d_sae]
+        self.original_weight["W_enc"] = self.sae.W_enc.data.clone()
+        masked_W_enc = self.sae.W_enc[:, self.feature_idxs].clone()
+        setattr(self.sae, "W_enc", nn.Parameter(masked_W_enc))
 
-        ## W_dec
-        self.original_weight["W_dec"] = getattr(self.sae, "W_dec").data.clone()
-        # mask the weight
-        masked_weight = self.sae.W_dec[self.feature_idxs]
-        # set the weight
-        setattr(self.sae, "W_dec", nn.Parameter(masked_weight))
+        # b_enc is [d_sae]
+        self.original_weight["b_enc"] = self.sae.b_enc.data.clone()
+        masked_b_enc = self.sae.b_enc[self.feature_idxs].clone()
+        setattr(self.sae, "b_enc", nn.Parameter(masked_b_enc))
 
-        ## W_enc
-        # clone the weight.
-        self.original_weight["W_enc"] = getattr(self.sae, "W_enc").data.clone()
-        # mask the weight
-        masked_weight = self.sae.W_enc[:, self.feature_idxs]
-        # set the weight
-        setattr(self.sae, "W_enc", nn.Parameter(masked_weight))
+        # W_dec is [d_sae, d_in]
+        if hasattr(self.sae, "W_dec") and self.sae.W_dec is not None:
+            self.original_weight["W_dec"] = self.sae.W_dec.data.clone()
+            masked_W_dec = self.sae.W_dec[self.feature_idxs, :].clone()
+            setattr(self.sae, "W_dec", nn.Parameter(masked_W_dec))
 
-        if self.sae.cfg.architecture == "standard":
-
-            ## b_enc
-            self.original_weight["b_enc"] = getattr(self.sae, "b_enc").data.clone()
-            # mask the weight
-            masked_weight = self.sae.b_enc[self.feature_idxs]
-            # set the weight
-            setattr(self.sae, "b_enc", nn.Parameter(masked_weight))
-
-        elif self.sae.cfg.architecture == "jumprelu":
-
-            ## b_enc
-            self.original_weight["b_enc"] = getattr(self.sae, "b_enc").data.clone()
-            # mask the weight
-            masked_weight = self.sae.b_enc[self.feature_idxs]
-            # set the weight
-            setattr(self.sae, "b_enc", nn.Parameter(masked_weight))
-
-            ## threshold
-            self.original_weight["threshold"] = getattr(
-                self.sae, "threshold"
-            ).data.clone()
-            # mask the weight
-            masked_weight = self.sae.threshold[self.feature_idxs]
-            # set the weight
-            setattr(self.sae, "threshold", nn.Parameter(masked_weight))
-
-        elif self.sae.cfg.architecture == "gated":
-
-            ## b_gate
-            self.original_weight["b_gate"] = getattr(self.sae, "b_gate").data.clone()
-            # mask the weight
-            masked_weight = self.sae.b_gate[self.feature_idxs]
-            # set the weight
-            setattr(self.sae, "b_gate", nn.Parameter(masked_weight))
-
-            ## r_mag
-            self.original_weight["r_mag"] = getattr(self.sae, "r_mag").data.clone()
-            # mask the weight
-            masked_weight = self.sae.r_mag[self.feature_idxs]
-            # set the weight
-            setattr(self.sae, "r_mag", nn.Parameter(masked_weight))
-
-            ## b_mag
-            self.original_weight["b_mag"] = getattr(self.sae, "b_mag").data.clone()
-            # mask the weight
-            masked_weight = self.sae.b_mag[self.feature_idxs]
-            # set the weight
-            setattr(self.sae, "b_mag", nn.Parameter(masked_weight))
+        # For JumpReLU, self.threshold is [d_sae]
+        # For other activation functions, or if not set, it might be None or not exist.
+        current_threshold = getattr(self.sae, "threshold", None)
+        if isinstance(current_threshold, torch.Tensor):
+            self.original_weight["threshold"] = current_threshold.data.clone()
+            # Mask the threshold if it's a tensor
+            masked_threshold = current_threshold[self.feature_idxs].clone()
+            # Set it back as a plain tensor, not nn.Parameter, as threshold isn't usually a learnable param of the SAE/wrapper itself
+            setattr(self.sae, "threshold", masked_threshold)
+        elif current_threshold is None:
+            self.original_weight["threshold"] = None  # Record that it was None
+            # self.sae.threshold remains None
         else:
-            raise (ValueError("Invalid architecture"))
+            # It's some other type, which is unexpected. Store it and print a warning.
+            print(
+                f"Warning: FeatureMaskingContext found self.sae.threshold of unexpected type: {type(current_threshold)}. Storing as is."
+            )
+            self.original_weight["threshold"] = current_threshold
 
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):  # type: ignore
+    def __exit__(self, exc_type, exc_value, traceback):
+        # Restore original weights and biases
+        if isinstance(self.original_weight["W_enc"], Tensor):
+            setattr(self.sae, "W_enc", nn.Parameter(self.original_weight["W_enc"]))
+        if isinstance(self.original_weight["b_enc"], Tensor):
+            setattr(self.sae, "b_enc", nn.Parameter(self.original_weight["b_enc"]))
+        if (
+            hasattr(self.sae, "W_dec")
+            and self.sae.W_dec is not None
+            and isinstance(self.original_weight.get("W_dec"), Tensor)
+        ):
+            setattr(self.sae, "W_dec", nn.Parameter(self.original_weight["W_dec"]))
 
-        # set everything back to normal
-        for key, value in self.original_weight.items():
-            setattr(self.sae, key, nn.Parameter(value))
+        # Restore threshold: it could be a Tensor, None, or another type if a warning was issued.
+        original_threshold = self.original_weight.get("threshold")
+        setattr(self.sae, "threshold", original_threshold)

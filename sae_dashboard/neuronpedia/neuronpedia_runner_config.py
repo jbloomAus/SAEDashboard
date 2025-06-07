@@ -62,6 +62,16 @@ class NeuronpediaRunnerConfig:
     # If true, we load a SkipTranscoder (inherits from Transcoder) instead.
     use_skip_transcoder: bool = False
 
+    use_clt: bool = False
+    clt_layer_idx: Optional[int] = None
+    clt_dtype: str = ""
+    # Optional filename for CLT weights (supports .safetensors or .pt). If empty, default search order will be used.
+    clt_weights_filename: str = ""
+
+    cache_dir: Optional[str] = None
+
+    ignore_tokens: Optional[List[int]] = None
+
 
 @dataclass
 class NeuronpediaVectorRunnerConfig:

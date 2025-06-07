@@ -141,6 +141,27 @@ def to_resid_direction(
     elif "hook_z" in model.activation_config.primary_hook_point:
         return direction @ model.W_O[model.hook_layer].flatten(0, 1).to(direction.dtype)
 
+    # For hook_mlp_out (output of MLP)
+    elif "hook_mlp_out" in model.activation_config.primary_hook_point:
+        return direction
+
+    # For hook_attn_out (output of attention layer)
+    elif "hook_attn_out" in model.activation_config.primary_hook_point:
+        return direction
+
+    # For ln1.hook_normalized (output of pre-attention LayerNorm)
+    elif "ln1.hook_normalized" in model.activation_config.primary_hook_point:
+        return direction
+
+    # For hook_normalized (e.g. ln1.hook_normalized, ln2.hook_normalized, the input to MLP or attn)
+    # Includes the custom l1.hook_normalized if used.
+    elif "hook_normalized" in model.activation_config.primary_hook_point:
+        return direction
+
+    # For hook_resid_pre (residual stream before MLP)
+    elif "hook_resid_pre" in model.activation_config.primary_hook_point:
+        return direction
+
     # Others not yet supported
     else:
         raise NotImplementedError(

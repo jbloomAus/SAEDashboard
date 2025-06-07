@@ -80,11 +80,27 @@ class SaeVisRunner:
 
         # add extra method to SAE which is not yet provided by SAE Lens.
         # encoder = self.mock_feature_acts_subset_for_now(encoder)
-        encoder.fold_W_dec_norm()
+        print("SaeVisRunner: Skipping fold_W_dec_norm() for encoder.")
 
         # turn off reshaping mode since that's not useful if we're caching activations on disk
-        if encoder.hook_z_reshaping_mode:
-            encoder.turn_off_forward_pass_hook_z_reshaping()
+        if hasattr(encoder, "hook_z_reshaping_mode") and encoder.hook_z_reshaping_mode:
+            if hasattr(encoder, "turn_off_forward_pass_hook_z_reshaping") and callable(
+                encoder.turn_off_forward_pass_hook_z_reshaping
+            ):
+                encoder.turn_off_forward_pass_hook_z_reshaping()
+            else:
+                print(
+                    "SaeVisRunner: encoder does not have a callable 'turn_off_forward_pass_hook_z_reshaping' method."
+                )
+        elif (
+            hasattr(encoder, "hook_z_reshaping_mode")
+            and not encoder.hook_z_reshaping_mode
+        ):
+            print("SaeVisRunner: hook_z_reshaping_mode is already False.")
+        else:
+            print(
+                "SaeVisRunner: encoder does not have 'hook_z_reshaping_mode' attribute."
+            )
 
         # set precision on encoders and model
         # encoder = encoder.to(DTYPES[self.cfg.dtype])
@@ -335,8 +351,23 @@ def get_decoder_weights_distribution(
     if not isinstance(feature_idx, list):
         feature_idx = [feature_idx]
 
+    # Check if the encoder is our CLT wrapper
+    is_clt = "CLTLayerWrapper" in str(type(encoder))
+    # Alternative (safer if CLTLayerWrapper can be imported directly):
+    # from .clt_layer_wrapper import CLTLayerWrapper # Adjust import path as needed
+    # is_clt = isinstance(encoder, CLTLayerWrapper)
+
     distribs = []
     for feature in feature_idx:
+        if is_clt:
+            # CLT decoders map to MLP output, not attention heads.
+            # Return a default distribution representing a single "head".
+            distribs.append(
+                DecoderWeightsDistribution(n_heads=1, allocation_by_head=[1.0])
+            )
+            continue
+
+        # Original SAE/Transcoder logic
         att_blocks = einops.rearrange(
             encoder.W_dec[feature, :],
             "(n_head d_head) -> n_head d_head",

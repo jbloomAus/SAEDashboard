@@ -1058,39 +1058,31 @@ class RollingCorrCoef:
         k: int,
         largest: bool = True,
     ) -> tuple[list[list[int]], list[list[float]], list[list[float]]]:
-        """
-        Takes topk of the pearson corrcoefs over the y-dimension (e.g. giving us the most correlated neurons or most
-        correlated encoder-B features for each encoder feature).
-
-        Args:
-            k: int
-                Number of top indices to take (usually 3, for the left-hand tables)
-            largest: bool
-                If True, then we take the largest k indices. If False, then we take the smallest k indices.
-
-        Returns:
-            pearson_indices: list[list[int]]
-                y-indices which are most correlated with each x-index (in terms of pearson corrcoef)
-            pearson_values: list[list[float]]
-                Values of pearson corrcoef for each of the topk indices
-            cossim_values: list[list[float]]
-                Values of cosine similarity for each of the topk indices
-        """
-        # Get correlation coefficient, using the formula from corrcoef method
         pearson, cossim = self.corrcoef()
+        # TopK internally handles k logic if k > dimension size
+        pearson_topk_obj = TopK(tensor=pearson, k=k, largest=largest)
+        cossim_values_at_topk = eindex(
+            cossim, pearson_topk_obj.indices, "X [X k]"
+        )  # pearson_topk_obj.indices is numpy
 
-        # Get the top pearson values
-        pearson_topk = TopK(tensor=pearson, k=k, largest=largest)  # shape (X, k)
+        # 'indices_from_topk' are the raw indices from the TopK operation, relative to the pearson matrix
+        indices_from_topk = pearson_topk_obj.indices.tolist()
 
-        # Get the cossim values for the top pearson values, i.e. cossim_values[X, k] = cossim[X, pearson_indices[X, k]]
-        cossim_values = eindex(cossim, pearson_topk.indices, "X [X k]")
+        # 'final_indices' will be returned. It starts as indices_from_topk and is then remapped if self.indices exists.
+        final_indices = indices_from_topk
 
-        # If we've supplied indices, use them to offset the returned pearson topk indices
-        indices = pearson_topk.indices.tolist()
         if self.indices is not None:
-            indices = [[self.indices[i] for i in x] for x in indices]
+            # This is the line that causes the IndexError
+            final_indices = [
+                [self.indices[idx_val] for idx_val in inner_list]
+                for inner_list in indices_from_topk
+            ]
 
-        return indices, pearson_topk.values.tolist(), cossim_values.tolist()
+        return (
+            final_indices,
+            pearson_topk_obj.values.tolist(),
+            cossim_values_at_topk.tolist(),
+        )
 
 
 @dataclass_json

@@ -4,18 +4,19 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Set, Tuple
+from typing import Dict, Set, Tuple, Optional, List
+from dataclasses import asdict
 
 import numpy as np
 import torch
 import wandb
 import wandb.sdk
 from matplotlib import colors
-from sae_lens.sae import SAE
-from sae_lens.training.activations_store import ActivationsStore
-from tqdm import tqdm
-from transformer_lens import HookedTransformer
-from transformers import AutoModelForCausalLM
+from sae_lens.sae import SAE  # type: ignore
+from sae_lens.training.activations_store import ActivationsStore  # type: ignore
+from tqdm import tqdm  # type: ignore
+from transformer_lens import HookedTransformer  # type: ignore
+from transformers import AutoModelForCausalLM  # type: ignore
 
 from sae_dashboard.components_config import (
     ActsHistogramConfig,
@@ -33,6 +34,7 @@ from sae_dashboard.neuronpedia.neuronpedia_runner_config import NeuronpediaRunne
 from sae_dashboard.sae_vis_data import SaeVisConfig
 from sae_dashboard.sae_vis_runner import SaeVisRunner
 from sae_dashboard.utils_fns import has_duplicate_rows
+from sae_dashboard.clt_layer_wrapper import CLTWrapperConfig
 
 # set TOKENIZERS_PARALLELISM to false to avoid warnings
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -50,10 +52,10 @@ DEFAULT_FALLBACK_DEVICE = "cpu"
 HTML_ANOMALIES = {
     "âĢĶ": "—",
     "âĢĵ": "–",
-    "âĢľ": "“",
-    "âĢĿ": "”",
-    "âĢĺ": "‘",
-    "âĢĻ": "’",
+    "âĢľ": """,
+    "âĢĿ": """,
+    "âĢĺ": "'",
+    "âĢĻ": "'",
     "âĢĭ": " ",  # TODO: this is actually zero width space
     "Ġ": " ",
     "Ċ": "\n",
@@ -67,6 +69,20 @@ class NeuronpediaRunner:
         cfg: NeuronpediaRunnerConfig,
     ):
         self.cfg = cfg
+
+        # --- Validation ---
+        flags = [
+            self.cfg.use_transcoder,
+            self.cfg.use_skip_transcoder,
+            self.cfg.use_clt,
+        ]
+        if sum(flags) > 1:
+            raise ValueError(
+                "Only one of --use-transcoder, --use-skip-transcoder, or --use-clt can be set."
+            )
+        if self.cfg.use_clt and self.cfg.clt_layer_idx is None:
+            raise ValueError("--clt-layer-idx must be specified when using --use-clt.")
+        # --- End Validation ---
 
         # Get device defaults. But if we have overrides, then use those.
         device_count = 1
@@ -155,6 +171,415 @@ class NeuronpediaRunner:
                     self.sae.to(dtype=dtype_torch)
                 except AttributeError:
                     raise ValueError(f"Invalid sae_dtype: {self.cfg.sae_dtype}")
+        elif self.cfg.use_clt:
+            # Dynamically import CLT components only when needed
+            try:
+                from clt.models.clt import CrossLayerTranscoder  # type: ignore
+                from clt.config.clt_config import CLTConfig  # type: ignore
+            except ImportError as e:
+                raise ImportError(
+                    "CLT components (CrossLayerTranscoder, CLTConfig) not found. "
+                    "Ensure the 'clt' package is installed and available." + str(e)
+                ) from e
+
+            if self.cfg.from_local_sae:
+                # Assuming CLT config is saved as 'cfg.json' in the local path
+                try:
+                    clt_config_path = Path(self.cfg.sae_path) / "cfg.json"
+                    if not clt_config_path.is_file():
+                        raise FileNotFoundError(
+                            f"CLT config file not found at {clt_config_path}"
+                        )
+                    clt_cfg = CLTConfig.from_json(clt_config_path)
+                except Exception as e:
+                    raise ValueError(
+                        f"Failed to load CLT config from {clt_config_path}: {e}"
+                    ) from e
+
+                _temp_clt_for_debug = CrossLayerTranscoder(
+                    config=clt_cfg,
+                    process_group=None,
+                    device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
+                )
+                print(
+                    "\n--- CLT Parameters BEFORE state_dict loading (Initial Random Values) ---"
+                )
+                encoder_module_temp = _temp_clt_for_debug.encoder_module.encoders[0]
+                if (
+                    hasattr(encoder_module_temp, "bias")
+                    and encoder_module_temp.bias
+                    and hasattr(encoder_module_temp, "bias_param")
+                    and encoder_module_temp.bias_param is not None
+                ):
+                    print(
+                        f"Norm of _temp_clt_for_debug.encoder_module.encoders[0].bias_param: {torch.norm(encoder_module_temp.bias_param.data).item()}"
+                    )
+                elif (
+                    hasattr(encoder_module_temp, "bias")
+                    and not encoder_module_temp.bias
+                ):
+                    print(
+                        "_temp_clt_for_debug.encoder_module.encoders[0] has bias=False"
+                    )
+                else:
+                    print(
+                        "_temp_clt_for_debug.encoder_module.encoders[0].bias_param does not exist, is None, or bias flag is False"
+                    )
+
+                decoder_key_example = "0->0"
+                decoder_module_temp = None
+                if decoder_key_example in _temp_clt_for_debug.decoder_module.decoders:
+                    decoder_module_temp = _temp_clt_for_debug.decoder_module.decoders[
+                        decoder_key_example
+                    ]
+
+                if (
+                    decoder_module_temp
+                    and hasattr(decoder_module_temp, "bias")
+                    and decoder_module_temp.bias
+                    and hasattr(decoder_module_temp, "bias_param")
+                    and decoder_module_temp.bias_param is not None
+                ):
+                    print(
+                        f"Norm of _temp_clt_for_debug.decoder_module.decoders['{decoder_key_example}'].bias_param: {torch.norm(decoder_module_temp.bias_param.data).item()}"
+                    )
+                elif (
+                    decoder_module_temp
+                    and hasattr(decoder_module_temp, "bias")
+                    and not decoder_module_temp.bias
+                ):
+                    print(
+                        f"_temp_clt_for_debug.decoder_module.decoders['{decoder_key_example}'] has bias=False"
+                    )
+                else:
+                    print(
+                        f"_temp_clt_for_debug.decoder_module.decoders['{decoder_key_example}'].bias_param does not exist, is None, or bias flag is False, or module not found"
+                    )
+                del _temp_clt_for_debug
+                print(
+                    "---------------------------------------------------------------------\n"
+                )
+
+                self.clt = CrossLayerTranscoder(
+                    config=clt_cfg,
+                    process_group=None,
+                    device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
+                )
+                # ---> Load the state dictionary (supports .pt / .bin / .safetensors)
+                # Determine which file to load. Preference order:
+                # 1. Explicit filename provided via cfg.clt_weights_filename.
+                # 2. First *.safetensors file found in sae_path directory.
+                # 3. "model.safetensors", then "model.pt", then "model.bin".
+
+                explicit_filename = (
+                    self.cfg.clt_weights_filename
+                    if hasattr(self.cfg, "clt_weights_filename")
+                    else ""
+                )
+
+                candidate_paths: List[Path] = []
+                if explicit_filename:
+                    candidate_paths.append(Path(self.cfg.sae_path) / explicit_filename)
+
+                # If no explicit filename or the file doesn't exist, search common patterns
+                if not candidate_paths or not candidate_paths[0].is_file():
+                    # Find any *.safetensors file in directory (common for CLT)
+                    candidate_paths.extend(
+                        sorted(Path(self.cfg.sae_path).glob("*.safetensors"))
+                    )
+                    # Add common legacy filenames
+                    candidate_paths.append(
+                        Path(self.cfg.sae_path) / "model.safetensors"
+                    )
+                    candidate_paths.append(Path(self.cfg.sae_path) / "model.pt")
+                    candidate_paths.append(Path(self.cfg.sae_path) / "model.bin")
+
+                # Pick the first existing path
+                weights_path: Optional[Path] = None
+                for cand in candidate_paths:
+                    if cand.is_file():
+                        weights_path = cand
+                        break
+
+                if weights_path is None:
+                    print(
+                        f"Warning: No CLT weights file found in {self.cfg.sae_path}. Expected one of: {', '.join(str(p) for p in candidate_paths)}. Weights are not loaded."
+                    )
+                else:
+                    print(f"Loading CLT state dict from: {weights_path}")
+
+                    # Choose loader based on file extension
+                    if weights_path.suffix == ".safetensors":
+                        try:
+                            from safetensors.torch import load_file as safe_load_file
+                        except ImportError as e:
+                            raise ImportError(
+                                "safetensors library is required to load .safetensors files. Install via `pip install safetensors`."
+                            ) from e
+
+                        raw_state_dict = safe_load_file(weights_path)
+                    else:
+                        raw_state_dict = torch.load(
+                            weights_path, map_location=self.cfg.sae_device
+                        )
+
+                    state_dict = raw_state_dict
+                    # state_dict = {
+                    #     k.replace("_orig_mod.", ""): v
+                    #     for k, v in raw_state_dict.items()
+                    # }
+
+                    print("\n--- Raw State Dict Parameter Norms (from model file) ---")
+                    sample_keys_to_check = [
+                        "encoder_module.encoders.0.weight",
+                        "encoder_module.encoders.0.bias_param",
+                        "decoder_module.decoders.0->0.weight",
+                        "decoder_module.decoders.0->0.bias_param",
+                    ]
+                    for key_to_check in sample_keys_to_check:
+                        if key_to_check in state_dict:
+                            print(
+                                f"Norm of state_dict['{key_to_check}']: {torch.norm(state_dict[key_to_check]).item()}"
+                            )
+                        else:
+                            print(
+                                f"Key '{key_to_check}' not found in processed state_dict."
+                            )
+                    print("--------------------------------------------------------\n")
+
+                    # Load the processed state dict
+                    self.clt.load_state_dict(state_dict)
+                    print("CLT state dict loaded successfully.")
+
+                    print("\n--- CLT Parameters AFTER state_dict loading ---")
+                    idx_to_check_clt = 0
+                    encoder_module_loaded = self.clt.encoder_module.encoders[
+                        idx_to_check_clt
+                    ]
+
+                    if (
+                        hasattr(encoder_module_loaded, "bias")
+                        and encoder_module_loaded.bias
+                        and hasattr(encoder_module_loaded, "bias_param")
+                        and encoder_module_loaded.bias_param is not None
+                    ):
+                        loaded_bias_norm = torch.norm(
+                            encoder_module_loaded.bias_param.data
+                        ).item()
+                        print(
+                            f"Norm of self.clt.encoder_module.encoders[{idx_to_check_clt}].bias_param (after loading): {loaded_bias_norm}"
+                        )
+                        source_key = (
+                            f"encoder_module.encoders.{idx_to_check_clt}.bias_param"
+                        )
+                        if source_key in state_dict:
+                            print(
+                                f"  (Compared to loaded state_dict['{source_key}'] norm: {torch.norm(state_dict[source_key]).item()})"
+                            )
+                    elif (
+                        hasattr(encoder_module_loaded, "bias")
+                        and not encoder_module_loaded.bias
+                    ):
+                        print(
+                            f"self.clt.encoder_module.encoders[{idx_to_check_clt}] has bias=False after loading"
+                        )
+                    else:
+                        print(
+                            f"self.clt.encoder_module.encoders[{idx_to_check_clt}].bias_param is None, does not exist, or bias flag is False after loading"
+                        )
+
+                    decoder_key_to_check_clt = f"{idx_to_check_clt}->{idx_to_check_clt}"
+                    decoder_module_loaded = None
+                    if decoder_key_to_check_clt in self.clt.decoder_module.decoders:
+                        decoder_module_loaded = self.clt.decoder_module.decoders[
+                            decoder_key_to_check_clt
+                        ]
+
+                    if (
+                        decoder_module_loaded
+                        and hasattr(decoder_module_loaded, "bias")
+                        and decoder_module_loaded.bias
+                        and hasattr(decoder_module_loaded, "bias_param")
+                        and decoder_module_loaded.bias_param is not None
+                    ):
+                        loaded_decoder_bias_norm = torch.norm(
+                            decoder_module_loaded.bias_param.data
+                        ).item()
+                        print(
+                            f"Norm of self.clt.decoder_module.decoders['{decoder_key_to_check_clt}'].bias_param (after loading): {loaded_decoder_bias_norm}"
+                        )
+                        source_decoder_key = f"decoder_module.decoders.{decoder_key_to_check_clt}.bias_param"
+                        if source_decoder_key in state_dict:
+                            print(
+                                f"  (Compared to loaded state_dict['{source_decoder_key}'] norm: {torch.norm(state_dict[source_decoder_key]).item()})"
+                            )
+                    elif (
+                        decoder_module_loaded
+                        and hasattr(decoder_module_loaded, "bias")
+                        and not decoder_module_loaded.bias
+                    ):
+                        print(
+                            f"self.clt.decoder_module.decoders['{decoder_key_to_check_clt}'] has bias=False after loading"
+                        )
+                    else:
+                        print(
+                            f"self.clt.decoder_module.decoders['{decoder_key_to_check_clt}'].bias_param is None, does not exist, or bias flag is False, or module not found after loading"
+                        )
+
+                    if (
+                        hasattr(encoder_module_loaded, "weight")
+                        and encoder_module_loaded.weight is not None
+                    ):
+                        print(
+                            f"Norm of self.clt.encoder_module.encoders[{idx_to_check_clt}].weight (after loading): {torch.norm(encoder_module_loaded.weight.data).item()}"
+                        )
+                    if (
+                        decoder_module_loaded
+                        and hasattr(decoder_module_loaded, "weight")
+                        and decoder_module_loaded.weight is not None
+                    ):
+                        print(
+                            f"Norm of self.clt.decoder_module.decoders['{decoder_key_to_check_clt}'].weight (after loading): {torch.norm(decoder_module_loaded.weight.data).item()}"
+                        )
+                    print("---------------------------------------------------\n")
+
+                # This else block is misplaced and causes a syntax error.
+                # else:
+                #     print(
+                #         f"Warning: CLT weights file not found at {weights_path}. Weights are not loaded."
+                #     )
+                #     # Potentially raise an error here if weights are mandatory
+                #     # raise FileNotFoundError(f"CLT weights file not found at {weights_path}")
+
+            else:
+                # Placeholder for loading CLT from a HuggingFace-like release/id system
+                # Adapt this if your CLT package provides a `from_pretrained` method
+                # self.clt = CrossLayerTranscoder.from_pretrained(
+                #     release=self.cfg.sae_set,  # Or appropriate mapping
+                #     clt_id=self.cfg.sae_path,   # Or appropriate mapping
+                #     device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
+                # )
+                raise NotImplementedError(
+                    "Loading CLT from non-local path (e.g., HF release) is not yet implemented."
+                )
+
+            # Apply dtype override if specified for CLT
+            if self.cfg.clt_dtype:
+                try:
+                    dtype_torch = getattr(torch, self.cfg.clt_dtype)
+                    self.clt.to(dtype=dtype_torch)
+                    print(f"Overriding CLT dtype to {self.cfg.clt_dtype}")
+                except AttributeError:
+                    raise ValueError(f"Invalid clt_dtype: {self.cfg.clt_dtype}")
+            elif hasattr(self.clt.config, "clt_dtype") and self.clt.config.clt_dtype:
+                # Use CLT's configured dtype if override not specified
+                self.cfg.clt_dtype = str(self.clt.config.clt_dtype).replace(
+                    "torch.", ""
+                )
+                print(f"Using CLT configured dtype: {self.cfg.clt_dtype}")
+            else:
+                # Default if no override and no config dtype
+                self.cfg.clt_dtype = "float32"
+                print(f"CLT dtype not specified, defaulting to {self.cfg.clt_dtype}")
+
+            # Instantiate the wrapper for the specific CLT layer
+            from sae_dashboard.clt_layer_wrapper import CLTLayerWrapper  # Local import
+
+            # Assert that clt_layer_idx is not None (already validated, but helps type checker)
+            assert (
+                self.cfg.clt_layer_idx is not None
+            ), "CLT layer index should not be None here due to earlier validation."
+
+            self.sae = CLTLayerWrapper(
+                self.clt, self.cfg.clt_layer_idx, clt_model_dir_path=self.cfg.sae_path
+            )
+            print(f"Created CLTLayerWrapper for layer {self.cfg.clt_layer_idx}")
+
+            print("\n--- CLTLayerWrapper Parameter Norms (self.sae) ---")
+            clt_layer_idx_for_wrapper = self.cfg.clt_layer_idx
+            assert (
+                clt_layer_idx_for_wrapper is not None
+            ), "clt_layer_idx should be set for CLTLayerWrapper"
+
+            print(f"Norm of self.sae.W_enc: {torch.norm(self.sae.W_enc).item()}")
+            clt_encoder_module_for_wrapper = self.clt.encoder_module.encoders[
+                clt_layer_idx_for_wrapper
+            ]
+            if hasattr(clt_encoder_module_for_wrapper, "weight"):
+                print(
+                    f"  (Source self.clt.encoder_module.encoders[{clt_layer_idx_for_wrapper}].weight.t() norm: {torch.norm(clt_encoder_module_for_wrapper.weight.data.t()).item()})"
+                )
+
+            if self.sae.b_enc is not None:
+                print(f"Norm of self.sae.b_enc: {torch.norm(self.sae.b_enc).item()}")
+                if (
+                    hasattr(clt_encoder_module_for_wrapper, "bias")
+                    and clt_encoder_module_for_wrapper.bias
+                    and hasattr(clt_encoder_module_for_wrapper, "bias_param")
+                    and clt_encoder_module_for_wrapper.bias_param is not None
+                ):
+                    print(
+                        f"  (Source self.clt.encoder_module.encoders[{clt_layer_idx_for_wrapper}].bias_param norm: {torch.norm(clt_encoder_module_for_wrapper.bias_param.data).item()})"
+                    )
+                elif (
+                    hasattr(clt_encoder_module_for_wrapper, "bias")
+                    and not clt_encoder_module_for_wrapper.bias
+                ):
+                    print(
+                        f"  (Source self.clt.encoder_module.encoders[{clt_layer_idx_for_wrapper}] has bias=False)"
+                    )
+                else:
+                    print(
+                        f"  (Source self.clt.encoder_module.encoders[{clt_layer_idx_for_wrapper}].bias_param not found or bias flag false)"
+                    )
+            else:
+                print("self.sae.b_enc is None")
+
+            wrapper_decoder_key = (
+                f"{clt_layer_idx_for_wrapper}->{clt_layer_idx_for_wrapper}"
+            )
+            clt_decoder_module_for_wrapper = None
+            if wrapper_decoder_key in self.clt.decoder_module.decoders:
+                clt_decoder_module_for_wrapper = self.clt.decoder_module.decoders[
+                    wrapper_decoder_key
+                ]
+
+            print(f"Norm of self.sae.W_dec: {torch.norm(self.sae.W_dec).item()}")
+            if clt_decoder_module_for_wrapper and hasattr(
+                clt_decoder_module_for_wrapper, "weight"
+            ):
+                print(
+                    f"  (Source self.clt.decoder_module.decoders['{wrapper_decoder_key}'].weight.t() norm: {torch.norm(clt_decoder_module_for_wrapper.weight.data.t()).item()})"
+                )
+
+            if self.sae.b_dec is not None:
+                print(f"Norm of self.sae.b_dec: {torch.norm(self.sae.b_dec).item()}")
+                if (
+                    clt_decoder_module_for_wrapper
+                    and hasattr(clt_decoder_module_for_wrapper, "bias")
+                    and clt_decoder_module_for_wrapper.bias
+                    and hasattr(clt_decoder_module_for_wrapper, "bias_param")
+                    and clt_decoder_module_for_wrapper.bias_param is not None
+                ):
+                    print(
+                        f"  (Source self.clt.decoder_module.decoders['{wrapper_decoder_key}'].bias_param norm: {torch.norm(clt_decoder_module_for_wrapper.bias_param.data).item()})"
+                    )
+                elif (
+                    clt_decoder_module_for_wrapper
+                    and hasattr(clt_decoder_module_for_wrapper, "bias")
+                    and not clt_decoder_module_for_wrapper.bias
+                ):
+                    print(
+                        f"  (Source self.clt.decoder_module.decoders['{wrapper_decoder_key}'] has bias=False)"
+                    )
+                else:
+                    print(
+                        f"  (Source self.clt.decoder_module.decoders['{wrapper_decoder_key}'].bias_param not found, or decoder module not found, or bias flag false)"
+                    )
+            else:
+                print("self.sae.b_dec is None")
+            print("-----------------------------------------------------\n")
+
         else:
             LoaderClass = SAE
             if self.cfg.from_local_sae:
@@ -208,77 +633,120 @@ class NeuronpediaRunner:
         print(f"Total number of tokens: {n_tokens_total}")
         print(f"Total number of contexts (prompts): {self.cfg.n_prompts_total}")
 
-        # get the sae's cfg and check if it has from pretrained kwargs
-        # with open(f"{self.cfg.sae_path}/cfg.json", "r") as f:
-        sae_cfg_json = self.sae.cfg.to_dict()
+        # --- Determine Model Config ---
+        model_cfg = self.sae.cfg
+
+        if isinstance(model_cfg, CLTWrapperConfig):
+            import dataclasses
+
+            sae_cfg_json = dataclasses.asdict(model_cfg)
+        elif hasattr(model_cfg, "to_dict"):
+            sae_cfg_json = model_cfg.to_dict()
+        else:
+            try:
+                sae_cfg_json = vars(model_cfg)
+            except TypeError:
+                sae_cfg_json = {}
+
         sae_from_pretrained_kwargs = sae_cfg_json.get(
             "model_from_pretrained_kwargs", {}
         )
-        print("SAE Config on disk:")
-        print(json.dumps(sae_cfg_json, indent=2))
-        if sae_from_pretrained_kwargs != {}:
-            print("SAE has from_pretrained_kwargs", sae_from_pretrained_kwargs)
+        print("SAE/Wrapper Config:")
+        import pprint
+
+        pprint.pprint(sae_cfg_json)
+        if sae_from_pretrained_kwargs:
+            print("SAE/Wrapper has from_pretrained_kwargs", sae_from_pretrained_kwargs)
         else:
             print(
-                "SAE does not have from_pretrained_kwargs. Standard TransformerLens Loading"
+                "SAE/Wrapper does not have from_pretrained_kwargs. Standard TransformerLens Loading"
             )
+        # --- End Determine Model Config ---
 
-        self.sae.cfg.dataset_path = self.cfg.huggingface_dataset_path
-        self.sae.cfg.context_size = self.cfg.n_tokens_in_prompt
+        # --- Set Config Values based on Runner Config ---
+        current_dataset_path = getattr(model_cfg, "dataset_path", None)
+        if not current_dataset_path:
+            model_cfg.dataset_path = self.cfg.huggingface_dataset_path
+            print(f"Set model_cfg dataset_path: {model_cfg.dataset_path}")
 
-        self.sae.fold_W_dec_norm()
+        current_context_size = getattr(model_cfg, "context_size", None)
+        if current_context_size is None:
+            model_cfg.context_size = self.cfg.n_tokens_in_prompt
+            print(f"Set model_cfg context_size: {model_cfg.context_size}")
 
-        print(f"SAE DType: {self.cfg.sae_dtype}")
-        print(f"Model DType: {self.cfg.model_dtype}")
+        # Prepend_bos should now exist on model_cfg due to CLTWrapperConfig update
+        # No need to set it here unless we want to explicitly override based on runner cfg
+        # --- End Set Config Values ---
 
-        # Initialize Model
-        self.model_id = self.sae.cfg.model_name
+        # --- Prepare Base Model ---
+        # if hasattr(self.sae, "fold_W_dec_norm") and callable(self.sae.fold_W_dec_norm):
+        #     self.sae.fold_W_dec_norm()
+        # else:
+        #     print("Skipping fold_W_dec_norm: Method not found")
+        print("\n--- Skipping fold_W_dec_norm as per user request. ---\n")
+
+        self.model_id = getattr(model_cfg, "model_name", None) or getattr(
+            self.cfg, "model_id", None
+        )
+        if not self.model_id:
+            raise ValueError("Could not determine model_id")
         self.cfg.model_id = self.model_id
-        self.layer = self.sae.cfg.hook_layer
+        self.layer = model_cfg.hook_layer
         self.cfg.layer = self.layer
-        # If custom HF model path is provided, load it first
+
+        print(f"SAE/Wrapper DType: {model_cfg.dtype}")
+        print(f"Base Model DType: {self.cfg.model_dtype}")
+
         hf_model = None
         if self.cfg.hf_model_path:
-            print(f"Loading custom HF model from: {self.cfg.hf_model_path}")
-            hf_model = AutoModelForCausalLM.from_pretrained(
-                self.cfg.hf_model_path,
-            )
+            hf_model = AutoModelForCausalLM.from_pretrained(self.cfg.hf_model_path)
 
+        print(f"Loading base model: {self.model_id}...")
         self.model = HookedTransformer.from_pretrained(
             model_name=self.model_id,
             device=self.cfg.model_device,
             n_devices=self.cfg.model_n_devices or 1,
-            hf_model=hf_model,  # Pass the custom model if provided
-            **sae_from_pretrained_kwargs,
+            hf_model=hf_model,
             dtype=self.cfg.model_dtype,
+            **sae_from_pretrained_kwargs,
         )
+        print(f"Base model {self.model_id} loaded successfully.")
+        # --- End Prepare Base Model ---
 
-        # Ensure MLP-in hooks are computed if needed (important for most Transcoders)
+        # --- Final Setup (Activations Store, Output Dir, Vocab) ---
+        # Ensure MLP-in hooks are computed if needed
+        hook_name_to_check = getattr(model_cfg, "hook_name", "")
         if (
-            self.cfg.use_transcoder or "hook_mlp_in" in self.sae.cfg.hook_name
+            self.cfg.use_transcoder
+            or self.cfg.use_skip_transcoder
+            or self.cfg.use_clt
+            or "hook_mlp_in" in hook_name_to_check
         ) and hasattr(self.model, "set_use_hook_mlp_in"):
-            # TransformerLens models 1.12+ support this flag
+            print("Setting use_hook_mlp_in=True on the base model.")
             self.model.set_use_hook_mlp_in(True)
 
         # Initialize Activations Store
+        print("Initializing ActivationsStore...")
         self.activations_store = ActivationsStore.from_sae(
             model=self.model,
             sae=self.sae,
             streaming=True,
-            store_batch_size_prompts=8,  # these don't matter
-            n_batches_in_buffer=16,  # these don't matter
+            store_batch_size_prompts=self.cfg.n_prompts_in_forward_pass,
+            n_batches_in_buffer=16,
             device=self.cfg.activation_store_device or "cpu",
         )
+        # Ensure ActivationsStore context size uses the value from model_cfg
+        # which might have been updated from runner cfg
+        self.activations_store.context_size = model_cfg.context_size
+
         self.cached_activations_dir = Path(
-            f"./cached_activations/{self.model_id}_{self.cfg.sae_set}_{self.sae.cfg.hook_name}_{self.sae.cfg.d_sae}width_{self.cfg.n_prompts_total}prompts"
+            f"./cached_activations/{self.model_id}_{self.cfg.sae_set}_{hook_name_to_check}_{model_cfg.d_sae}width_{self.cfg.n_prompts_total}prompts"
         )
 
-        # override the number of context tokens if we specified one
-        # this is useful because sometimes the default context tokens is too large for us to quickly generate
-        if self.cfg.n_tokens_in_prompt is not None:
-            self.activations_store.context_size = self.cfg.n_tokens_in_prompt
+        # This override seems redundant if already set via model_cfg, remove or clarify?
+        # if self.cfg.n_tokens_in_prompt is not None:
+        #     self.activations_store.context_size = self.cfg.n_tokens_in_prompt
 
-        # if we have additional info, add it to the outputs subdir
         self.np_sae_id_suffix = self.cfg.np_sae_id_suffix
 
         if not os.path.exists(cfg.outputs_dir):
@@ -472,7 +940,7 @@ class NeuronpediaRunner:
             json.dump(run_settings, f, indent=4)
 
         wandb_cfg = self.cfg.__dict__
-        wandb_cfg["sae_cfg"] = self.sae.cfg.to_dict()
+        wandb_cfg["sae_cfg"] = asdict(self.sae.cfg)
 
         current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         set_name = (
@@ -688,6 +1156,29 @@ def main():
         action="store_true",
         help="If set, load a SkipTranscoder instead of a Transcoder/SAE",
     )
+    parser.add_argument(
+        "--use-clt",
+        action="store_true",
+        help="If set, load a CrossLayerTranscoder instead of a standard SAE/Transcoder",
+    )
+    parser.add_argument(
+        "--clt-layer-idx",
+        type=int,
+        default=None,
+        help="Layer index to use for CLT encoder (required if --use-clt)",
+    )
+    parser.add_argument(
+        "--clt-dtype",
+        type=str,
+        default="",
+        help="Optional override for CLT data type (e.g., 'float16')",
+    )
+    parser.add_argument(
+        "--clt-weights-filename",
+        type=str,
+        default="",
+        help="Filename of the CLT weights file (supports .safetensors / .pt). If omitted, script will search for a suitable file automatically.",
+    )
 
     args = parser.parse_args()
 
@@ -712,6 +1203,10 @@ def main():
         hf_model_path=args.hf_model_path,
         use_transcoder=args.use_transcoder,
         use_skip_transcoder=args.use_skip_transcoder,
+        use_clt=args.use_clt,
+        clt_layer_idx=args.clt_layer_idx,
+        clt_dtype=args.clt_dtype,
+        clt_weights_filename=args.clt_weights_filename,
     )
 
     runner = NeuronpediaRunner(cfg)
