@@ -61,8 +61,6 @@ from transformer_lens import HookedTransformer  # type: ignore
 
 model = HookedTransformer.from_pretrained("EleutherAI/pythia-160m")
 
-print(model)
-
 
 def copy_output_folder(source: str, destination: str):
     """
