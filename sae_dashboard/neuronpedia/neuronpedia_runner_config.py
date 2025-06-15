@@ -54,6 +54,7 @@ class NeuronpediaRunnerConfig:
     ignore_positions: Optional[List[int]] = None
 
     hf_model_path: Optional[str] = None
+    converter_name: Optional[str] = None
 
 
 @dataclass
