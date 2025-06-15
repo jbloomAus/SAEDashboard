@@ -12,6 +12,7 @@ import wandb
 import wandb.sdk
 from matplotlib import colors
 from sae_lens.sae import SAE
+from sae_lens.toolkit.pretrained_sae_loaders import NAMED_PRETRAINED_SAE_LOADERS
 from sae_lens.training.activations_store import ActivationsStore
 from tqdm import tqdm
 from transformer_lens import HookedTransformer
@@ -104,10 +105,22 @@ class NeuronpediaRunner:
                 dtype=self.cfg.sae_dtype if self.cfg.sae_dtype != "" else None,
             )
         else:
+            # Validate and prepare converter for remote SAE loading
+            converter = None
+            if self.cfg.converter_name is not None:
+                if self.cfg.converter_name not in NAMED_PRETRAINED_SAE_LOADERS:
+                    available_converters = list(NAMED_PRETRAINED_SAE_LOADERS.keys())
+                    raise ValueError(
+                        f"Invalid converter '{self.cfg.converter_name}'. Available converters: {available_converters}"
+                    )
+                print(f"Using custom converter: {self.cfg.converter_name}")
+                converter = NAMED_PRETRAINED_SAE_LOADERS[self.cfg.converter_name]
+
             self.sae, _, _ = SAE.from_pretrained(
                 release=self.cfg.sae_set,
                 sae_id=self.cfg.sae_path,
                 device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
+                converter=converter,
             )
             if self.cfg.sae_dtype != "":
                 if self.cfg.sae_dtype == "float16":
@@ -614,6 +627,12 @@ def main():
         default=None,
         help="Optional: Path to custom HuggingFace model to use instead of default weights",
     )
+    parser.add_argument(
+        "--converter-name",
+        type=str,
+        default=None,
+        help="Optional: Custom loader name in NAMED_PRETRAINED_SAE_LOADERS",
+    )
 
     args = parser.parse_args()
 
@@ -636,6 +655,7 @@ def main():
         end_batch=args.end_batch,
         use_wandb=args.use_wandb,
         hf_model_path=args.hf_model_path,
+        converter_name=args.converter_name,
     )
 
     runner = NeuronpediaRunner(cfg)
