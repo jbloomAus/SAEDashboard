@@ -116,7 +116,6 @@ class DFACalculator:
     def calculate_gqa_intermediate_tensor(
         self, attn_weights: torch.Tensor, v: torch.Tensor, feature_indices: List[int]
     ) -> torch.Tensor:
-
         n_query_heads = attn_weights.shape[1]
         n_kv_heads = v.shape[2]
         expansion_factor = n_query_heads // n_kv_heads

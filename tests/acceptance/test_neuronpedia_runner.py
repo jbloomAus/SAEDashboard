@@ -25,7 +25,6 @@ def json_to_class(json_file: str, cls: Type[T]) -> T:
 
 # pytest -s tests/acceptance/test_neuronpedia_runner.py::test_simple_neuronpedia_runner
 def test_simple_neuronpedia_runner():
-
     # (_, SAE_WEIGHTS_PATH, _) = download_sae_from_hf(
     #     "jbloom/GPT2-Small-SAEs-Reformatted", "blocks.0.hook_resid_pre"
     # )
@@ -156,7 +155,6 @@ def test_simple_neuronpedia_runner():
 
 
 def test_simple_neuronpedia_runner_different_dtypes_sae_model():
-
     # (_, SAE_WEIGHTS_PATH, _) = download_sae_from_hf(
     #     "jbloom/GPT2-Small-SAEs-Reformatted", "blocks.0.hook_resid_pre"
     # )
@@ -224,7 +222,6 @@ def test_simple_neuronpedia_runner_different_dtypes_sae_model():
 
 # pytest -s tests/benchmark/test_neuronpedia_runner.py::test_benchmark_neuronpedia_runner
 def test_benchmark_neuronpedia_runner():
-
     NP_OUTPUT_FOLDER = "neuronpedia_outputs/benchmark"
     SAE_SET = "gpt2-small-res-jb"
     SAE_PATH = "blocks.0.hook_resid_pre"
@@ -290,7 +287,6 @@ def test_benchmark_neuronpedia_runner():
 
 
 def test_simple_neuronpedia_runner_hook_z_sae():
-
     NP_OUTPUT_FOLDER = "neuronpedia_outputs/test_attn"
     ACT_CACHE_FOLDER = "cached_activations"
     SAE_SET = "gpt2-small-hook-z-kk"
@@ -326,7 +322,6 @@ def test_simple_neuronpedia_runner_hook_z_sae():
 
 
 def test_neuronpedia_runner_prefix_suffix_it_model():
-
     NP_OUTPUT_FOLDER = "neuronpedia_outputs/test_masking"
     ACT_CACHE_FOLDER = "cached_activations"
     SAE_SET = "gpt2-small-res-jb"

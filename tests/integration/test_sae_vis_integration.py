@@ -63,7 +63,7 @@ def setup_test_environment() -> (
 
 
 def test_sae_vis_runner_integration(
-    setup_test_environment: Callable[[], Tuple[HookedTransformer, SAE, torch.Tensor]]
+    setup_test_environment: Callable[[], Tuple[HookedTransformer, SAE, torch.Tensor]],
 ):
     model, sae, token_dataset = setup_test_environment()
 

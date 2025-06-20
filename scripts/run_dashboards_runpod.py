@@ -56,7 +56,6 @@ def copy_output_folder(source: str, destination: str):
 
 
 for saelens_sae_id, saelens_np_id in list_of_saes:
-
     directory = get_pretrained_saes_directory()
 
     def find_saelens_release_from_neuronpedia_id(neuronpedia_id: str) -> str:
@@ -85,7 +84,6 @@ for saelens_sae_id, saelens_np_id in list_of_saes:
     ACT_CACHE_FOLDER = "cached_activations"
 
     if __name__ == "__main__":
-
         # delete output files if present
         # os.system(f"rm -rf {NP_OUTPUT_FOLDER}")
         # os.system(f"rm -rf {ACT_CACHE_FOLDER}")

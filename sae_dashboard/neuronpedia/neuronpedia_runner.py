@@ -98,7 +98,7 @@ class NeuronpediaRunner:
 
         # Initialize SAE, defaulting to SAE dtype unless we override
         if self.cfg.from_local_sae:
-            self.sae = SAE.load_from_pretrained(
+            self.sae = SAE.load_from_pretrained(  # type: ignore
                 path=self.cfg.sae_path,
                 device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
                 dtype=self.cfg.sae_dtype if self.cfg.sae_dtype != "" else None,
@@ -154,7 +154,9 @@ class NeuronpediaRunner:
         # get the sae's cfg and check if it has from pretrained kwargs
         # with open(f"{self.cfg.sae_path}/cfg.json", "r") as f:
         sae_cfg_json = self.sae.cfg.to_dict()
-        sae_from_pretrained_kwargs = sae_cfg_json.get("model_from_pretrained_kwargs", {})
+        sae_from_pretrained_kwargs = sae_cfg_json.get(
+            "model_from_pretrained_kwargs", {}
+        )
         print("SAE Config on disk:")
         print(json.dumps(sae_cfg_json, indent=2))
         if sae_from_pretrained_kwargs != {}:
@@ -334,7 +336,6 @@ class NeuronpediaRunner:
         return target_feature_indexes
 
     def get_feature_batches(self):
-
         # divide into batches
         feature_idx = torch.tensor(self.target_feature_indexes)
         n_subarrays = np.ceil(len(feature_idx) / self.cfg.n_features_at_a_time).astype(
@@ -361,7 +362,6 @@ class NeuronpediaRunner:
             f.write(skipped_indexes_json)
 
     def get_tokens(self):
-
         tokens_file = f"{self.cfg.outputs_dir}/tokens_{self.cfg.n_prompts_total}.pt"
         if os.path.isfile(tokens_file):
             print("Tokens exist, loading them.")
@@ -383,7 +383,7 @@ class NeuronpediaRunner:
 
     def get_vocab_dict(self) -> Dict[int, str]:
         # get vocab
-        vocab_dict = self.model.tokenizer.vocab  # type: ignore
+        vocab_dict: dict = self.model.tokenizer.vocab  # type: ignore
         new_vocab_dict = {}
         # Replace substrings in the keys of vocab_dict using HTML_ANOMALIES
         for k, v in vocab_dict.items():  # type: ignore
@@ -399,7 +399,6 @@ class NeuronpediaRunner:
 
     # TODO: make this function simpler
     def run(self):
-
         run_settings_path = self.cfg.outputs_dir + "/" + RUN_SETTINGS_FILE
         run_settings = self.cfg.__dict__
         with open(run_settings_path, "w") as f:
@@ -443,7 +442,6 @@ class NeuronpediaRunner:
             for feature_batch_count, features_to_process in tqdm(
                 enumerate(feature_idx)
             ):
-
                 if feature_batch_count < self.cfg.start_batch:
                     feature_batch_count = feature_batch_count + 1
                     continue
@@ -494,7 +492,11 @@ class NeuronpediaRunner:
                     perform_ablation_experiments=False,
                     dtype=self.cfg.sae_dtype,
                     cache_dir=self.cached_activations_dir,
-                    ignore_tokens={self.model.tokenizer.pad_token_id, self.model.tokenizer.bos_token_id, self.model.tokenizer.eos_token_id},  # type: ignore
+                    ignore_tokens={
+                        self.model.tokenizer.pad_token_id,  # type: ignore
+                        self.model.tokenizer.bos_token_id,  # type: ignore
+                        self.model.tokenizer.eos_token_id,  # type: ignore
+                    },  # type: ignore
                     ignore_positions=self.cfg.ignore_positions or [],
                     use_dfa=self.cfg.use_dfa,
                 )

@@ -63,7 +63,7 @@ class TransformerLensWrapper(nn.Module):
         activation_dict = {}
 
         def build_act_dict(
-            hooks: Sequence[Tuple[str, Callable[[Tensor, HookPoint], None]]]
+            hooks: Sequence[Tuple[str, Callable[[Tensor, HookPoint], None]]],
         ) -> None:
             for hook_point, _ in hooks:
                 # The hook functions work by storing data in model's hook context, so we pop them back out
@@ -83,7 +83,9 @@ class TransformerLensWrapper(nn.Module):
         ]
 
         output: Tensor = self.model.run_with_hooks(
-            tokens, stop_at_layer=self.hook_layer + 1, fwd_hooks=hooks  # type: ignore
+            tokens,
+            stop_at_layer=self.hook_layer + 1,
+            fwd_hooks=hooks,  # type: ignore
         )
 
         build_act_dict(hooks)
