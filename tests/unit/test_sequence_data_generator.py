@@ -110,7 +110,6 @@ def test_get_sequences_data_expected_duplicates(
 def test_package_sequences_data_no_duplicates(
     sequence_data_generator: SequenceDataGenerator,
 ) -> None:
-
     token_ids = torch.randint(0, 1000, (10, 5))
     feat_acts_coloring = torch.randn(10, 5)
     feat_logits = torch.randn(1000)

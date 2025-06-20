@@ -344,7 +344,6 @@ class NeuronpediaVectorRunner:
         return [x.tolist() for x in batches]
 
     def get_tokens(self):
-
         tokens_file = f"{self.cfg.outputs_dir}/tokens_{self.cfg.n_prompts_total}.pt"
         if os.path.isfile(tokens_file):
             print("Tokens exist, loading them.")
@@ -382,7 +381,6 @@ class NeuronpediaVectorRunner:
 
     # TODO: make this function simpler
     def run(self):
-
         run_settings_path = self.cfg.outputs_dir + "/" + RUN_SETTINGS_FILE
         run_settings = self.cfg.__dict__
         with open(run_settings_path, "w") as f:
@@ -421,7 +419,6 @@ class NeuronpediaVectorRunner:
             for feature_batch_count, features_to_process in tqdm(
                 enumerate(feature_idx)
             ):
-
                 if feature_batch_count < self.cfg.start_batch:
                     feature_batch_count = feature_batch_count + 1
                     continue
@@ -482,7 +479,11 @@ class NeuronpediaVectorRunner:
                     perform_ablation_experiments=False,
                     dtype=self.cfg.vector_dtype,
                     cache_dir=self.cached_activations_dir,
-                    ignore_tokens={self.model.tokenizer.pad_token_id, self.model.tokenizer.bos_token_id, self.model.tokenizer.eos_token_id},  # type: ignore
+                    ignore_tokens={
+                        self.model.tokenizer.pad_token_id,  # type: ignore
+                        self.model.tokenizer.bos_token_id,  # type: ignore
+                        self.model.tokenizer.eos_token_id,  # type: ignore
+                    },  # type: ignore
                     ignore_positions=self.cfg.ignore_positions or [],
                     ignore_thresholds=self.cfg.activation_thresholds,
                     use_dfa=self.cfg.use_dfa,

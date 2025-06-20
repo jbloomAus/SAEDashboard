@@ -6,7 +6,6 @@ DEFAULT_SPARSITY_THRESHOLD = -6
 
 @dataclass
 class NeuronpediaRunnerConfig:
-
     sae_set: str
     sae_path: str
     outputs_dir: str

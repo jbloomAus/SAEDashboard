@@ -35,7 +35,6 @@ def equalish(a: Any, b: Any, tol: float = EQUAL_VALUE_TOLERANCE):
 
 @dataclass
 class NeuronpediaDashboardActivation:
-
     def __init__(
         self,
         bin_min: float = 0,
@@ -99,7 +98,6 @@ class NeuronpediaDashboardActivation:
 
 @dataclass
 class NeuronpediaDashboardFeature:
-
     def __init__(
         self,
         feature_index: int = 0,
@@ -295,7 +293,6 @@ class NeuronpediaDashboardFeature:
 
 @dataclass
 class NeuronpediaDashboardBatch:
-
     def __init__(
         self,
         model_id: str = "",
