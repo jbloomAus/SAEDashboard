@@ -188,7 +188,7 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
     elif torch.cuda.is_available():
         device = "cuda"
     try:
-        sparse_autoencoder = SAE.load_from_pretrained(sae_path_string, device=device)  # type: ignore
+        sparse_autoencoder = SAE.load_from_disk(sae_path_string, device=device)  # type: ignore
     except Exception:
         sparse_autoencoder, _, _ = SAE.from_pretrained(
             sae_set, str(sae_path), device=device
