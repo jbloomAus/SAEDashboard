@@ -4,7 +4,6 @@ from pathlib import Path
 import pytest
 from jaxtyping import Int
 from sae_lens import SAE
-from syrupy.assertion import SnapshotAssertion
 from torch import Tensor
 from transformer_lens import HookedTransformer
 
@@ -74,7 +73,7 @@ def sae_vis_data(
     autoencoder.cfg.device = TEST_DEVICE
     autoencoder.to(TEST_DEVICE)
     data = SaeVisRunner(cfg).run(encoder=autoencoder, model=model, tokens=tokens)
-    return data
+    return data  # noqa: RET504
 
 
 def test_SaeVisData_create_results_look_reasonable(
@@ -149,7 +148,6 @@ def test_SaeVisData_create_and_save_feature_centric_vis(
 def test_SaeVisData_save_json_snapshot(
     sae_vis_data: SaeVisData,
     tmp_path: Path,
-    snapshot: SnapshotAssertion,
 ):
     save_path = tmp_path / "feature_data.json"
 

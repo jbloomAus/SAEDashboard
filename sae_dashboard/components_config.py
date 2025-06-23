@@ -1,5 +1,6 @@
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any, Iterator, Literal
+from typing import Any, Literal
 
 SEQUENCES_CONFIG_HELP = dict(
     buffer="How many tokens to add as context to each sequence, on each side. The tokens chosen for the top acts / \

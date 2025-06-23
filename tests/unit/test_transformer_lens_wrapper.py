@@ -14,7 +14,7 @@ def real_model() -> HookedTransformer:
 
 
 @pytest.fixture
-def valid_activation_config(real_model: HookedTransformer) -> ActivationConfig:
+def valid_activation_config() -> ActivationConfig:
     return ActivationConfig(
         primary_hook_point="blocks.5.hook_resid_post",
         auxiliary_hook_points=[
@@ -111,16 +111,16 @@ def test_forward(
     # Additional checks
     for key, value in activation_dict.items():
         assert isinstance(value, torch.Tensor), f"Value for {key} is not a torch.Tensor"
-        assert (
-            value.shape[0] == 2 and value.shape[1] == 10
-        ), f"Incorrect batch or sequence dimension for {key}"
+        assert value.shape[0] == 2 and value.shape[1] == 10, (
+            f"Incorrect batch or sequence dimension for {key}"
+        )
 
     # Check that 'hook_z' tensors are flattened
     for key in activation_dict:
         if "hook_z" in key:
-            assert (
-                len(activation_dict[key].shape) == 3
-            ), f"{key} should be flattened to 3 dimensions"
+            assert len(activation_dict[key].shape) == 3, (
+                f"{key} should be flattened to 3 dimensions"
+            )
 
 
 def test_hook_fn_store_act(

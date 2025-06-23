@@ -1,14 +1,11 @@
 import random
 import re
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import (
     Any,
     Callable,
-    Iterable,
     Literal,
-    Optional,
-    Sequence,
-    Type,
     TypeVar,
     overload,
 )
@@ -46,8 +43,7 @@ def get_tokens(
         all_tokens_list.append(batch_tokens)
 
     all_tokens = torch.cat(all_tokens_list, dim=0)
-    all_tokens = all_tokens[torch.randperm(all_tokens.shape[0])]
-    return all_tokens
+    return all_tokens[torch.randperm(all_tokens.shape[0])]
 
 
 def has_duplicate_rows(tensor: torch.Tensor) -> bool:
@@ -79,10 +75,9 @@ def has_duplicate_rows(tensor: torch.Tensor) -> bool:
 
         # Check if any row appears more than once
         return any(count > 1 for count in counts.values())
-    else:
-        # Original strategy for other devices
-        _, counts = torch.unique(tensor, dim=0, return_counts=True)
-        return bool(torch.any(counts > 1))
+    # Original strategy for other devices
+    _, counts = torch.unique(tensor, dim=0, return_counts=True)
+    return bool(torch.any(counts > 1))
 
 
 def get_device() -> torch.device:
@@ -233,10 +228,9 @@ def get_decode_html_safe_fn(
         if isinstance(token_id, int):
             str_tok = vocab_dict.get(token_id, "UNK")
             return process_str_tok(str_tok, html=html)
-        else:
-            if isinstance(token_id, torch.Tensor):
-                token_id = token_id.tolist()
-            return [decode(tok) for tok in token_id]  # type: ignore
+        if isinstance(token_id, torch.Tensor):
+            token_id = token_id.tolist()
+        return [decode(tok) for tok in token_id]  # type: ignore
 
     return decode
 
@@ -437,9 +431,9 @@ class TopK:
             return utils.to_numpy(topk.values), utils.to_numpy(topk.indices)
 
         # Get the topk of the tensor, but only computed over the values of the tensor which are nontrivial
-        assert (
-            tensor_mask.shape == tensor.shape[:-1]
-        ), "Error: unexpected shape for tensor mask."
+        assert tensor_mask.shape == tensor.shape[:-1], (
+            "Error: unexpected shape for tensor mask."
+        )
         tensor_nontrivial_values = tensor[tensor_mask]  # shape [rows d]
         k = min(self.k, tensor_nontrivial_values.shape[-1])
         k = self.k
@@ -500,8 +494,7 @@ def pad_with_zeros(
 
     if side == "right":
         return x + [0.0] * (n - len(x))
-    else:
-        return [0.0] * (n - len(x)) + x
+    return [0.0] * (n - len(x)) + x
 
 
 # This defines the number of decimal places we'll use. It's assumed to refer to values in the range [0, 1] rather than
@@ -562,11 +555,11 @@ class FeatureStatistics:
     @classmethod
     def create(
         cls,
-        data: Optional[torch.Tensor] = None,
+        data: torch.Tensor | None = None,
         ranges_and_precisions: list[
             tuple[list[float], int]
         ] = ASYMMETRIC_RANGES_AND_PRECISIONS,
-        batch_size: Optional[int] = None,
+        batch_size: int | None = None,
     ) -> "FeatureStatistics":
         """Calculates various statistics for a tensor of activations.
 
@@ -651,9 +644,9 @@ class FeatureStatistics:
 
         Note, we also deal with the special case where self has no data.
         """
-        assert (
-            self.ranges_and_precisions == other.ranges_and_precisions
-        ), "Error: can't merge two FeatureStatistics objects with different ranges."
+        assert self.ranges_and_precisions == other.ranges_and_precisions, (
+            "Error: can't merge two FeatureStatistics objects with different ranges."
+        )
 
         self.max.extend(other.max)
         self.frac_nonzero.extend(other.frac_nonzero)
@@ -746,10 +739,10 @@ if MAIN:
 
     print("When 50% of data is 0, and 50% is Unif[0, 1]")
     for v, q, p in zip(values[0], quantiles[0], precisions[0]):
-        print(f"Value: {v:.3f}, Precision: {p}, Quantile: {q:.{p-2}%}")
+        print(f"Value: {v:.3f}, Precision: {p}, Quantile: {q:.{p - 2}%}")
     print("\nWhen 100% of data is Unif[0, 1]")
     for v, q, p in zip(values[1], quantiles[1], precisions[1]):
-        print(f"Value: {v:.3f}, Precision: {p}, Quantile: {q:.{p-2}%}")
+        print(f"Value: {v:.3f}, Precision: {p}, Quantile: {q:.{p - 2}%}")
 
 
 def split_string(
@@ -757,17 +750,16 @@ def split_string(
     str1: str,
     str2: str,
 ) -> tuple[str, str]:
-    assert (
-        str1 in input_string and str2 in input_string
-    ), "Error: str1 and str2 must be in input_string"
+    assert str1 in input_string and str2 in input_string, (
+        "Error: str1 and str2 must be in input_string"
+    )
     pattern = f"({re.escape(str1)}.*?){re.escape(str2)}"
     match = re.search(pattern, input_string, flags=re.DOTALL)
     if match:
         between_str1_str2 = match.group(1)
         remaining_string = input_string.replace(between_str1_str2, "")
         return between_str1_str2, remaining_string
-    else:
-        return "", input_string
+    return "", input_string
 
 
 # Example usage
@@ -979,19 +971,19 @@ class RollingCorrCoef:
         assert x.ndim == 2 and y.ndim == 2, "Both x and y should be 2D"
         X, Nx = x.shape
         Y, Ny = y.shape
-        assert (
-            Nx == Ny
-        ), "Error: x and y should have the same size in the last dimension"
+        assert Nx == Ny, (
+            "Error: x and y should have the same size in the last dimension"
+        )
         if self.with_self:
             assert X == Y, "If with_self is True, then x and y should be the same shape"
         if self.X is not None:
-            assert (
-                X == self.X
-            ), "Error: updating a corrcoef object with different sized dataset."
+            assert X == self.X, (
+                "Error: updating a corrcoef object with different sized dataset."
+            )
         if self.Y is not None:
-            assert (
-                Y == self.Y
-            ), "Error: updating a corrcoef object with different sized dataset."
+            assert Y == self.Y, (
+                "Error: updating a corrcoef object with different sized dataset."
+            )
         self.X = X
         self.Y = Y
 
@@ -1117,7 +1109,7 @@ class HistogramData:
 
     @classmethod
     def from_data(
-        cls: Type[T],
+        cls: type[T],
         data: Tensor,
         n_bins: int,
         tickmode: Literal["ints", "5 ticks"],
@@ -1192,5 +1184,4 @@ def max_or_1(mylist: Sequence[float | int], abs: bool = False) -> float | int:
 
     if abs:
         return max(max(x, -x) for x in mylist)
-    else:
-        return max(mylist)
+    return max(mylist)
