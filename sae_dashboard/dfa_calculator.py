@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Union
+from typing import Any
 
 import einops
 import numpy as np
@@ -25,11 +25,11 @@ class DFACalculator:
 
     def calculate(
         self,
-        activations: Union[Dict[str, torch.Tensor], ActivationCache],
+        activations: dict[str, torch.Tensor] | ActivationCache,
         layer_num: int,
-        feature_indices: List[int],
+        feature_indices: list[int],
         max_value_indices: torch.Tensor,
-    ) -> Dict[int, Any]:  # type: ignore
+    ) -> dict[int, Any]:  # type: ignore
         """Calculate DFA values for a given layer and set of feature indices."""
         if not feature_indices:
             return {}
@@ -79,17 +79,13 @@ class DFACalculator:
         results["dfa_max_value"] = max_values.detach().cpu().numpy().T
 
         # Create a dictionary mapping feature indices to their respective data
-        final_results = {
-            feat_idx: results[i] for i, feat_idx in enumerate(feature_indices)
-        }
-
-        return final_results
+        return {feat_idx: results[i] for i, feat_idx in enumerate(feature_indices)}
 
     def calculate_standard_intermediate_tensor(
         self,
         attn_weights: torch.Tensor,
         v: torch.Tensor,
-        feature_indices: List[int],
+        feature_indices: list[int],
     ) -> torch.Tensor:
         v_cat = einops.rearrange(
             v, "batch src_pos n_heads d_head -> batch src_pos (n_heads d_head)"
@@ -105,16 +101,14 @@ class DFACalculator:
 
         W_enc_selected = self.sae.W_enc[:, feature_indices]  # [d_model, num_indices]
 
-        per_src_pos_dfa = einops.einsum(
+        return einops.einsum(
             decomposed_z_cat,
             W_enc_selected,
             "batch dest_pos src_pos d_model, d_model num_features -> batch dest_pos src_pos num_features",
         )
 
-        return per_src_pos_dfa
-
     def calculate_gqa_intermediate_tensor(
-        self, attn_weights: torch.Tensor, v: torch.Tensor, feature_indices: List[int]
+        self, attn_weights: torch.Tensor, v: torch.Tensor, feature_indices: list[int]
     ) -> torch.Tensor:
         n_query_heads = attn_weights.shape[1]
         n_kv_heads = v.shape[2]

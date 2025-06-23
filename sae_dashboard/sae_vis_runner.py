@@ -2,7 +2,7 @@ import math
 import random
 import re
 from collections import defaultdict
-from typing import Iterable, List, Union
+from collections.abc import Iterable
 
 import einops
 import numpy as np
@@ -168,15 +168,15 @@ class SaeVisRunner:
                 )
 
                 # Get logits histogram data (no title)
-                feature_data_dict[feat].logits_histogram_data = (
-                    LogitsHistogramData.from_data(
-                        data=logit_vector.to(
-                            torch.float32
-                        ),  # need this otherwise fails on MPS
-                        n_bins=layout.logits_hist_cfg.n_bins,  # type: ignore
-                        tickmode="5 ticks",
-                        title=None,
-                    )
+                feature_data_dict[
+                    feat
+                ].logits_histogram_data = LogitsHistogramData.from_data(
+                    data=logit_vector.to(
+                        torch.float32
+                    ),  # need this otherwise fails on MPS
+                    n_bins=layout.logits_hist_cfg.n_bins,  # type: ignore
+                    tickmode="5 ticks",
+                    title=None,
                 )
 
                 # Get data for feature activations histogram (including the title!)
@@ -208,15 +208,15 @@ class SaeVisRunner:
                 nonzero_feat_acts = masked_feat_acts[masked_feat_acts > 0]
                 frac_nonzero = nonzero_feat_acts.numel() / masked_feat_acts.numel()
 
-                feature_data_dict[feat].acts_histogram_data = (
-                    ActsHistogramData.from_data(
-                        data=nonzero_feat_acts.to(
-                            torch.float32
-                        ),  # need this otherwise fails on MPS
-                        n_bins=layout.act_hist_cfg.n_bins,  # type: ignore
-                        tickmode="5 ticks",
-                        title=f"ACTIVATIONS<br>DENSITY = {frac_nonzero:.3%}",
-                    )
+                feature_data_dict[
+                    feat
+                ].acts_histogram_data = ActsHistogramData.from_data(
+                    data=nonzero_feat_acts.to(
+                        torch.float32
+                    ),  # need this otherwise fails on MPS
+                    n_bins=layout.act_hist_cfg.n_bins,  # type: ignore
+                    tickmode="5 ticks",
+                    title=f"ACTIVATIONS<br>DENSITY = {frac_nonzero:.3%}",
                 )
 
                 # Create a MiddlePlotsData object from this, and add it to the dict
@@ -228,21 +228,23 @@ class SaeVisRunner:
                 # ! Calculate all data for the right-hand visualisations, i.e. the sequences
 
                 # Add this feature's sequence data to the list
-                feature_data_dict[feat].sequence_data = (
-                    sequence_data_generator.get_sequences_data(
-                        feat_acts=masked_feat_acts,
-                        feat_logits=logits[i],
-                        resid_post=torch.tensor([]),  # no longer used
-                        feature_resid_dir=feature_resid_dir[i],
-                    )
+                feature_data_dict[
+                    feat
+                ].sequence_data = sequence_data_generator.get_sequences_data(
+                    feat_acts=masked_feat_acts,
+                    feat_logits=logits[i],
+                    resid_post=torch.tensor([]),  # no longer used
+                    feature_resid_dir=feature_resid_dir[i],
                 )
                 if self.cfg.use_dfa:
                     feature_data_dict[feat].dfa_data = all_consolidated_dfa_results.get(
-                        feat, None
+                        feat
                     )
-                    feature_data_dict[feat].decoder_weights_data = (
-                        get_decoder_weights_distribution(encoder, model, feat)[0]
-                    )
+                    feature_data_dict[
+                        feat
+                    ].decoder_weights_data = get_decoder_weights_distribution(
+                        encoder, model, feat
+                    )[0]
 
                 # Update the 2nd progress bar (fwd passes & getting sequence data dominates the runtime of these computations)
                 if progress is not None:
@@ -267,7 +269,7 @@ class SaeVisRunner:
             total_time = sum(time_logs.values())
             table = Table("Task", "Time", "Pct %")
             for task, duration in time_logs.items():
-                table.add_row(task, f"{duration:.2f}s", f"{duration/total_time:.1%}")
+                table.add_row(task, f"{duration:.2f}s", f"{duration / total_time:.1%}")
             rprint(table)
 
         sae_vis_data.cfg = self.cfg
@@ -281,23 +283,21 @@ class SaeVisRunner:
             random.seed(self.cfg.seed)
             torch.manual_seed(self.cfg.seed)
             np.random.seed(self.cfg.seed)
-        return None
+        return
 
     def handle_features(
         self, features: Iterable[int] | None, encoder_wrapper: SAE
     ) -> list[int]:
         if features is None:
             return list(range(encoder_wrapper.cfg.d_sae))
-        else:
-            return list(features)
+        return list(features)
 
     def get_feature_batches(self, features_list: list[int]) -> list[list[int]]:
         # Break up the features into batches
-        feature_batches = [
+        return [
             x.tolist()
             for x in torch.tensor(features_list).split(self.cfg.minibatch_size_features)
         ]
-        return feature_batches
 
     def get_progress_bar(
         self,
@@ -330,8 +330,8 @@ class SaeVisRunner:
 def get_decoder_weights_distribution(
     encoder: SAE,
     model: HookedTransformer,
-    feature_idx: Union[int, List[int]],
-) -> List[DecoderWeightsDistribution]:
+    feature_idx: int | list[int],
+) -> list[DecoderWeightsDistribution]:
     if not isinstance(feature_idx, list):
         feature_idx = [feature_idx]
 

@@ -43,10 +43,7 @@ def precision_data(request):  # type:ignore
 @pytest.fixture(params=[torch.float16, torch.float32, torch.float64])
 def large_precision_data(request):  # type:ignore
     # check if cuda is available, and if so, set device to this
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-    else:
-        device = torch.device("cpu")
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     # Create some sample data
     data = torch.randn(100, 1000, device=device, dtype=request.param)
     return data, request.param
@@ -125,9 +122,9 @@ def test_feature_statistics_batched_vs_unbatched(
     )  # Process 10 features at a time
 
     # Compare max values
-    assert np.allclose(
-        unbatched_stats.max, batched_stats.max, atol=1e-3
-    ), "Max values do not match"
+    assert np.allclose(unbatched_stats.max, batched_stats.max, atol=1e-3), (
+        "Max values do not match"
+    )
 
     # Compare fraction of non-zero values
     assert np.allclose(
@@ -135,23 +132,23 @@ def test_feature_statistics_batched_vs_unbatched(
     ), "Fraction of non-zero values do not match"
 
     # Compare quantiles
-    assert (
-        unbatched_stats.quantiles == batched_stats.quantiles
-    ), "Quantiles do not match"
+    assert unbatched_stats.quantiles == batched_stats.quantiles, (
+        "Quantiles do not match"
+    )
 
     # Compare quantile data
-    assert len(unbatched_stats.quantile_data) == len(
-        batched_stats.quantile_data
-    ), "Quantile data lengths do not match"
+    assert len(unbatched_stats.quantile_data) == len(batched_stats.quantile_data), (
+        "Quantile data lengths do not match"
+    )
     for unbatched_qd, batched_qd in zip(
         unbatched_stats.quantile_data, batched_stats.quantile_data
     ):
-        assert len(unbatched_qd) == len(
-            batched_qd
-        ), "Quantile data sub-lengths do not match"
-        assert np.allclose(
-            unbatched_qd, batched_qd, atol=1e-3
-        ), "Quantile data values do not match"
+        assert len(unbatched_qd) == len(batched_qd), (
+            "Quantile data sub-lengths do not match"
+        )
+        assert np.allclose(unbatched_qd, batched_qd, atol=1e-3), (
+            "Quantile data values do not match"
+        )
 
     # Compare ranges_and_precisions
     assert (
@@ -177,38 +174,42 @@ def test_feature_statistics_batched_vs_unbatched_uneven_sizes(
     batched_stats = FeatureStatistics.create(data, batch_size=batch_size)
 
     # Compare max values
-    assert np.allclose(
-        unbatched_stats.max, batched_stats.max, atol=1e-3
-    ), f"Max values do not match for n_features={n_features}, batch_size={batch_size}"
+    assert np.allclose(unbatched_stats.max, batched_stats.max, atol=1e-3), (
+        f"Max values do not match for n_features={n_features}, batch_size={batch_size}"
+    )
 
     # Compare fraction of non-zero values
     assert np.allclose(
         unbatched_stats.frac_nonzero, batched_stats.frac_nonzero, atol=1e-3
-    ), f"Fraction of non-zero values do not match for n_features={n_features}, batch_size={batch_size}"
+    ), (
+        f"Fraction of non-zero values do not match for n_features={n_features}, batch_size={batch_size}"
+    )
 
     # Compare quantiles
-    assert (
-        unbatched_stats.quantiles == batched_stats.quantiles
-    ), f"Quantiles do not match for n_features={n_features}, batch_size={batch_size}"
+    assert unbatched_stats.quantiles == batched_stats.quantiles, (
+        f"Quantiles do not match for n_features={n_features}, batch_size={batch_size}"
+    )
 
     # Compare quantile data
-    assert len(unbatched_stats.quantile_data) == len(
-        batched_stats.quantile_data
-    ), f"Quantile data lengths do not match for n_features={n_features}, batch_size={batch_size}"
+    assert len(unbatched_stats.quantile_data) == len(batched_stats.quantile_data), (
+        f"Quantile data lengths do not match for n_features={n_features}, batch_size={batch_size}"
+    )
     for unbatched_qd, batched_qd in zip(
         unbatched_stats.quantile_data, batched_stats.quantile_data
     ):
-        assert len(unbatched_qd) == len(
-            batched_qd
-        ), f"Quantile data sub-lengths do not match for n_features={n_features}, batch_size={batch_size}"
-        assert np.allclose(
-            unbatched_qd, batched_qd, atol=1e-3
-        ), f"Quantile data values do not match for n_features={n_features}, batch_size={batch_size}"
+        assert len(unbatched_qd) == len(batched_qd), (
+            f"Quantile data sub-lengths do not match for n_features={n_features}, batch_size={batch_size}"
+        )
+        assert np.allclose(unbatched_qd, batched_qd, atol=1e-3), (
+            f"Quantile data values do not match for n_features={n_features}, batch_size={batch_size}"
+        )
 
     # Compare ranges_and_precisions
     assert (
         unbatched_stats.ranges_and_precisions == batched_stats.ranges_and_precisions
-    ), f"Ranges and precisions do not match for n_features={n_features}, batch_size={batch_size}"
+    ), (
+        f"Ranges and precisions do not match for n_features={n_features}, batch_size={batch_size}"
+    )
 
 
 def test_feature_statistics_create(precision_data: tuple[torch.Tensor, torch.dtype]):

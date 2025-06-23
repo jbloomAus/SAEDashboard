@@ -114,14 +114,12 @@ def get_logits_table_data(logit_vector: Float[Tensor, "d_vocab"], n_rows: int):
     bottom_logit_values = bottom_logits.values.tolist()
     bottom_token_ids = bottom_logits.indices.tolist()
 
-    logits_table_data = LogitsTableData(
+    return LogitsTableData(
         bottom_logits=bottom_logit_values,
         bottom_token_ids=bottom_token_ids,
         top_logits=top_logit_values,
         top_token_ids=top_token_ids,
     )
-
-    return logits_table_data
 
 
 # @torch.inference_mode()
@@ -213,13 +211,13 @@ def parse_prompt_data(
     if feature_idx is None:
         feature_idx = list(sae_vis_data.feature_data_dict.keys())
     n_feats = len(feature_idx)
-    assert (
-        feature_resid_dir.shape[0] == n_feats
-    ), f"The number of features in feature_resid_dir ({feature_resid_dir.shape[0]}) does not match the number of feature indices ({n_feats})"
+    assert feature_resid_dir.shape[0] == n_feats, (
+        f"The number of features in feature_resid_dir ({feature_resid_dir.shape[0]}) does not match the number of feature indices ({n_feats})"
+    )
 
-    assert (
-        feat_acts.shape[1] == n_feats
-    ), f"The number of features in feat_acts ({feat_acts.shape[1]}) does not match the number of feature indices ({n_feats})"
+    assert feat_acts.shape[1] == n_feats, (
+        f"The number of features in feat_acts ({feat_acts.shape[1]}) does not match the number of feature indices ({n_feats})"
+    )
 
     feats_loss_contribution = torch.empty(
         size=(n_feats, tokens.shape[1] - 1), device=device
@@ -301,7 +299,7 @@ def parse_prompt_data(
             )
             act_quantile_topk = TopK(act_quantile, k=k, largest=True)
             act_formatting = [
-                f".{act_precision[i]-2}%" for i in act_quantile_topk.indices
+                f".{act_precision[i] - 2}%" for i in act_quantile_topk.indices
             ]
             top_features = _feature_idx[act_quantile_topk.indices].tolist()
             formatted_scores = [
@@ -407,4 +405,4 @@ def get_prompt_data(
         num_top_features=num_top_features,
     )
 
-    return scores_dict
+    return scores_dict  # noqa: RET504

@@ -3,6 +3,9 @@ import math
 import os
 from pathlib import Path
 
+# from sae_lens.toolkit.pretrained_saes import load_sparsity
+from typing import Annotated
+
 import requests
 import torch
 import typer
@@ -11,9 +14,6 @@ from rich.align import Align
 from rich.panel import Panel
 from sae_lens.analysis.neuronpedia_integration import NanAndInfReplacer
 from sae_lens.sae import SAE
-
-# from sae_lens.toolkit.pretrained_saes import load_sparsity
-from typing_extensions import Annotated
 
 from sae_dashboard.neuronpedia.neuronpedia_runner import (
     NeuronpediaRunner,
@@ -213,7 +213,7 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
     print("\n")
     if run_settings_path.exists() and run_settings_path.is_file():
         # load the json file
-        with open(run_settings_path, "r") as f:
+        with open(run_settings_path) as f:
             run_settings = json.load(f)
             print(
                 f"[yellow]Found existing run_settings.json in {run_settings_path.as_posix()}, checking them."
@@ -433,8 +433,8 @@ def upload(
 
     if upload_dead_stubs:
         skipped_path = os.path.join(outputs_dir, "skipped_indexes.json")
-        f = open(skipped_path, "r")
-        data = json.load(f)
+        with open(skipped_path) as f:
+            data = json.load(f)
         url = host + "/api/local/upload-skipped-features"
         result = requests.post(
             url,
@@ -460,8 +460,8 @@ def upload(
     # Upload alive features
     for file_path in files_to_upload:
         print("===== Uploading file: " + os.path.basename(file_path))
-        f = open(file_path, "r")
-        data = json.load(f, parse_constant=NanAndInfReplacer)
+        with open(file_path) as f:
+            data = json.load(f, parse_constant=NanAndInfReplacer)
 
         url = host + "/api/local/upload-features"
         result = requests.post(

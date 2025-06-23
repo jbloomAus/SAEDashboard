@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Callable, List, Literal, Optional
+from typing import Any, Callable, Literal
 
 from sae_dashboard.components import (
     ActsHistogramData,
@@ -26,8 +26,8 @@ from sae_dashboard.layout import SaeVisLayoutConfig
 
 @dataclass
 class DFAData:
-    dfaValues: List[List[float]] = field(default_factory=list)
-    dfaTargetIndex: List[int] = field(default_factory=list)
+    dfaValues: list[list[float]] = field(default_factory=list)
+    dfaTargetIndex: list[int] = field(default_factory=list)
     dfaMaxValue: float = 0.0
 
 
@@ -68,8 +68,8 @@ class FeatureData:
         default_factory=lambda: SequenceMultiGroupData()
     )
     prompt_data: SequenceData = field(default_factory=lambda: SequenceData())
-    dfa_data: Optional[dict[int, dict[str, Any]]] = None
-    decoder_weights_data: Optional[DecoderWeightsDistribution] = None
+    dfa_data: dict[int, dict[str, Any]] | None = None
+    decoder_weights_data: DecoderWeightsDistribution | None = None
 
     def __post_init__(self):
         if self.dfa_data is None:
@@ -90,9 +90,9 @@ class FeatureData:
             # Add DFA config here if we create a specific config for it
         }
         config_class_name = config.__class__.__name__
-        assert (
-            config_class_name in CONFIG_CLASS_MAP
-        ), f"Invalid component config: {config_class_name}"
+        assert config_class_name in CONFIG_CLASS_MAP, (
+            f"Invalid component config: {config_class_name}"
+        )
         return CONFIG_CLASS_MAP[config_class_name]
 
     def _get_html_data_feature_centric(
@@ -164,16 +164,18 @@ class FeatureData:
         html_obj = HTML()
 
         # Verify that we only have a single column
-        assert layout.columns.keys() == {
-            0
-        }, f"prompt_centric_layout should only have 1 column, instead found cols {layout.columns.keys()}"
-        assert (
-            layout.prompt_cfg is not None
-        ), "prompt_centric_cfg should include a PromptConfig, but found None"
+        assert layout.columns.keys() == {0}, (
+            f"prompt_centric_layout should only have 1 column, instead found cols {layout.columns.keys()}"
+        )
+        assert layout.prompt_cfg is not None, (
+            "prompt_centric_cfg should include a PromptConfig, but found None"
+        )
         if layout.seq_cfg is not None:
             assert (layout.seq_cfg.n_quantiles == 0) or (
                 layout.seq_cfg.stack_mode == "stack-all"
-            ), "prompt_centric_layout should have stack_mode='stack-all' if n_quantiles > 0, so that it fits in 1 col"
+            ), (
+                "prompt_centric_layout should have stack_mode='stack-all' if n_quantiles > 0, so that it fits in 1 col"
+            )
 
         # Get the maximum color over both the prompt and the sequences
         max_feat_act = max(
