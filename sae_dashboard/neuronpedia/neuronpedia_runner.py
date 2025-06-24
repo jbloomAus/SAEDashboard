@@ -98,7 +98,7 @@ class NeuronpediaRunner:
 
         # Initialize SAE, defaulting to SAE dtype unless we override
         if self.cfg.from_local_sae:
-            self.sae = SAE.load_from_disk(    # type: ignore
+            self.sae = SAE.load_from_disk(  # type: ignore
                 path=self.cfg.sae_path,
                 device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
                 dtype=self.cfg.sae_dtype if self.cfg.sae_dtype != "" else None,
