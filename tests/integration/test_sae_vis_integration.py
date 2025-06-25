@@ -3,31 +3,12 @@ from typing import Callable, Tuple
 import pytest
 import torch
 from sae_lens import SAE, ActivationsStore
-from tqdm import tqdm
 from transformer_lens import HookedTransformer
 
 # from sae_dashboard.feature_data import FeatureData
 from sae_dashboard.sae_vis_data import SaeVisConfig, SaeVisData
 from sae_dashboard.sae_vis_runner import SaeVisRunner
-from sae_dashboard.utils_fns import FeatureStatistics
-
-
-def get_tokens(
-    activations_store: ActivationsStore,
-    n_prompts: int,
-):
-    all_tokens_list = []
-    pbar = tqdm(range(n_prompts))
-    for _ in pbar:
-        batch_tokens = activations_store.get_batch_tokens()
-        batch_tokens = batch_tokens[torch.randperm(batch_tokens.shape[0])][
-            : batch_tokens.shape[0]
-        ]
-        all_tokens_list.append(batch_tokens)
-
-    all_tokens = torch.cat(all_tokens_list, dim=0)
-    all_tokens = all_tokens[torch.randperm(all_tokens.shape[0])]
-    return all_tokens
+from sae_dashboard.utils_fns import FeatureStatistics, get_tokens
 
 
 @pytest.fixture
