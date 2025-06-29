@@ -87,9 +87,6 @@ def test_sae_vis_runner_integration(
         model=model,
         tokens=token_dataset,
     )
-    if data.feature_data_dict[15].dfa_data:
-        print(data.feature_data_dict[15].dfa_data[0])
-        print(data.feature_data_dict.keys())
     # Verify the structure and content of the resulting SaeVisData object
     assert isinstance(data, SaeVisData)
     assert len(data.feature_data_dict) == len(test_feature_idx)
@@ -131,7 +128,6 @@ def test_sae_vis_runner_integration(
 
         # Check DFA data
         if feature_vis_config.use_dfa:
-            print(f"Checking feature {feat_idx} DFA data")
             assert hasattr(feature_data, "dfa_data")
             assert feature_data.dfa_data is not None
             assert isinstance(feature_data.dfa_data, dict)
