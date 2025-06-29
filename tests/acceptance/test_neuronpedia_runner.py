@@ -225,7 +225,6 @@ def test_benchmark_neuronpedia_runner():
     NP_OUTPUT_FOLDER = "neuronpedia_outputs/benchmark"
     SAE_SET = "gpt2-small-res-jb"
     SAE_PATH = "blocks.0.hook_resid_pre"
-    print(SAE_PATH)
 
     # delete output files if present
     os.system(f"rm -rf {NP_OUTPUT_FOLDER}")

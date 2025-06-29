@@ -141,5 +141,3 @@ def test_neuronpedia_json_output():
                 assert (
                     "dfa_targetIndex" in activation
                 ), f"'dfa_targetIndex' missing in activation in {batch_file}"
-
-    print("All batch files passed the structure check.")
