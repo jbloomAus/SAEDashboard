@@ -226,9 +226,6 @@ def test_performance_comparison(model: HookedTransformer, autoencoder: SAE):
     gqa_time = time.time() - start_time
     calculator.use_gqa = False
 
-    print(f"Standard method time: {standard_time:.4f} seconds")
-    print(f"GQA method time: {gqa_time:.4f} seconds")
-
     # Assert that both methods complete in a reasonable time
     assert standard_time < 10, "Standard method took too long"
     assert gqa_time < 10, "GQA method took too long"

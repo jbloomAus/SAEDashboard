@@ -114,7 +114,7 @@ def test_TopK_without_mask_smallest():
 def test_feature_statistics_batched_vs_unbatched(
     large_precision_data: tuple[torch.Tensor, torch.dtype],
 ):
-    data, dtype = large_precision_data
+    data, _ = large_precision_data
 
     # Create unbatched FeatureStatistics object
     unbatched_stats = FeatureStatistics.create(data)
@@ -158,9 +158,6 @@ def test_feature_statistics_batched_vs_unbatched(
         unbatched_stats.ranges_and_precisions == batched_stats.ranges_and_precisions
     ), "Ranges and precisions do not match"
 
-    print(f"Test completed for dtype: {dtype}")
-    print("Batched and unbatched results match within tolerance.")
-
 
 @pytest.mark.parametrize("n_features,batch_size", [(100, 10), (100, 30), (100, 7)])
 def test_feature_statistics_batched_vs_unbatched_uneven_sizes(
@@ -168,7 +165,7 @@ def test_feature_statistics_batched_vs_unbatched_uneven_sizes(
     n_features: int,
     batch_size: int,
 ):
-    data, dtype = large_precision_data
+    data, _ = large_precision_data
 
     # Slice the data to the specified number of features
     data = data[:n_features]
@@ -213,14 +210,9 @@ def test_feature_statistics_batched_vs_unbatched_uneven_sizes(
         unbatched_stats.ranges_and_precisions == batched_stats.ranges_and_precisions
     ), f"Ranges and precisions do not match for n_features={n_features}, batch_size={batch_size}"
 
-    print(
-        f"Test completed for dtype: {dtype}, n_features: {n_features}, batch_size: {batch_size}"
-    )
-    print("Batched and unbatched results match within tolerance.")
-
 
 def test_feature_statistics_create(precision_data: tuple[torch.Tensor, torch.dtype]):
-    data, dtype = precision_data
+    data, _ = precision_data
 
     # Create FeatureStatistics object
     feature_stats = FeatureStatistics.create(data)
@@ -239,8 +231,6 @@ def test_feature_statistics_create(precision_data: tuple[torch.Tensor, torch.dty
     # Test quantile data
     assert len(feature_stats.quantile_data) == 3  # One for each row in the input data
     assert all(len(qd) > 0 for qd in feature_stats.quantile_data)
-
-    print(f"Test completed for dtype: {dtype}")
 
 
 def test_feature_statistics_update():

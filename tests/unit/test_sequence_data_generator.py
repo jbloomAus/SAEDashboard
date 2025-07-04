@@ -46,17 +46,6 @@ def test_get_sequences_data_expected_duplicates(
         (sd.original_index, sd.qualifying_token_index) for sd in all_sequence_data
     )
 
-    # Print duplicate information
-    print("\nDuplicate pairs:")
-    for pair, count in pair_counts.items():
-        if count > 1:
-            print(f"{pair}: {count} occurrences")
-            # Print which groups contain this pair
-            groups_with_pair = [
-                i for i, oi, qti in group_sequence_pairs if (oi, qti) == pair
-            ]
-            print(f"  Found in groups: {groups_with_pair}")
-
     # Check for duplicates within the same group
     duplicates_in_same_group = False
     for i, group in enumerate(sequence_multi_group_data.seq_group_data):
@@ -66,21 +55,8 @@ def test_get_sequences_data_expected_duplicates(
         group_pair_counts = Counter(group_pairs)
         if any(count > 1 for count in group_pair_counts.values()):
             duplicates_in_same_group = True
-            print(f"Duplicates found in group {i}: {group.title}")
-            for pair, count in group_pair_counts.items():
-                if count > 1:
-                    print(f"  {pair}: {count} occurrences")
-
-    # Print group information
-    print("\nGroup information:")
-    for i, group in enumerate(sequence_multi_group_data.seq_group_data):
-        print(f"Group {i}: {group.title}")
-        print(f"  Number of sequences: {len(group.seq_data)}")
 
     num_duplicates = sum(count - 1 for count in pair_counts.values())
-    print(f"\nTotal sequences: {len(all_sequence_data)}")
-    print(f"Unique pairs: {len(pair_counts)}")
-    print(f"Number of duplicates: {num_duplicates}")
 
     # Assertions
     assert not duplicates_in_same_group, "Duplicates found within the same group"
@@ -103,8 +79,6 @@ def test_get_sequences_data_expected_duplicates(
             assert (
                 len(groups_with_pair) == 2
             ), f"Duplicate {pair} found in more than two groups: {groups_with_pair}"
-
-    print("\nAll assertions passed.")
 
 
 def test_package_sequences_data_no_duplicates(
