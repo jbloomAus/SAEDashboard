@@ -2,7 +2,7 @@ import math
 import random
 import re
 from collections import defaultdict
-from typing import Iterable, List, Union
+from collections.abc import Iterable
 
 import einops
 import numpy as np
@@ -160,15 +160,15 @@ class VectorVisRunner:
                 )
 
                 # Get logits histogram data (no title)
-                vector_data_dict[vector_idx].logits_histogram_data = (
-                    LogitsHistogramData.from_data(
-                        data=logit_vector.to(
-                            torch.float32
-                        ),  # need this otherwise fails on MPS
-                        n_bins=layout.logits_hist_cfg.n_bins,  # type: ignore
-                        tickmode="5 ticks",
-                        title=None,
-                    )
+                vector_data_dict[
+                    vector_idx
+                ].logits_histogram_data = LogitsHistogramData.from_data(
+                    data=logit_vector.to(
+                        torch.float32
+                    ),  # need this otherwise fails on MPS
+                    n_bins=layout.logits_hist_cfg.n_bins,  # type: ignore
+                    tickmode="5 ticks",
+                    title=None,
                 )
 
                 # Get data for feature activations histogram (including the title!)
@@ -209,15 +209,15 @@ class VectorVisRunner:
                 nonzero_feat_acts = masked_feat_acts[masked_feat_acts > 0]
                 frac_nonzero = nonzero_feat_acts.numel() / masked_feat_acts.numel()
 
-                vector_data_dict[vector_idx].acts_histogram_data = (
-                    ActsHistogramData.from_data(
-                        data=nonzero_feat_acts.to(
-                            torch.float32
-                        ),  # need this otherwise fails on MPS
-                        n_bins=layout.act_hist_cfg.n_bins,  # type: ignore
-                        tickmode="5 ticks",
-                        title=f"ACTIVATIONS<br>DENSITY = {frac_nonzero:.3%}",
-                    )
+                vector_data_dict[
+                    vector_idx
+                ].acts_histogram_data = ActsHistogramData.from_data(
+                    data=nonzero_feat_acts.to(
+                        torch.float32
+                    ),  # need this otherwise fails on MPS
+                    n_bins=layout.act_hist_cfg.n_bins,  # type: ignore
+                    tickmode="5 ticks",
+                    title=f"ACTIVATIONS<br>DENSITY = {frac_nonzero:.3%}",
                 )
 
                 # Create a MiddlePlotsData object from this, and add it to the dict
@@ -229,13 +229,13 @@ class VectorVisRunner:
                 # ! Calculate all data for the right-hand visualisations, i.e. the sequences
 
                 # Add this feature's sequence data to the list
-                vector_data_dict[vector_idx].sequence_data = (
-                    sequence_data_generator.get_sequences_data(
-                        feat_acts=masked_feat_acts,
-                        feat_logits=logits[i],
-                        resid_post=torch.tensor([]),  # no longer used
-                        feature_resid_dir=feature_resid_dir[i],
-                    )
+                vector_data_dict[
+                    vector_idx
+                ].sequence_data = sequence_data_generator.get_sequences_data(
+                    feat_acts=masked_feat_acts,
+                    feat_logits=logits[i],
+                    resid_post=torch.tensor([]),  # no longer used
+                    feature_resid_dir=feature_resid_dir[i],
                 )
                 # if self.cfg.use_dfa:
                 #     vector_data_dict[vector_idx].dfa_data = all_consolidated_dfa_results.get(
@@ -268,7 +268,7 @@ class VectorVisRunner:
             total_time = sum(time_logs.values())
             table = Table("Task", "Time", "Pct %")
             for task, duration in time_logs.items():
-                table.add_row(task, f"{duration:.2f}s", f"{duration/total_time:.1%}")
+                table.add_row(task, f"{duration:.2f}s", f"{duration / total_time:.1%}")
             rprint(table)
 
         vector_vis_data.cfg = self.cfg
@@ -282,25 +282,23 @@ class VectorVisRunner:
             random.seed(self.cfg.seed)
             torch.manual_seed(self.cfg.seed)
             np.random.seed(self.cfg.seed)
-        return None
+        return
 
     def handle_vector_indices(
         self, vector_indices: Iterable[int] | None, encoder_wrapper: VectorSet
     ) -> list[int]:
         if vector_indices is None:
             return list(range(encoder_wrapper.cfg.d_vectors))
-        else:
-            return list(vector_indices)
+        return list(vector_indices)
 
     def get_vector_batches(self, vector_indices_list: list[int]) -> list[list[int]]:
         # Break up the features into batches
-        vector_batches = [
+        return [
             x.tolist()
             for x in torch.tensor(vector_indices_list).split(
                 self.cfg.minibatch_size_features
             )
         ]
-        return vector_batches
 
     def get_progress_bar(
         self,
@@ -333,8 +331,8 @@ class VectorVisRunner:
 def get_decoder_weights_distribution(
     encoder: SAE,
     model: HookedTransformer,
-    feature_idx: Union[int, List[int]],
-) -> List[DecoderWeightsDistribution]:
+    feature_idx: int | list[int],
+) -> list[DecoderWeightsDistribution]:
     if not isinstance(feature_idx, list):
         feature_idx = [feature_idx]
 

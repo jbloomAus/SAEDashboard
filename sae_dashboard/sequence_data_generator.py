@@ -121,18 +121,15 @@ class SequenceDataGenerator:
             raise NotImplementedError(
                 "We are not supporting ablation experiments for now."
             )
-        else:
-            # ! (5) Store the results in a SequenceMultiGroupData object
-            # Now that we've indexed everything, construct the batch of SequenceData objects
-            sequence_multigroup_data = self.package_sequences_data(
-                token_ids=token_ids,
-                feat_acts_coloring=feat_acts_coloring,
-                feat_logits=feat_logits,
-                indices_dict=indices_dict,
-                indices_bold=indices_bold,
-            )
-
-        return sequence_multigroup_data
+        # ! (5) Store the results in a SequenceMultiGroupData object
+        # Now that we've indexed everything, construct the batch of SequenceData objects
+        return self.package_sequences_data(
+            token_ids=token_ids,
+            feat_acts_coloring=feat_acts_coloring,
+            feat_logits=feat_logits,
+            indices_dict=indices_dict,
+            indices_bold=indices_bold,
+        )
 
     def get_buffer_and_padding(
         self,
@@ -353,20 +350,19 @@ class SequenceDataGenerator:
             #     ]
             #     sequence_groups_data.append(SequenceGroupData(group_name, seq_data))
 
-        else:
-            for group_idx, group_name in enumerate(indices_dict.keys()):
-                seq_data = [
-                    SequenceData(
-                        original_index=int(indices_bold[i, 0].item()),
-                        token_ids=token_ids[i].tolist(),
-                        feat_acts=[round(f, 4) for f in feat_acts_coloring[i].tolist()],
-                        token_logits=feat_logits[token_ids[i]].tolist(),
-                        qualifying_token_index=int(indices_bold[i, 1].item()),
-                    )
-                    for i in range(
-                        group_sizes_cumsum[group_idx], group_sizes_cumsum[group_idx + 1]
-                    )
-                ]
-                sequence_groups_data.append(SequenceGroupData(group_name, seq_data))
+        for group_idx, group_name in enumerate(indices_dict.keys()):
+            seq_data = [
+                SequenceData(
+                    original_index=int(indices_bold[i, 0].item()),
+                    token_ids=token_ids[i].tolist(),
+                    feat_acts=[round(f, 4) for f in feat_acts_coloring[i].tolist()],
+                    token_logits=feat_logits[token_ids[i]].tolist(),
+                    qualifying_token_index=int(indices_bold[i, 1].item()),
+                )
+                for i in range(
+                    group_sizes_cumsum[group_idx], group_sizes_cumsum[group_idx + 1]
+                )
+            ]
+            sequence_groups_data.append(SequenceGroupData(group_name, seq_data))
 
         return SequenceMultiGroupData(sequence_groups_data)

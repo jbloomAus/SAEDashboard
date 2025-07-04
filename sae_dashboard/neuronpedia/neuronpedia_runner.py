@@ -4,7 +4,6 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Set, Tuple
 
 import numpy as np
 import torch
@@ -241,7 +240,7 @@ class NeuronpediaRunner:
         outputs_dir.mkdir(parents=True, exist_ok=True)
         return str(outputs_dir)
 
-    def hash_tensor(self, tensor: torch.Tensor) -> Tuple[int, ...]:
+    def hash_tensor(self, tensor: torch.Tensor) -> tuple[int, ...]:
         return tuple(tensor.cpu().numpy().flatten().tolist())
 
     def generate_tokens(
@@ -250,7 +249,7 @@ class NeuronpediaRunner:
         n_prompts: int = 4096 * 6,
     ) -> torch.Tensor:
         all_tokens_list = []
-        unique_sequences: Set[Tuple[int, ...]] = set()
+        unique_sequences: set[tuple[int, ...]] = set()
         pbar = tqdm(range(n_prompts // activations_store.store_batch_size_prompts))
 
         for _ in pbar:
@@ -342,9 +341,7 @@ class NeuronpediaRunner:
             int
         )
         feature_idx = np.array_split(feature_idx, n_subarrays)
-        feature_idx = [x.tolist() for x in feature_idx]
-
-        return feature_idx
+        return [x.tolist() for x in feature_idx]
 
     def record_skipped_features(self):
         # write dead into file so we can create them as dead in Neuronpedia
@@ -381,7 +378,7 @@ class NeuronpediaRunner:
 
         return tokens
 
-    def get_vocab_dict(self) -> Dict[int, str]:
+    def get_vocab_dict(self) -> dict[int, str]:
         # get vocab
         vocab_dict: dict = self.model.tokenizer.vocab  # type: ignore
         new_vocab_dict = {}

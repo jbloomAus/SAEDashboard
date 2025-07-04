@@ -1,7 +1,8 @@
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from dataclasses_json import dataclass_json
 from rich import print as rprint
@@ -193,12 +194,10 @@ class SaeVisData:
 
         _self = _SaeVisData.from_dict(data)
 
-        self = SaeVisData(
+        return SaeVisData(
             cfg=cfg,
             feature_data_dict=_self.feature_data_dict,
             feature_stats=_self.feature_stats,
             model=model,
             encoder=encoder,
         )
-
-        return self

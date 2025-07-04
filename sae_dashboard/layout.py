@@ -78,9 +78,9 @@ class SaeVisLayoutConfig:
         all_component_names = [
             comp.__class__.__name__.rstrip("Config") for comp in all_components
         ]
-        assert len(all_component_names) == len(
-            set(all_component_names)
-        ), "Duplicate components in layout config"
+        assert len(all_component_names) == len(set(all_component_names)), (
+            "Duplicate components in layout config"
+        )
         self.components: dict[str, BaseComponentConfig] = {
             name: comp for name, comp in zip(all_component_names, all_components)
         }

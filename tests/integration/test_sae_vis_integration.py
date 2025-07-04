@@ -1,4 +1,4 @@
-from typing import Callable, Tuple
+from typing import Callable
 
 import pytest
 import torch
@@ -26,15 +26,14 @@ def get_tokens(
         all_tokens_list.append(batch_tokens)
 
     all_tokens = torch.cat(all_tokens_list, dim=0)
-    all_tokens = all_tokens[torch.randperm(all_tokens.shape[0])]
-    return all_tokens
+    return all_tokens[torch.randperm(all_tokens.shape[0])]
 
 
 @pytest.fixture
-def setup_test_environment() -> (
-    Callable[[], Tuple[HookedTransformer, SAE, torch.Tensor]]
-):
-    def _setup() -> Tuple[HookedTransformer, SAE, torch.Tensor]:
+def setup_test_environment() -> Callable[
+    [], tuple[HookedTransformer, SAE, torch.Tensor]
+]:
+    def _setup() -> tuple[HookedTransformer, SAE, torch.Tensor]:
         # Set up a small-scale test environment
         device = "cpu"  # Use CUDA for testing
         model = HookedTransformer.from_pretrained("gpt2-small", device=device)
@@ -63,7 +62,7 @@ def setup_test_environment() -> (
 
 
 def test_sae_vis_runner_integration(
-    setup_test_environment: Callable[[], Tuple[HookedTransformer, SAE, torch.Tensor]],
+    setup_test_environment: Callable[[], tuple[HookedTransformer, SAE, torch.Tensor]],
 ):
     model, sae, token_dataset = setup_test_environment()
 

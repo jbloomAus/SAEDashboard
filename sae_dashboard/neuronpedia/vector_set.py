@@ -1,7 +1,7 @@
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import torch
 
@@ -11,7 +11,7 @@ class VectorSetConfig:
     # Core vector properties
     d_in: int
     d_vectors: int  # Number of vectors (replaces d_sae)
-    vector_names: List[str]  # Names for each vector
+    vector_names: list[str]  # Names for each vector
 
     # Model/hook details
     model_name: str
@@ -29,7 +29,7 @@ class VectorSetConfig:
     device: str
 
     # Optional metadata
-    model_from_pretrained_kwargs: Dict[str, Any] = field(default_factory=dict)
+    model_from_pretrained_kwargs: dict[str, Any] = field(default_factory=dict)
 
 
 class VectorSet:
@@ -38,7 +38,7 @@ class VectorSet:
     def __init__(
         self,
         vectors: torch.Tensor,  # [n_vectors, d_model]
-        names: List[str],
+        names: list[str],
         hook_point: str,
         hook_layer: int,
         hook_head_index: int | None,
@@ -48,7 +48,7 @@ class VectorSet:
         dataset_path: str = "",
         context_size: int = 128,
         model_name: str = "",
-        model_from_pretrained_kwargs: Optional[Dict[str, Any]] = None,
+        model_from_pretrained_kwargs: dict[str, Any] | None = None,
     ):
         self.vectors = vectors.to(device=device)
         self.names = names
@@ -81,7 +81,7 @@ class VectorSet:
         hook_point: str,
         hook_layer: int,
         model_name: str,
-        names: List[str] | None = None,
+        names: list[str] | None = None,
         **kwargs: Any,
     ) -> "VectorSet":
         """Load vectors from a JSON file where they're stored as 1D arrays
@@ -130,7 +130,7 @@ class VectorSet:
         hook_point: str,
         hook_layer: int,
         model_name: str,
-        names: List[str] | None = None,
+        names: list[str] | None = None,
         **kwargs: Any,
     ) -> "VectorSet":
         """Load vectors from a JSON file where they're stored as 1D arrays (without config)

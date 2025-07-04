@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import List, Optional
 
 DEFAULT_SPARSITY_THRESHOLD = -6
 
@@ -9,10 +8,10 @@ class NeuronpediaRunnerConfig:
     sae_set: str
     sae_path: str
     outputs_dir: str
-    np_sae_id_suffix: Optional[str] = (
+    np_sae_id_suffix: str | None = (
         None  # this is the __[np_sae_id_suffix] after the SAE Set
     )
-    np_set_name: Optional[str] = None
+    np_set_name: str | None = None
     from_local_sae: bool = False
     sparsity_threshold: int = DEFAULT_SPARSITY_THRESHOLD
     huggingface_dataset_path: str = ""
@@ -27,7 +26,7 @@ class NeuronpediaRunnerConfig:
     n_features_at_a_time: int = 128
     quantile_feature_batch_size: int = 64
     start_batch: int = 0
-    end_batch: Optional[int] = None
+    end_batch: int | None = None
 
     # quantiles
     n_quantiles: int = 5
@@ -39,8 +38,8 @@ class NeuronpediaRunnerConfig:
 
     model_dtype: str = ""
     sae_dtype: str = ""
-    model_id: Optional[str] = None
-    layer: Optional[int] = None
+    model_id: str | None = None
+    layer: int | None = None
 
     sae_device: str | None = None
     activation_store_device: str | None = None
@@ -49,36 +48,36 @@ class NeuronpediaRunnerConfig:
     use_wandb: bool = False
 
     shuffle_tokens: bool = True
-    prefix_tokens: Optional[List[int]] = None
-    suffix_tokens: Optional[List[int]] = None
-    ignore_positions: Optional[List[int]] = None
+    prefix_tokens: list[int] | None = None
+    suffix_tokens: list[int] | None = None
+    ignore_positions: list[int] | None = None
 
-    hf_model_path: Optional[str] = None
+    hf_model_path: str | None = None
 
 
 @dataclass
 class NeuronpediaVectorRunnerConfig:
     # Vector loading parameters
     outputs_dir: str  # Where to save outputs
-    vector_names: Optional[List[str]] = None  # Names for each vector (optional)
+    vector_names: list[str] | None = None  # Names for each vector (optional)
 
     # Token generation parameters
     n_prompts_total: int = 24576
     n_tokens_in_prompt: int = 128
     n_prompts_in_forward_pass: int = 32
     prepend_bos: bool = True  # TODO: eventually include this in vector set export
-    prepend_chat_template_text: Optional[str] = None
+    prepend_chat_template_text: str | None = None
 
     # Batching parameters
     n_vectors_at_a_time: int = 128  # Similar to n_features_at_a_time
     quantile_vector_batch_size: int = 64
     start_batch: int = 0
-    end_batch: Optional[int] = None
+    end_batch: int | None = None
 
     # additional calculations
     use_dfa: bool = False
     include_original_vectors_in_output: bool = False
-    activation_thresholds: Optional[dict[int, float | int]] = None
+    activation_thresholds: dict[int, float | int] | None = None
     # Quantile parameters for activation analysis
     n_quantiles: int = 5
     top_acts_group_size: int = 30
@@ -87,12 +86,12 @@ class NeuronpediaVectorRunnerConfig:
     # Device and dtype settings
     model_dtype: str = ""
     vector_dtype: str = ""
-    model_id: Optional[str] = None
-    layer: Optional[int] = None
+    model_id: str | None = None
+    layer: int | None = None
     activation_store_device: str | None = None
-    model_device: Optional[str] = None
-    vector_device: Optional[str] = None
-    model_n_devices: Optional[int] = None
+    model_device: str | None = None
+    vector_device: str | None = None
+    model_n_devices: int | None = None
 
     # Dataset parameters
     huggingface_dataset_path: str = ""
@@ -100,6 +99,6 @@ class NeuronpediaVectorRunnerConfig:
     # Additional settings
     use_wandb: bool = False
     shuffle_tokens: bool = True
-    prefix_tokens: Optional[List[int]] = None
-    suffix_tokens: Optional[List[int]] = None
-    ignore_positions: Optional[List[int]] = None
+    prefix_tokens: list[int] | None = None
+    suffix_tokens: list[int] | None = None
+    ignore_positions: list[int] | None = None

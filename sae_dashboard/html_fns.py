@@ -39,9 +39,8 @@ def uColorMap(x: float) -> str:
     if x2 < 0:
         v = int(255 * (x2 + 1))
         return f"rgb({v},{v},255)"
-    else:
-        v = int(255 * (1 - x2))
-        return f"rgb(255,{v},{v})"
+    v = int(255 * (1 - x2))
+    return f"rgb(255,{v},{v})"
 
 
 class HTML:
@@ -148,21 +147,21 @@ class HTML:
         # Check arguments
         if isinstance(filename, str):
             filename = Path(filename)
-        assert (
-            filename.suffix == ".html"
-        ), f"Expected {filename.resolve()!r} to have .html suffix"
-        assert (
-            filename.parent.exists()
-        ), f"Expected {filename.parent.resolve()!r} to exist"
+        assert filename.suffix == ".html", (
+            f"Expected {filename.resolve()!r} to have .html suffix"
+        )
+        assert filename.parent.exists(), (
+            f"Expected {filename.parent.resolve()!r} to exist"
+        )
         assert self.js_data.keys() == {"AGGDATA", "DASHBOARD_DATA"}
 
         # ! JavaScript
 
         # Get path where we store all template JavaScript files
         js_path = Path(__file__).parent / "js"
-        assert all(
-            file.suffix == ".js" for file in js_path.iterdir()
-        ), f"Expected all files in {js_path.resolve()} to have .js suffix"
+        assert all(file.suffix == ".js" for file in js_path.iterdir()), (
+            f"Expected all files in {js_path.resolve()} to have .js suffix"
+        )
 
         # Define the contents of the `createVis` function, which takes in some `DATA[key]` object, and uses it to fill
         # in HTML. We create this by concatenating all files referred to in the keys of the `DATA[key]` object, since
@@ -317,7 +316,7 @@ def grid_column(
     # # Un-indent the final </div>
     # html_str = html_str[:-len(f"{indent}</div>")] + "\n</div>"
 
-    return html_str
+    return html_str  # noqa: RET504
 
 
 # # TODO - why doesn't fetch work on browsers? Annoying security thing, means I need to have the data in just one file

@@ -1,6 +1,7 @@
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Sequence, Tuple
+from typing import Callable
 
 import torch
 import torch.nn as nn
@@ -19,7 +20,7 @@ DTYPES = {
 @dataclass
 class ActivationConfig:
     primary_hook_point: str
-    auxiliary_hook_points: List[str]
+    auxiliary_hook_points: list[str]
 
 
 class TransformerLensWrapper(nn.Module):
@@ -37,33 +38,33 @@ class TransformerLensWrapper(nn.Module):
 
     def validate_hook_points(self):
         """Checks that the hook points are valid and that the model has them"""
-        assert (
-            self.activation_config.primary_hook_point in self.model.hook_dict
-        ), f"Invalid hook point: {self.activation_config.primary_hook_point}"
+        assert self.activation_config.primary_hook_point in self.model.hook_dict, (
+            f"Invalid hook point: {self.activation_config.primary_hook_point}"
+        )
 
         for hook_point in self.activation_config.auxiliary_hook_points:
-            assert (
-                hook_point in self.model.hook_dict
-            ), f"Invalid hook point: {hook_point}"
+            assert hook_point in self.model.hook_dict, (
+                f"Invalid hook point: {hook_point}"
+            )
 
     def get_layer(self, hook_point: str):
         """Get the layer (so we can do the early stopping in our forward pass)"""
         layer_match = re.match(r"blocks\.(\d+)\.", hook_point)
-        assert (
-            layer_match
-        ), f"Error: expecting hook_point to be 'blocks.{{layer}}.{{...}}', but got {hook_point!r}"
+        assert layer_match, (
+            f"Error: expecting hook_point to be 'blocks.{{layer}}.{{...}}', but got {hook_point!r}"
+        )
         return int(layer_match.group(1))
 
     def forward(  # type: ignore
         self,
         tokens: Int[Tensor, "batch seq"],
         return_logits: bool = True,
-    ) -> Dict[str, Tensor]:
+    ) -> dict[str, Tensor]:
         """Executes a forward pass, collecting specific hook point activations and optionally logit outputs"""
         activation_dict = {}
 
         def build_act_dict(
-            hooks: Sequence[Tuple[str, Callable[[Tensor, HookPoint], None]]],
+            hooks: Sequence[tuple[str, Callable[[Tensor, HookPoint], None]]],
         ) -> None:
             for hook_point, _ in hooks:
                 # The hook functions work by storing data in model's hook context, so we pop them back out
@@ -75,7 +76,7 @@ class TransformerLensWrapper(nn.Module):
                     activation = activation.flatten(-2, -1)
                 activation_dict[hook_point] = activation
 
-        hooks: List[Tuple[str, Callable[[Tensor, HookPoint], None]]] = [
+        hooks: list[tuple[str, Callable[[Tensor, HookPoint], None]]] = [
             (self.activation_config.primary_hook_point, self.hook_fn_store_act)
         ] + [
             (point, self.hook_fn_store_act)
@@ -134,16 +135,13 @@ def to_resid_direction(
         return direction
 
     # If it was trained on the MLP layer, then we apply the W_out map
-    elif ("pre" in model.activation_config.primary_hook_point) or (
+    if ("pre" in model.activation_config.primary_hook_point) or (
         "post" in model.activation_config.primary_hook_point
     ):
         return direction @ model.W_out[model.hook_layer]
 
-    elif "hook_z" in model.activation_config.primary_hook_point:
+    if "hook_z" in model.activation_config.primary_hook_point:
         return direction @ model.W_O[model.hook_layer].flatten(0, 1).to(direction.dtype)
 
     # Others not yet supported
-    else:
-        raise NotImplementedError(
-            "The hook your SAE was trained on isn't yet supported"
-        )
+    raise NotImplementedError("The hook your SAE was trained on isn't yet supported")
