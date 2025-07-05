@@ -184,6 +184,7 @@ demo_feature_dashboards.html
 **.safetensors
 **flamegraph.html
 artifacts/
+prof/
 
 .vscode/settings.json
 dfa_tests.ipynb
