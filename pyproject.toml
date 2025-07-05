@@ -33,6 +33,7 @@ syrupy = "^4.6.1"
 flake8 = "^7.0.0"
 pytest-cov = "^5.0.0"
 black = "^24.4.2"
+pytest-memray = "^1.7.0"
 
 [tool.poetry.scripts]
 neuronpedia-runner = "sae_dashboard.neuronpedia.neuronpedia_runner:main"
