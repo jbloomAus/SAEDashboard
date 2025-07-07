@@ -9,7 +9,10 @@ from torch import Tensor
 from transformer_lens import HookedTransformer
 
 from sae_dashboard.components_config import SequencesConfig
-from sae_dashboard.data_writing_fns import save_feature_centric_vis
+from sae_dashboard.data_writing_fns import (
+    save_feature_centric_vis,
+    save_prompt_centric_vis,
+)
 from sae_dashboard.sae_vis_data import SaeVisConfig, SaeVisData
 from sae_dashboard.sae_vis_runner import SaeVisRunner
 
@@ -118,6 +121,41 @@ def test_SaeVisData_create_and_save_feature_centric_vis(
     # tmp_path = Path(".") # when you want to manually inspect it.
     save_path = tmp_path / "feature_centric_vis.html"
     save_feature_centric_vis(sae_vis_data=sae_vis_data, filename=save_path)
+    assert (save_path).exists()
+    with open(save_path) as f:
+        html_contents = f.read()
+
+    # all the CSS should be in the HTML
+    css_files = (ROOT_DIR / "sae_dashboard" / "css").glob("*.css")
+    assert len(list(css_files)) > 0
+    for css_file in css_files:
+        with open(css_file) as f:
+            assert f.read() in html_contents
+
+    # all the JS should be in the HTML
+    js_files = (ROOT_DIR / "sae_dashboard" / "js").glob("*.js")
+    assert len(list(js_files)) > 0
+    for js_file in js_files:
+        with open(js_file) as f:
+            assert f.read() in html_contents
+
+    # all the HTML templates should be in the HTML
+    html_files = (ROOT_DIR / "sae_dashboard" / "html").glob("*.html")
+    assert len(list(html_files)) > 0
+    for html_file in html_files:
+        with open(html_file) as f:
+            assert f.read() in html_contents
+
+    assert json.dumps(sae_vis_data.feature_stats.aggdata) in html_contents
+
+
+def test_save_prompt_centric_vis(
+    sae_vis_data: SaeVisData,
+    tmp_path: Path,
+):
+    # tmp_path = Path(".") # when you want to manually inspect it.
+    save_path = tmp_path / "prompt_centric_vis.html"
+    save_prompt_centric_vis(sae_vis_data, prompt="Hello world", filename=save_path)
     assert (save_path).exists()
     with open(save_path) as f:
         html_contents = f.read()

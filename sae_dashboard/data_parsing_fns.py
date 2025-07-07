@@ -1,3 +1,5 @@
+import re
+
 import einops
 import numpy as np
 import torch
@@ -247,9 +249,10 @@ def parse_prompt_data(
         contribution_to_logprobs = orig_logits.log_softmax(
             dim=-1
         ) - new_logits.log_softmax(dim=-1)
-        top_contribution_to_logits = TopK(contribution_to_logprobs[:-1], k=5)
+        # Convert to float32 for compatibility with TopK
+        top_contribution_to_logits = TopK(contribution_to_logprobs.float()[:-1], k=5)
         bottom_contribution_to_logits = TopK(
-            contribution_to_logprobs[:-1], k=5, largest=False
+            contribution_to_logprobs.float()[:-1], k=5, largest=False
         )
 
         # Get the change in loss (which is negative of change of logprobs for correct token)
@@ -374,25 +377,41 @@ def get_prompt_data(
     )
     assert isinstance(tokens, torch.Tensor)
 
-    model_wrapped = TransformerLensWrapper(model, ActivationConfig(cfg.hook_point, []))
+    # Determine auxiliary hook points
+    auxiliary_hook_points = []
+    if "hook_resid" not in cfg.hook_point:
+        if match := re.match(r"blocks\.(\d+)\.", cfg.hook_point):
+            layer_num = int(match.group(1))
+            auxiliary_hook_points = [f"blocks.{layer_num}.hook_resid_post"]
+
+    model_wrapped = TransformerLensWrapper(
+        model, ActivationConfig(cfg.hook_point, auxiliary_hook_points)
+    )
+
+    # Get consistent dtype for all operations
+    dtype = model.W_U.dtype
+
+    activations = model_wrapped(tokens, return_logits=False)
+    act_post = activations[cfg.hook_point]
+
+    hook_point = auxiliary_hook_points[0] if auxiliary_hook_points else cfg.hook_point
+    resid_post = activations[hook_point].squeeze(0).to(dtype)
 
     feature_act_dir = encoder.W_enc[:, feature_idx]  # [d_in feats]
     feature_out_dir = encoder.W_dec[feature_idx]  # [feats d_in]
-    feature_resid_dir = to_resid_direction(
-        feature_out_dir, model_wrapped
-    )  # [feats d_model]
+    feature_resid_dir = to_resid_direction(feature_out_dir, model_wrapped).to(dtype)
+
     assert (
         feature_act_dir.T.shape
         == feature_out_dir.shape
         == (len(feature_idx), encoder.cfg.d_in)
     )
 
-    # ! Define hook functions to cache all the info required for feature ablation, then run those hook fns
-    resid_post, act_post = model_wrapped(tokens, return_logits=False)
-    resid_post: Tensor = resid_post.squeeze(0)  # type: ignore
-    feat_acts = encoder.get_feature_acts_subset(act_post, feature_idx).squeeze(  # type: ignore
-        0
-    )  # [seq feats]  # type: ignore
+    feat_acts = (
+        encoder.encode(act_post.to(encoder.device, encoder.dtype))[..., feature_idx]
+        .squeeze(0)
+        .to(act_post.device, dtype)
+    )
 
     # ! Use the data we've collected to make the scores_dict and update the sae_vis_data
     scores_dict = parse_prompt_data(
