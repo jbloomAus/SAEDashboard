@@ -163,7 +163,8 @@ class SaeVisData:
         """
         if isinstance(filename, str):
             filename = Path(filename)
-        assert filename.suffix == ".json", "Filename must have a .json extension"
+        if filename.suffix != ".json":
+            raise ValueError("Filename must have a .json extension")
 
         _self = _SaeVisData(
             feature_data_dict=self.feature_data_dict,
@@ -186,7 +187,8 @@ class SaeVisData:
         """
         if isinstance(filename, str):
             filename = Path(filename)
-        assert filename.suffix == ".json", "Filename must have a .json extension"
+        if filename.suffix != ".json":
+            raise ValueError("Filename must have a .json extension")
 
         with open(filename) as f:
             data = json.load(f)

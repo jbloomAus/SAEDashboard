@@ -213,13 +213,15 @@ def parse_prompt_data(
     if feature_idx is None:
         feature_idx = list(sae_vis_data.feature_data_dict.keys())
     n_feats = len(feature_idx)
-    assert (
-        feature_resid_dir.shape[0] == n_feats
-    ), f"The number of features in feature_resid_dir ({feature_resid_dir.shape[0]}) does not match the number of feature indices ({n_feats})"
+    if feature_resid_dir.shape[0] != n_feats:
+        raise ValueError(
+            f"The number of features in feature_resid_dir ({feature_resid_dir.shape[0]}) does not match the number of feature indices ({n_feats})"
+        )
 
-    assert (
-        feat_acts.shape[1] == n_feats
-    ), f"The number of features in feat_acts ({feat_acts.shape[1]}) does not match the number of feature indices ({n_feats})"
+    if feat_acts.shape[1] != n_feats:
+        raise ValueError(
+            f"The number of features in feat_acts ({feat_acts.shape[1]}) does not match the number of feature indices ({n_feats})"
+        )
 
     feats_loss_contribution = torch.empty(
         size=(n_feats, tokens.shape[1] - 1), device=device
@@ -362,17 +364,18 @@ def get_prompt_data(
     # ! Boring setup code
     feature_idx = list(sae_vis_data.feature_data_dict.keys())
     encoder = sae_vis_data.encoder
-    assert isinstance(encoder, SAE)
+    assert isinstance(encoder, SAE)  # get pyright checks to pass
     model = sae_vis_data.model
-    assert isinstance(model, HookedTransformer)
+    assert isinstance(model, HookedTransformer)  # get pyright checks to pass
     cfg = sae_vis_data.cfg
-    assert isinstance(cfg.hook_point, str), f"{cfg.hook_point=}, expected a string"
+    if not isinstance(cfg.hook_point, str):
+        raise TypeError(f"{cfg.hook_point=}, expected a string")
 
     str_toks: list[str] = model.tokenizer.tokenize(prompt)  # type: ignore
     tokens = model.tokenizer.encode(prompt, return_tensors="pt").to(  # type: ignore
         sae_vis_data.cfg.device
     )
-    assert isinstance(tokens, torch.Tensor)
+    # assert isinstance(tokens, torch.Tensor)
 
     model_wrapped = TransformerLensWrapper(model, ActivationConfig(cfg.hook_point, []))
 
@@ -381,11 +384,15 @@ def get_prompt_data(
     feature_resid_dir = to_resid_direction(
         feature_out_dir, model_wrapped
     )  # [feats d_model]
-    assert (
-        feature_act_dir.T.shape
-        == feature_out_dir.shape
-        == (len(feature_idx), encoder.cfg.d_in)
-    )
+    if feature_act_dir.T.shape != feature_out_dir.shape or feature_out_dir.shape != (
+        len(feature_idx),
+        encoder.cfg.d_in,
+    ):
+        raise ValueError(
+            f"Shape mismatch: feature_act_dir.T.shape={feature_act_dir.T.shape}, "
+            f"feature_out_dir.shape={feature_out_dir.shape}, "
+            f"expected shape={(len(feature_idx), encoder.cfg.d_in)}"
+        )
 
     # ! Define hook functions to cache all the info required for feature ablation, then run those hook fns
     resid_post, act_post = model_wrapped(tokens, return_logits=False)

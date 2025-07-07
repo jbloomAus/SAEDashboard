@@ -330,7 +330,10 @@ class NeuronpediaVectorRunner:
             tokens = torch.cat([tokens, suffix_repeated], dim=1)
 
         # assert length hasn't changed
-        assert tokens.shape[1] == original_length
+        if tokens.shape[1] != original_length:
+            raise ValueError(
+                f"Token length mismatch: expected {original_length}, got {tokens.shape[1]}"
+            )
         return tokens
 
     def get_feature_batches(self):
@@ -359,7 +362,8 @@ class NeuronpediaVectorRunner:
                 tokens_file,
             )
 
-        assert not has_duplicate_rows(tokens), "Duplicate rows in tokens"
+        if has_duplicate_rows(tokens):
+            raise ValueError("Duplicate rows in tokens")
 
         return tokens
 
@@ -400,7 +404,8 @@ class NeuronpediaVectorRunner:
 
         # Use number of vectors instead of features
         self.n_features = self.vector_set.cfg.d_vectors
-        assert self.n_features is not None
+        if self.n_features is None:
+            raise ValueError("Number of features must be specified")
 
         feature_idx = self.get_feature_batches()
         if self.cfg.start_batch >= len(feature_idx):

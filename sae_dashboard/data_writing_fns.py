@@ -41,8 +41,10 @@ def save_feature_centric_vis(
     )
 
     # Get tokenize function (we only need to define it once)
-    assert sae_vis_data.model is not None
-    assert sae_vis_data.model.tokenizer is not None
+    if sae_vis_data.model is None:
+        raise ValueError("Model is required but not provided")
+    if sae_vis_data.model.tokenizer is None:
+        raise ValueError("Model tokenizer is required but not provided")
     decode_fn = get_decode_html_safe_fn(sae_vis_data.model.tokenizer)
 
     # Create iterator
@@ -150,8 +152,10 @@ def save_prompt_centric_vis(
     first_key = f"{first_metric}|{first_seq_pos}"
 
     # Get tokenize function (we only need to define it once)
-    assert sae_vis_data.model is not None
-    assert sae_vis_data.model.tokenizer is not None
+    if sae_vis_data.model is None:
+        raise ValueError("Model is required but not provided")
+    if sae_vis_data.model.tokenizer is None:
+        raise ValueError("Model tokenizer is required but not provided")
     decode_fn = get_decode_html_safe_fn(sae_vis_data.model.tokenizer)
 
     # For each (metric, seqpos) object, we merge the prompt-centric views of each of the top features, then we merge
@@ -188,12 +192,15 @@ def save_prompt_centric_vis(
             HTML_OBJ.html_data = deepcopy(html_obj.html_data)
 
     # Check our first key is in the scores_dict (if not, we should pick a different key)
-    assert first_key in scores_dict, "\n".join(
-        [
-            f"Key {first_key} not found in {scores_dict.keys()=}.",
-            "This means that there are no features with a nontrivial score for this choice of key & metric.",
-        ]
-    )
+    if first_key not in scores_dict:
+        raise KeyError(
+            "\n".join(
+                [
+                    f"Key {first_key} not found in {scores_dict.keys()=}.",
+                    "This means that there are no features with a nontrivial score for this choice of key & metric.",
+                ]
+            )
+        )
 
     # Add the aggdata
     HTML_OBJ.js_data = {
