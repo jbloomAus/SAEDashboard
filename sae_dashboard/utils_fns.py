@@ -437,9 +437,8 @@ class TopK:
             return utils.to_numpy(topk.values), utils.to_numpy(topk.indices)
 
         # Get the topk of the tensor, but only computed over the values of the tensor which are nontrivial
-        assert (
-            tensor_mask.shape == tensor.shape[:-1]
-        ), "Error: unexpected shape for tensor mask."
+        if tensor_mask.shape != tensor.shape[:-1]:
+            raise ValueError("Error: unexpected shape for tensor mask.")
         tensor_nontrivial_values = tensor[tensor_mask]  # shape [rows d]
         k = min(self.k, tensor_nontrivial_values.shape[-1])
         k = self.k
@@ -496,7 +495,8 @@ def pad_with_zeros(
     """
     Pads a list with zeros to make it the correct length.
     """
-    assert len(x) <= n, "Error: x must have fewer than n elements."
+    if len(x) > n:
+        raise ValueError("Error: x must have fewer than n elements.")
 
     if side == "right":
         return x + [0.0] * (n - len(x))
@@ -651,9 +651,10 @@ class FeatureStatistics:
 
         Note, we also deal with the special case where self has no data.
         """
-        assert (
-            self.ranges_and_precisions == other.ranges_and_precisions
-        ), "Error: can't merge two FeatureStatistics objects with different ranges."
+        if self.ranges_and_precisions != other.ranges_and_precisions:
+            raise ValueError(
+                "Error: can't merge two FeatureStatistics objects with different ranges."
+            )
 
         self.max.extend(other.max)
         self.frac_nonzero.extend(other.frac_nonzero)
@@ -757,9 +758,8 @@ def split_string(
     str1: str,
     str2: str,
 ) -> tuple[str, str]:
-    assert (
-        str1 in input_string and str2 in input_string
-    ), "Error: str1 and str2 must be in input_string"
+    if not (str1 in input_string and str2 in input_string):
+        raise ValueError("Error: str1 and str2 must be in input_string")
     pattern = f"({re.escape(str1)}.*?){re.escape(str2)}"
     match = re.search(pattern, input_string, flags=re.DOTALL)
     if match:
@@ -976,22 +976,29 @@ class RollingCorrCoef:
 
     def update(self, x: Float[Tensor, "X N"], y: Float[Tensor, "Y N"]) -> None:
         # Get values of x and y, and check for consistency with each other & with previous values
-        assert x.ndim == 2 and y.ndim == 2, "Both x and y should be 2D"
+        if not (x.ndim == 2 and y.ndim == 2):
+            raise ValueError("Both x and y should be 2D")
         X, Nx = x.shape
         Y, Ny = y.shape
-        assert (
-            Nx == Ny
-        ), "Error: x and y should have the same size in the last dimension"
+        if Nx != Ny:
+            raise ValueError(
+                "Error: x and y should have the same size in the last dimension"
+            )
         if self.with_self:
-            assert X == Y, "If with_self is True, then x and y should be the same shape"
+            if X != Y:
+                raise ValueError(
+                    "If with_self is True, then x and y should be the same shape"
+                )
         if self.X is not None:
-            assert (
-                X == self.X
-            ), "Error: updating a corrcoef object with different sized dataset."
+            if X != self.X:
+                raise ValueError(
+                    "Error: updating a corrcoef object with different sized dataset."
+                )
         if self.Y is not None:
-            assert (
-                Y == self.Y
-            ), "Error: updating a corrcoef object with different sized dataset."
+            if Y != self.Y:
+                raise ValueError(
+                    "Error: updating a corrcoef object with different sized dataset."
+                )
         self.X = X
         self.Y = Y
 
@@ -1149,7 +1156,8 @@ class HistogramData:
 
         # Choose tickvalues
         # TODO - improve this, it's currently a bit hacky (currently I only use the 5 ticks mode)
-        assert tickmode in ["ints", "5 ticks"]
+        if tickmode not in ["ints", "5 ticks"]:
+            raise ValueError(f"tickmode must be 'ints' or '5 ticks', got {tickmode}")
         if tickmode == "ints":
             top_tickval = int(max_value)
             tick_vals = torch.arange(0, top_tickval + 1, 1).tolist()

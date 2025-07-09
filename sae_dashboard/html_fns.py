@@ -148,21 +148,23 @@ class HTML:
         # Check arguments
         if isinstance(filename, str):
             filename = Path(filename)
-        assert (
-            filename.suffix == ".html"
-        ), f"Expected {filename.resolve()!r} to have .html suffix"
-        assert (
-            filename.parent.exists()
-        ), f"Expected {filename.parent.resolve()!r} to exist"
-        assert self.js_data.keys() == {"AGGDATA", "DASHBOARD_DATA"}
+        if filename.suffix != ".html":
+            raise ValueError(f"Expected {filename.resolve()!r} to have .html suffix")
+        if not filename.parent.exists():
+            raise FileNotFoundError(f"Expected {filename.parent.resolve()!r} to exist")
+        if self.js_data.keys() != {"AGGDATA", "DASHBOARD_DATA"}:
+            raise ValueError(
+                f"Expected js_data keys to be {{'AGGDATA', 'DASHBOARD_DATA'}}, got {self.js_data.keys()}"
+            )
 
         # ! JavaScript
 
         # Get path where we store all template JavaScript files
         js_path = Path(__file__).parent / "js"
-        assert all(
-            file.suffix == ".js" for file in js_path.iterdir()
-        ), f"Expected all files in {js_path.resolve()} to have .js suffix"
+        if not all(file.suffix == ".js" for file in js_path.iterdir()):
+            raise ValueError(
+                f"Expected all files in {js_path.resolve()} to have .js suffix"
+            )
 
         # Define the contents of the `createVis` function, which takes in some `DATA[key]` object, and uses it to fill
         # in HTML. We create this by concatenating all files referred to in the keys of the `DATA[key]` object, since
