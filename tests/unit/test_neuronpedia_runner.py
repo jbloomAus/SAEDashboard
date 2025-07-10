@@ -16,7 +16,7 @@ def runner_config() -> NeuronpediaRunnerConfig:
         outputs_dir="test_outputs",
         n_prompts_total=256,
         n_tokens_in_prompt=128,
-        huggingface_dataset_path="Skylion007/openwebtext",
+        huggingface_dataset_path="monology/pile-uncopyrighted",
     )
 
 
