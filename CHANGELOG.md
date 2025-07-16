@@ -2,6 +2,55 @@
 
 
 
+## v0.6.10 (2025-07-16)
+
+### Fix
+
+* fix: Merge pull request #45 from Hzfinfdu/main
+
+fix: reading model_from_pretrained_kwargs from SAELens config with th… ([`0a509fe`](https://github.com/jbloomAus/SAEDashboard/commit/0a509fede04737b8087140fb4fe5f7addc259806))
+
+* fix: reading model_from_pretrained_kwargs from SAELens config with the correct key ([`9938812`](https://github.com/jbloomAus/SAEDashboard/commit/9938812ad209764ceb021eedffb08c0fc5a31c89))
+
+### Unknown
+
+* Merge pull request #60 from jbloomAus/fix-unit-tests
+
+fixes unit tests ([`1a3975d`](https://github.com/jbloomAus/SAEDashboard/commit/1a3975df60198dc169dfcf3354a8e8da5383029f))
+
+* fixes unit tests ([`2a35d5d`](https://github.com/jbloomAus/SAEDashboard/commit/2a35d5dd4ad08e3d3532158030d86dbef93ad309))
+
+* dedupes get_tokens() (#55)
+
+* dedupes get_tokens()
+
+* adds newline ([`faeb6f1`](https://github.com/jbloomAus/SAEDashboard/commit/faeb6f119d35a275a304d39c6e8cc9c7c40d31ce))
+
+* fixes make commands (#57) ([`cb74411`](https://github.com/jbloomAus/SAEDashboard/commit/cb74411039d0c9d0b0883c85434f27601cf940a5))
+
+* deletes print statements in tests (#56) ([`026ba30`](https://github.com/jbloomAus/SAEDashboard/commit/026ba305f4e31f5b47d4f9ada04c7cb0c3aae7f0))
+
+* deletes unused direct_effect_feature_ablation_experiment() (#52) ([`391ff94`](https://github.com/jbloomAus/SAEDashboard/commit/391ff949a997a99b605bd55a706d6fed2892249c))
+
+* removes unused files (#54) ([`5381cc7`](https://github.com/jbloomAus/SAEDashboard/commit/5381cc7118c7655c6c14cdbbd12e1f6c00278fc2))
+
+* Merge pull request #47 from Marlon154/main
+
+Fixing deprecated fn call for SAE Lens ([`61c9bd4`](https://github.com/jbloomAus/SAEDashboard/commit/61c9bd4ad8ccd5d96cb5c89eb961db0e7fbc2ab0))
+
+* Merge branch &#39;main&#39; into main ([`50b202a`](https://github.com/jbloomAus/SAEDashboard/commit/50b202a0b2fef413dd46b4ce2838bae27c0ac252))
+
+* Merge pull request #35 from chanind/relax-saelens-dep
+
+fix: relax SAELens and einops requirements ([`6c71bbf`](https://github.com/jbloomAus/SAEDashboard/commit/6c71bbfd7b6f1562093f1192616a7a55188631d3))
+
+* fixing type checking ([`42a9845`](https://github.com/jbloomAus/SAEDashboard/commit/42a9845bba856c942f6d70182429cdb49e0ea917))
+
+* Merge branch &#39;main&#39; into relax-saelens-dep ([`3e6c870`](https://github.com/jbloomAus/SAEDashboard/commit/3e6c8703afd5ce80c29ec1ed0fc729def3f7f8fa))
+
+* Fixing deprecated fn call ([`f1da0e6`](https://github.com/jbloomAus/SAEDashboard/commit/f1da0e6ea7d663e5ff54612d7979d1b1ed9a6b77))
+
+
 ## v0.6.9 (2025-02-25)
 
 ### Fix
@@ -72,6 +121,8 @@ fix: run_settings.json should properly log model_id and layer ([`f3bde39`](https
 
 * fix: Force Build ([`2e4979c`](https://github.com/jbloomAus/SAEDashboard/commit/2e4979c07ad8bcd2760ee0981ee415d17fef2e5a))
 
+* fix: relax SAELens requirement ([`a83147e`](https://github.com/jbloomAus/SAEDashboard/commit/a83147efbf30ef4c4380f306a03468a0c8d41be0))
+
 ### Unknown
 
 * Merge pull request #39 from jbloomAus/allow_vector_output
@@ -103,6 +154,10 @@ Feature/vector dashboards ([`64c44a9`](https://github.com/jbloomAus/SAEDashboard
 enable passing custom HF model to replace model weights ([`5d98417`](https://github.com/jbloomAus/SAEDashboard/commit/5d98417877c2cfe52bb09ddada0b4b53849b344a))
 
 * enable passing custom HF model to replace model weights ([`b2d6ae5`](https://github.com/jbloomAus/SAEDashboard/commit/b2d6ae5446fb79f4662bcdac6030cb6072b09b60))
+
+* also relax einops ([`62614ac`](https://github.com/jbloomAus/SAEDashboard/commit/62614ac27ca50527556cc7c891e589e63a14e9bc))
+
+* fix type checks ([`5a2cca0`](https://github.com/jbloomAus/SAEDashboard/commit/5a2cca0334a0907e7685cbef798cda71cd249ba4))
 
 * Don&#39;t copy to output folder by default ([`4dbde12`](https://github.com/jbloomAus/SAEDashboard/commit/4dbde1214d49eaaf9b591f083f34e57c8c0c1dbd))
 
