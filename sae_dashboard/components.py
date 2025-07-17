@@ -97,7 +97,8 @@ class FeatureTablesData:
 
         # Store the neuron alignment data, if it exists
         if len(self.neuron_alignment_indices) > 0:
-            assert len(self.neuron_alignment_indices) >= cfg.n_rows, "Not enough rows!"
+            if len(self.neuron_alignment_indices) < cfg.n_rows:
+                raise ValueError("Not enough rows!")
             data["neuronAlignment"] = [
                 {
                     "index": index,
@@ -247,7 +248,10 @@ class LogitsTableData:
         Converts data -> HTML object, for the logits table (i.e. the top and bottom affected tokens by this feature).
         """
         # Crop the lists to `cfg.n_rows` (first checking the config doesn't ask for more rows than we have)
-        assert cfg.n_rows <= len(self.bottom_logits)
+        if cfg.n_rows > len(self.bottom_logits):
+            raise ValueError(
+                f"Requested {cfg.n_rows} rows but only have {len(self.bottom_logits)} logits"
+            )
         bottom_token_ids = self.bottom_token_ids[: cfg.n_rows]
         bottom_logits = self.bottom_logits[: cfg.n_rows]
         top_token_ids = self.top_token_ids[: cfg.n_rows]
@@ -377,9 +381,6 @@ class SequenceData:
                 The data for this sequence, in the form of a list of dicts for each token (where the dict stores things
                 like token, feature activations, etc).
         """
-        assert isinstance(
-            cfg, (PromptConfig, SequencesConfig)
-        ), f"Invalid config type: {type(cfg)}"
         seq_group_id = component_specific_kwargs.get("seq_group_id", None)
         max_feat_act = component_specific_kwargs.get("max_feat_act", None)
         max_loss_contribution = component_specific_kwargs.get(
@@ -402,7 +403,8 @@ class SequenceData:
         # If we only have data for the bold token, we pad out everything with zeros or empty lists
         only_bold = isinstance(cfg, SequencesConfig) and not (cfg.compute_buffer)
         if only_bold:
-            assert bold_idx != "max", "Don't know how to deal with this case yet."
+            if bold_idx == "max":
+                raise NotImplementedError("Don't know how to deal with this case yet.")
             feat_acts = [
                 self.feat_acts[0] if (i == bold_idx) else 0.0
                 for i in range(self.seq_len)
@@ -452,25 +454,31 @@ class SequenceData:
         # If we sent in a prompt rather than this being sliced from a longer sequence, then the pos_ids etc will be shorter
         # than the token list by 1, so we need to pad it at the first token
         if isinstance(cfg, PromptConfig):
-            assert (
+            if not (
                 len(pos_ids)
                 == len(neg_ids)
                 == len(pos_val)
                 == len(neg_val)
                 == len(self.token_ids) - 1
-            ), "If this is a single prompt, these lists must be the same length as token_ids or 1 less"
+            ):
+                raise ValueError(
+                    "If this is a single prompt, these lists must be the same length as token_ids or 1 less"
+                )
             pos_ids = [[]] + pos_ids
             neg_ids = [[]] + neg_ids
             pos_val = [[]] + pos_val
             neg_val = [[]] + neg_val
 
-        assert (
+        if not (
             len(pos_ids)
             == len(neg_ids)
             == len(pos_val)
             == len(neg_val)
             == len(self.token_ids)
-        ), "If this is part of a sequence group etc are given, they must be the same length as token_ids"
+        ):
+            raise ValueError(
+                "If this is part of a sequence group etc are given, they must be the same length as token_ids"
+            )
 
         # Process the tokens to get str toks
         toks = to_str_tokens(decode_fn, self.token_ids)
@@ -711,7 +719,7 @@ class SequenceMultiGroupData:
         Returns:
             html_obj:  Object containing the HTML and JavaScript data for these multiple seq groups.
         """
-        assert isinstance(column, int)
+        assert isinstance(column, int)  # get pyright checks to pass
 
         # Get max activation value & max loss contributions, over all sequences in all groups
         max_feat_act = component_specific_kwargs.get("max_feat_act", self.max_feat_act)

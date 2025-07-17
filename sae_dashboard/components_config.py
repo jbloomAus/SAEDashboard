@@ -75,7 +75,7 @@ class SequencesConfig(BaseComponentConfig):
     hover_below: bool = True
 
     def data_is_contained_in(self, other: BaseComponentConfig) -> bool:
-        assert isinstance(other, self.__class__)
+        assert isinstance(other, self.__class__)  # get pyright checks to pass
         return all(
             [
                 self.buffer is None
@@ -118,7 +118,7 @@ class ActsHistogramConfig(BaseComponentConfig):
     n_bins: int = 50
 
     def data_is_contained_in(self, other: BaseComponentConfig) -> bool:
-        assert isinstance(other, self.__class__)
+        assert isinstance(other, self.__class__)  # get pyright checks to pass
         return self.n_bins == other.n_bins
 
     @property
@@ -131,7 +131,7 @@ class LogitsHistogramConfig(BaseComponentConfig):
     n_bins: int = 50
 
     def data_is_contained_in(self, other: BaseComponentConfig) -> bool:
-        assert isinstance(other, self.__class__)
+        assert isinstance(other, self.__class__)  # get pyright checks to pass
         return self.n_bins == other.n_bins
 
     @property
@@ -144,7 +144,7 @@ class LogitsTableConfig(BaseComponentConfig):
     n_rows: int = 10
 
     def data_is_contained_in(self, other: BaseComponentConfig) -> bool:
-        assert isinstance(other, self.__class__)
+        assert isinstance(other, self.__class__)  # get pyright checks to pass
         return self.n_rows <= other.n_rows
 
     @property
@@ -161,7 +161,7 @@ class FeatureTablesConfig(BaseComponentConfig):
     correlated_b_features_table: bool = False
 
     def data_is_contained_in(self, other: BaseComponentConfig) -> bool:
-        assert isinstance(other, self.__class__)
+        assert isinstance(other, self.__class__)  # get pyright checks to pass
         return all(
             [
                 self.n_rows <= other.n_rows,

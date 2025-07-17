@@ -90,9 +90,8 @@ class FeatureData:
             # Add DFA config here if we create a specific config for it
         }
         config_class_name = config.__class__.__name__
-        assert (
-            config_class_name in CONFIG_CLASS_MAP
-        ), f"Invalid component config: {config_class_name}"
+        if config_class_name not in CONFIG_CLASS_MAP:
+            raise ValueError(f"Invalid component config: {config_class_name}")
         return CONFIG_CLASS_MAP[config_class_name]
 
     def _get_html_data_feature_centric(
@@ -164,16 +163,22 @@ class FeatureData:
         html_obj = HTML()
 
         # Verify that we only have a single column
-        assert layout.columns.keys() == {
-            0
-        }, f"prompt_centric_layout should only have 1 column, instead found cols {layout.columns.keys()}"
-        assert (
-            layout.prompt_cfg is not None
-        ), "prompt_centric_cfg should include a PromptConfig, but found None"
+        if layout.columns.keys() != {0}:
+            raise ValueError(
+                f"prompt_centric_layout should only have 1 column, instead found cols {layout.columns.keys()}"
+            )
+        if layout.prompt_cfg is None:
+            raise ValueError(
+                "prompt_centric_cfg should include a PromptConfig, but found None"
+            )
         if layout.seq_cfg is not None:
-            assert (layout.seq_cfg.n_quantiles == 0) or (
-                layout.seq_cfg.stack_mode == "stack-all"
-            ), "prompt_centric_layout should have stack_mode='stack-all' if n_quantiles > 0, so that it fits in 1 col"
+            if not (
+                (layout.seq_cfg.n_quantiles == 0)
+                or (layout.seq_cfg.stack_mode == "stack-all")
+            ):
+                raise ValueError(
+                    "prompt_centric_layout should have stack_mode='stack-all' if n_quantiles > 0, so that it fits in 1 col"
+                )
 
         # Get the maximum color over both the prompt and the sequences
         max_feat_act = max(
