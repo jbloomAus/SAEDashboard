@@ -2,6 +2,8 @@ import json
 import os
 from typing import Type, TypeVar
 
+import pytest
+
 from sae_dashboard.neuronpedia.neuronpedia_dashboard import NeuronpediaDashboardBatch
 from sae_dashboard.neuronpedia.neuronpedia_runner import (
     NeuronpediaRunner,
@@ -356,3 +358,49 @@ def test_neuronpedia_runner_prefix_suffix_it_model():
     runner.run()
 
     assert "run_settings.json" in os.listdir(runner.cfg.outputs_dir)
+
+
+def test_neuronpedia_runner_run_converter_name():
+    np_output_folder = "neuronpedia_outputs/test_converter"
+    act_cache_folder = "cached_activations"
+
+    os.system(f"rm -rf {np_output_folder}")
+    os.system(f"rm -rf {act_cache_folder}")
+
+    cfg = NeuronpediaRunnerConfig(
+        sae_set="gpt2-small-res-jb",
+        sae_path="blocks.0.hook_resid_pre",
+        np_set_name="res-jb",
+        outputs_dir=np_output_folder,
+        sparsity_threshold=1,
+        n_prompts_total=1000,
+        n_features_at_a_time=2,
+        end_batch=0,
+        use_wandb=False,
+        shuffle_tokens=False,
+        converter_name="sae_lens",
+        huggingface_dataset_path="monology/pile-uncopyrighted",
+    )
+
+    runner = NeuronpediaRunner(cfg)
+    runner.run()
+
+    correct_path = os.path.join("tests/acceptance/test_converter", "batch-0.json")
+    correct_data = json_to_class(correct_path, NeuronpediaDashboardBatch)
+    test_path = os.path.join(runner.cfg.outputs_dir, "batch-0.json")
+    assert os.path.exists(test_path), f"file {test_path} does not exist"
+    test_data = json_to_class(test_path, NeuronpediaDashboardBatch)
+    assert test_data == correct_data
+
+
+def test_neuronpedia_runner_raises_error_if_converter_name_not_found():
+    cfg = NeuronpediaRunnerConfig(
+        sae_set="gpt2-small-res-jb",
+        sae_path="blocks.0.hook_resid_pre",
+        outputs_dir="neuronpedia_outputs/test_converter",
+        converter_name="bogus_converter_name",
+        use_wandb=False,
+    )
+
+    with pytest.raises(ValueError):
+        _ = NeuronpediaRunner(cfg)
