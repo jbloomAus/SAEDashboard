@@ -73,10 +73,10 @@ jobs:
         run: poetry run black --check .
 
       - name: check types
-        run: poetry run pyright .
+        run: make check-type
 
       - name: test
-        run: poetry run pytest --cov=sae_dashboard --cov-report=term-missing tests/unit
+        run: make test
 
       - name: build
         run: poetry build
