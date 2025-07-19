@@ -11,7 +11,7 @@ This codebase was originally designed to replicate Anthropic's sparse autoencode
 ## Features
 
 - Customizable dashboards with various plots and data representations for SAE features
-- Support for any SAE in the SAELens library
+- Support for SAEs in SAELens and other libraries
 - Neuronpedia integration for hosting and comprehensive neuron analysis (note: this requires a Neuronpedia account and is currently only used internally)
 - Ability to handle large datasets and models efficiently
 
@@ -84,6 +84,10 @@ runner.run()
 ```
 
 For more options and detailed configuration, refer to the `NeuronpediaRunnerConfig` class in the code.
+
+## Generate dashboards for SAEs from other libraries
+
+You can generate dashboards for any SAE from SAELens or another library that is not in in the SAELens [pretrained_saes.yaml](https://github.com/jbloomAus/SAELens/blob/main/sae_lens/pretrained_saes.yaml) file as long as a correct arg is passed to `converter_name` in `NeuronpediaRunnerConfig`. See the [neuronpedia_runner.py](https://github.com/jbloomAus/SAEDashboard/blob/main/sae_dashboard/neuronpedia/neuronpedia_runner.py) file for more details, or ask on the [Open Source Mechanistic Interpretability Slack](https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-2k0id7mv8-CsIgPLmmHd03RPJmLUcapw). If you write a good custom loader for another library, please consider contributing it back to SAELens!
 
 ## Configuration Options
 
