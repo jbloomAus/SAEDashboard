@@ -2,7 +2,7 @@ import math
 import random
 import re
 from collections import defaultdict
-from typing import Iterable, List, Union
+from typing import Any, Iterable, List, Union
 
 import einops
 import numpy as np
@@ -331,7 +331,7 @@ class VectorVisRunner:
 
 
 def get_decoder_weights_distribution(
-    encoder: SAE,
+    encoder: SAE[Any],
     model: HookedTransformer,
     feature_idx: Union[int, List[int]],
 ) -> List[DecoderWeightsDistribution]:

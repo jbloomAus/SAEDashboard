@@ -86,7 +86,7 @@ def test_add_prefix_suffix_to_tokens_prepend_bos_false(
     neuronpedia_runner.cfg.suffix_tokens = [104, 105, 106]  # Example suffix tokens
 
     # get the tokens
-    neuronpedia_runner.sae.cfg.prepend_bos = False
+    neuronpedia_runner.sae.cfg.metadata.prepend_bos = False
     tokens = neuronpedia_runner.get_tokens()
     tokens = neuronpedia_runner.add_prefix_suffix_to_tokens(tokens)
 

@@ -2,7 +2,7 @@ import math
 import random
 import re
 from collections import defaultdict
-from typing import Iterable, List, Union
+from typing import Any, Iterable, List, Union
 
 import einops
 import numpy as np
@@ -42,7 +42,7 @@ class FeatureDataGeneratorFactory:
     def create(
         cfg: SaeVisConfig,
         model: HookedTransformer,
-        encoder: SAE,
+        encoder: SAE[Any],
         tokens: Int[Tensor, "batch seq"],
     ) -> FeatureDataGenerator:
         """Builds a FeatureDataGenerator using the provided config and model."""
@@ -73,7 +73,10 @@ class SaeVisRunner:
 
     @torch.inference_mode()
     def run(
-        self, encoder: SAE, model: HookedTransformer, tokens: Int[Tensor, "batch seq"]
+        self,
+        encoder: SAE[Any],
+        model: HookedTransformer,
+        tokens: Int[Tensor, "batch seq"],
     ) -> SaeVisData:
         # Apply random seed
         self.set_seeds()
@@ -284,7 +287,7 @@ class SaeVisRunner:
         return None
 
     def handle_features(
-        self, features: Iterable[int] | None, encoder_wrapper: SAE
+        self, features: Iterable[int] | None, encoder_wrapper: SAE[Any]
     ) -> list[int]:
         if features is None:
             return list(range(encoder_wrapper.cfg.d_sae))
@@ -328,7 +331,7 @@ class SaeVisRunner:
 
 
 def get_decoder_weights_distribution(
-    encoder: SAE,
+    encoder: SAE[Any],
     model: HookedTransformer,
     feature_idx: Union[int, List[int]],
 ) -> List[DecoderWeightsDistribution]:

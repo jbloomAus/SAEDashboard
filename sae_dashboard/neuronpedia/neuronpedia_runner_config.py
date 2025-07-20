@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 DEFAULT_SPARSITY_THRESHOLD = -6
 
@@ -22,6 +22,8 @@ class NeuronpediaRunnerConfig:
     n_prompts_total: int = 24576
     n_tokens_in_prompt: int = 128
     n_prompts_in_forward_pass: int = 32
+    disable_concat_sequences: bool = False
+    sequence_separator_token: int | Literal["bos", "eos", "sep"] | None = "bos"
 
     # batching
     n_features_at_a_time: int = 128

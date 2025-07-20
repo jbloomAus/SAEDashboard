@@ -11,8 +11,9 @@ import torch
 import wandb
 import wandb.sdk
 from matplotlib import colors
-from sae_lens.sae import SAE
+from sae_lens.saes.sae import SAE
 from sae_lens.training.activations_store import ActivationsStore
+from sae_lens.util import extract_layer_from_tlens_hook_name
 from tqdm import tqdm
 from transformer_lens import HookedTransformer
 from transformers import AutoModelForCausalLM
@@ -104,7 +105,7 @@ class NeuronpediaRunner:
                 dtype=self.cfg.sae_dtype if self.cfg.sae_dtype != "" else None,
             )
         else:
-            self.sae, _, _ = SAE.from_pretrained(
+            self.sae = SAE.from_pretrained(
                 release=self.cfg.sae_set,
                 sae_id=self.cfg.sae_path,
                 device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
@@ -175,9 +176,9 @@ class NeuronpediaRunner:
         print(f"Model DType: {self.cfg.model_dtype}")
 
         # Initialize Model
-        self.model_id = self.sae.cfg.model_name
+        self.model_id = self.sae.cfg.metadata.model_name
         self.cfg.model_id = self.model_id
-        self.layer = self.sae.cfg.hook_layer
+        self.layer = extract_layer_from_tlens_hook_name(self.sae.cfg.metadata.hook_name)
         self.cfg.layer = self.layer
         # If custom HF model path is provided, load it first
         hf_model = None
@@ -204,9 +205,12 @@ class NeuronpediaRunner:
             store_batch_size_prompts=8,  # these don't matter
             n_batches_in_buffer=16,  # these don't matter
             device=self.cfg.activation_store_device or "cpu",
+            dataset=self.cfg.huggingface_dataset_path,
+            disable_concat_sequences=self.cfg.disable_concat_sequences,
+            sequence_separator_token=self.cfg.sequence_separator_token,
         )
         self.cached_activations_dir = Path(
-            f"./cached_activations/{self.model_id}_{self.cfg.sae_set}_{self.sae.cfg.hook_name}_{self.sae.cfg.d_sae}width_{self.cfg.n_prompts_total}prompts"
+            f"./cached_activations/{self.model_id}_{self.cfg.sae_set}_{self.sae.cfg.metadata.hook_name}_{self.sae.cfg.d_sae}width_{self.cfg.n_prompts_total}prompts"
         )
 
         # override the number of context tokens if we specified one
@@ -230,7 +234,7 @@ class NeuronpediaRunner:
         Returns:
             Path: The path to the created output directory.
         """
-        outputs_subdir = f"{self.model_id}_{self.cfg.sae_set}_{self.sae.cfg.hook_name}_{self.sae.cfg.d_sae}"
+        outputs_subdir = f"{self.model_id}_{self.cfg.sae_set}_{self.sae.cfg.metadata.hook_name}_{self.sae.cfg.d_sae}"
         if self.np_sae_id_suffix is not None:
             outputs_subdir += f"_{self.np_sae_id_suffix}"
         outputs_dir = Path(self.cfg.outputs_dir).joinpath(outputs_subdir)
@@ -292,13 +296,13 @@ class NeuronpediaRunner:
             raise ValueError("Prefix and suffix are too long for the given tokens.")
 
         # Trim original tokens
-        tokens = tokens[:, : keep_length - self.sae.cfg.prepend_bos]
+        tokens = tokens[:, : keep_length - self.sae.cfg.metadata.prepend_bos]
 
         if self.cfg.prefix_tokens:
             prefix = torch.tensor(self.cfg.prefix_tokens).to(tokens.device)
             prefix_repeated = prefix.unsqueeze(0).repeat(tokens.shape[0], 1)
             # if sae.cfg.prepend_bos, then add that before the suffix
-            if self.sae.cfg.prepend_bos:
+            if self.sae.cfg.metadata.prepend_bos:
                 bos = bos_tokens.unsqueeze(1)
                 prefix_repeated = torch.cat([bos, prefix_repeated], dim=1)
             tokens = torch.cat([prefix_repeated, tokens], dim=1)
@@ -414,7 +418,7 @@ class NeuronpediaRunner:
         if self.cfg.use_wandb:
             wandb.init(
                 project="sae-dashboard-generation",
-                name=f"{self.model_id}_{set_name}_{self.sae.cfg.hook_name}_{current_time}",
+                name=f"{self.model_id}_{set_name}_{self.sae.cfg.metadata.hook_name}_{current_time}",
                 save_code=True,
                 mode="online",
                 config=wandb_cfg,
@@ -481,7 +485,7 @@ class NeuronpediaRunner:
                 )
 
                 feature_vis_config_gpt = SaeVisConfig(
-                    hook_point=self.sae.cfg.hook_name,
+                    hook_point=self.sae.cfg.metadata.hook_name,
                     features=features_to_process,
                     minibatch_size_features=self.cfg.n_features_at_a_time,
                     minibatch_size_tokens=self.cfg.n_prompts_in_forward_pass,
@@ -597,6 +601,17 @@ def main():
         help="Number of features per batch",
     )
     parser.add_argument(
+        "--disable-concat-sequences",
+        action="store_true",
+        help="Disable concatenation of sequences in ActivationsStore",
+    )
+    parser.add_argument(
+        "--sequence-separator-token",
+        type=str,
+        default="bos",
+        help="Token to use as separator between sequences (default: bos, use 'none' for None)",
+    )
+    parser.add_argument(
         "--start-batch", type=int, default=0, help="Starting batch number"
     )
     parser.add_argument(
@@ -617,6 +632,10 @@ def main():
 
     args = parser.parse_args()
 
+    sequence_separator_token = args.sequence_separator_token
+    if sequence_separator_token == "none":
+        sequence_separator_token = None
+
     cfg = NeuronpediaRunnerConfig(
         sae_set=args.sae_set,
         sae_path=args.sae_path,
@@ -636,6 +655,8 @@ def main():
         end_batch=args.end_batch,
         use_wandb=args.use_wandb,
         hf_model_path=args.hf_model_path,
+        disable_concat_sequences=args.disable_concat_sequences,
+        sequence_separator_token=sequence_separator_token,
     )
 
     runner = NeuronpediaRunner(cfg)

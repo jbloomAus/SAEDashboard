@@ -1,7 +1,7 @@
 import os
 import shutil
 
-from sae_lens.toolkit.pretrained_saes_directory import get_pretrained_saes_directory
+from sae_lens.loading.pretrained_saes_directory import get_pretrained_saes_directory
 
 from sae_dashboard.neuronpedia.neuronpedia_runner import (
     NeuronpediaRunner,

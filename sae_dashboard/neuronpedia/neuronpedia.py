@@ -10,7 +10,7 @@ from rich import print
 from rich.align import Align
 from rich.panel import Panel
 from sae_lens.analysis.neuronpedia_integration import NanAndInfReplacer
-from sae_lens.sae import SAE
+from sae_lens.saes.sae import SAE
 
 # from sae_lens.toolkit.pretrained_saes import load_sparsity
 from typing_extensions import Annotated
@@ -190,9 +190,7 @@ Enter -1 to do all batches. Existing batch files will not be overwritten.""",
     try:
         sparse_autoencoder = SAE.load_from_disk(sae_path_string, device=device)  # type: ignore
     except Exception:
-        sparse_autoencoder, _, _ = SAE.from_pretrained(
-            sae_set, str(sae_path), device=device
-        )
+        sparse_autoencoder = SAE.from_pretrained(sae_set, str(sae_path), device=device)
     model_id = sparse_autoencoder.cfg.model_name
     if dtype == "":
         dtype = sparse_autoencoder.cfg.dtype

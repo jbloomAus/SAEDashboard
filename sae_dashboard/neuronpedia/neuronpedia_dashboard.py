@@ -321,7 +321,7 @@ class NeuronpediaDashboardBatch:
         if self.sae_set != other.sae_set:
             print(f"sae_set does not match: {self.sae_set} and {other.sae_set}")
             return False
-        if self.sae_id_suffix != other.sae:
+        if self.sae_id_suffix != other.sae_id_suffix:
             print(
                 f"sae_id_suffix does not match: {self.sae_id_suffix} and {other.sae_id_suffix}"
             )

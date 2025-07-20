@@ -1,4 +1,5 @@
 import time
+from typing import Any
 
 import numpy as np
 import pytest
@@ -9,14 +10,14 @@ from transformer_lens import HookedTransformer
 from sae_dashboard.dfa_calculator import DFACalculator
 
 
-def test_dfa_calculator_initialization(model: HookedTransformer, autoencoder: SAE):
+def test_dfa_calculator_initialization(model: HookedTransformer, autoencoder: SAE[Any]):
     calculator = DFACalculator(model, autoencoder)
     assert calculator.model == model
     assert calculator.sae == autoencoder
 
 
 def test_dfa_calculation_shape(
-    model: HookedTransformer, autoencoder: SAE, tokens: torch.Tensor
+    model: HookedTransformer, autoencoder: SAE[Any], tokens: torch.Tensor
 ):
     calculator = DFACalculator(model, autoencoder)
 
@@ -44,7 +45,7 @@ def test_dfa_calculation_shape(
 
 
 def test_dfa_calculation_values(
-    model: HookedTransformer, autoencoder: SAE, tokens: torch.Tensor
+    model: HookedTransformer, autoencoder: SAE[Any], tokens: torch.Tensor
 ):
     calculator = DFACalculator(model, autoencoder)
 
@@ -68,7 +69,7 @@ def test_dfa_calculation_values(
 
 
 def test_dfa_calculation_multiple_features(
-    model: HookedTransformer, autoencoder: SAE, tokens: torch.Tensor
+    model: HookedTransformer, autoencoder: SAE[Any], tokens: torch.Tensor
 ):
     calculator = DFACalculator(model, autoencoder)
 
@@ -94,7 +95,7 @@ def test_dfa_calculation_multiple_features(
 
 
 def test_dfa_calculation_different_layers(
-    model: HookedTransformer, autoencoder: SAE, tokens: torch.Tensor
+    model: HookedTransformer, autoencoder: SAE[Any], tokens: torch.Tensor
 ):
     calculator = DFACalculator(model, autoencoder)
 
@@ -115,7 +116,7 @@ def test_dfa_calculation_different_layers(
 
 
 def test_dfa_calculation_edge_cases(
-    model: HookedTransformer, autoencoder: SAE, tokens: torch.Tensor
+    model: HookedTransformer, autoencoder: SAE[Any], tokens: torch.Tensor
 ):
     calculator = DFACalculator(model, autoencoder)
 
@@ -160,7 +161,7 @@ def test_dfa_calculation_edge_cases(
     )
 
 
-def test_functional_equivalence(model: HookedTransformer, autoencoder: SAE):
+def test_functional_equivalence(model: HookedTransformer, autoencoder: SAE[Any]):
     calculator = DFACalculator(model, autoencoder)
 
     # Use the actual model configuration
@@ -195,7 +196,7 @@ def test_functional_equivalence(model: HookedTransformer, autoencoder: SAE):
     assert not torch.isinf(gqa_result).any()
 
 
-def test_performance_comparison(model: HookedTransformer, autoencoder: SAE):
+def test_performance_comparison(model: HookedTransformer, autoencoder: SAE[Any]):
     calculator = DFACalculator(model, autoencoder)
 
     # Use the actual model configuration
@@ -231,7 +232,7 @@ def test_performance_comparison(model: HookedTransformer, autoencoder: SAE):
     assert gqa_time < 10, "GQA method took too long"
 
 
-def test_different_shapes(model: HookedTransformer, autoencoder: SAE):
+def test_different_shapes(model: HookedTransformer, autoencoder: SAE[Any]):
     calculator = DFACalculator(model, autoencoder)
 
     # Test with different shapes
@@ -269,7 +270,7 @@ def test_different_shapes(model: HookedTransformer, autoencoder: SAE):
         assert gqa_result.shape == (batch_size, seq_len, seq_len, len(feature_indices))
 
 
-def test_edge_cases(model: HookedTransformer, autoencoder: SAE):
+def test_edge_cases(model: HookedTransformer, autoencoder: SAE[Any]):
     calculator = DFACalculator(model, autoencoder)
 
     # Test with minimal input size

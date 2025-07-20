@@ -1,11 +1,10 @@
-from typing import Callable, Tuple
+from typing import Any, Callable, Tuple
 
 import pytest
 import torch
-from sae_lens import SAE, ActivationsStore
+from sae_lens import SAE, ActivationsStore, SAEConfig
 from transformer_lens import HookedTransformer
 
-# from sae_dashboard.feature_data import FeatureData
 from sae_dashboard.sae_vis_data import SaeVisConfig, SaeVisData
 from sae_dashboard.sae_vis_runner import SaeVisRunner
 from sae_dashboard.utils_fns import FeatureStatistics, get_tokens
@@ -13,13 +12,13 @@ from sae_dashboard.utils_fns import FeatureStatistics, get_tokens
 
 @pytest.fixture
 def setup_test_environment() -> (
-    Callable[[], Tuple[HookedTransformer, SAE, torch.Tensor]]
+    Callable[[], Tuple[HookedTransformer, SAE[SAEConfig], torch.Tensor]]
 ):
-    def _setup() -> Tuple[HookedTransformer, SAE, torch.Tensor]:
+    def _setup() -> Tuple[HookedTransformer, SAE[SAEConfig], torch.Tensor]:
         # Set up a small-scale test environment
         device = "cpu"  # Use CUDA for testing
         model = HookedTransformer.from_pretrained("gpt2-small", device=device)
-        sae, _, _ = SAE.from_pretrained(
+        sae = SAE.from_pretrained(
             release="gpt2-small-hook-z-kk", sae_id="blocks.5.hook_z", device=device
         )
         sae.fold_W_dec_norm()
@@ -32,6 +31,7 @@ def setup_test_environment() -> (
             store_batch_size_prompts=16,
             n_batches_in_buffer=8,
             device=device,
+            dataset=sae.cfg.metadata.dataset_path,
         )
 
         token_dataset = get_tokens(activations_store, 256)
@@ -44,7 +44,9 @@ def setup_test_environment() -> (
 
 
 def test_sae_vis_runner_integration(
-    setup_test_environment: Callable[[], Tuple[HookedTransformer, SAE, torch.Tensor]],
+    setup_test_environment: Callable[
+        [], Tuple[HookedTransformer, SAE[Any], torch.Tensor]
+    ],
 ):
     model, sae, token_dataset = setup_test_environment()
 
