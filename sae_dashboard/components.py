@@ -436,11 +436,14 @@ class SequenceData:
             neg_val = deepcopy(self.bottom_logits)
 
         # EXPERIMENT: let's just hardcode everything except feature acts to be 0's for now.
-        loss_contribution = [0.0 for _ in range(self.seq_len)]
-        pos_ids = [[] for _ in range(self.seq_len)]
-        neg_ids = [[] for _ in range(self.seq_len)]
-        pos_val = [[] for _ in range(self.seq_len)]
-        neg_val = [[] for _ in range(self.seq_len)]
+        list_length = (
+            self.seq_len - 1 if isinstance(cfg, PromptConfig) else self.seq_len
+        )
+        loss_contribution = [0.0 for _ in range(list_length)]
+        pos_ids = [[] for _ in range(list_length)]
+        neg_ids = [[] for _ in range(list_length)]
+        pos_val = [[] for _ in range(list_length)]
+        neg_val = [[] for _ in range(list_length)]
         ### END EXPERIMENT
 
         # Get values for converting into colors later
