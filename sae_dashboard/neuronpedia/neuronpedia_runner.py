@@ -235,31 +235,36 @@ class NeuronpediaRunner:
 
         # Initialize Model
         # For transcoders, model_name might be in metadata
-        if hasattr(self.sae.cfg, 'model_name'):
+        if hasattr(self.sae.cfg, "model_name"):
             self.model_id = self.sae.cfg.model_name
-        elif hasattr(self.sae.cfg, 'metadata') and 'model_name' in self.sae.cfg.metadata:
-            self.model_id = self.sae.cfg.metadata['model_name']
+        elif (
+            hasattr(self.sae.cfg, "metadata") and "model_name" in self.sae.cfg.metadata
+        ):
+            self.model_id = self.sae.cfg.metadata["model_name"]
         else:
             raise ValueError("Could not find model_name in SAE config")
-        
+
         self.cfg.model_id = self.model_id
-        
+
         # For transcoders, hook_layer might be hook_layer_out
-        if hasattr(self.sae.cfg, 'hook_layer'):
+        if hasattr(self.sae.cfg, "hook_layer"):
             self.layer = self.sae.cfg.hook_layer
-        elif hasattr(self.sae.cfg, 'hook_layer_out'):
+        elif hasattr(self.sae.cfg, "hook_layer_out"):
             self.layer = self.sae.cfg.hook_layer_out
         else:
             # Try to extract layer from hook_name (e.g., "blocks.5.hook_resid_pre" -> 5)
             # We need to get hook_name first
-            hook_name = self.sae.cfg.metadata.get('hook_name', '')
+            hook_name = self.sae.cfg.metadata.get("hook_name", "")
             import re
-            match = re.search(r'blocks\.(\d+)\.', hook_name)
+
+            match = re.search(r"blocks\.(\d+)\.", hook_name)
             if match:
                 self.layer = int(match.group(1))
             else:
-                raise ValueError("Could not find hook_layer in SAE config or extract from hook_name")
-            
+                raise ValueError(
+                    "Could not find hook_layer in SAE config or extract from hook_name"
+                )
+
         self.cfg.layer = self.layer
         # If custom HF model path is provided, load it first
         hf_model = None
@@ -280,11 +285,11 @@ class NeuronpediaRunner:
 
         # Ensure MLP-in hooks are computed if needed (important for most Transcoders)
         # Get hook_name - it's always in metadata for both SAEs and Transcoders
-        self.hook_name = self.sae.cfg.metadata['hook_name']
-        
-        if (
-            self.cfg.use_transcoder or "hook_mlp_in" in self.hook_name
-        ) and hasattr(self.model, "set_use_hook_mlp_in"):
+        self.hook_name = self.sae.cfg.metadata["hook_name"]
+
+        if (self.cfg.use_transcoder or "hook_mlp_in" in self.hook_name) and hasattr(
+            self.model, "set_use_hook_mlp_in"
+        ):
             # TransformerLens models 1.12+ support this flag
             self.model.set_use_hook_mlp_in(True)
 
@@ -323,7 +328,9 @@ class NeuronpediaRunner:
         Returns:
             Path: The path to the created output directory.
         """
-        outputs_subdir = f"{self.model_id}_{self.cfg.sae_set}_{self.hook_name}_{self.sae.cfg.d_sae}"
+        outputs_subdir = (
+            f"{self.model_id}_{self.cfg.sae_set}_{self.hook_name}_{self.sae.cfg.d_sae}"
+        )
         if self.np_sae_id_suffix is not None:
             outputs_subdir += f"_{self.np_sae_id_suffix}"
         outputs_dir = Path(self.cfg.outputs_dir).joinpath(outputs_subdir)
@@ -386,10 +393,10 @@ class NeuronpediaRunner:
 
         # Trim original tokens
         # prepend_bos might be in cfg directly (for tests) or in metadata
-        if hasattr(self.sae.cfg, 'prepend_bos'):
+        if hasattr(self.sae.cfg, "prepend_bos"):
             prepend_bos = self.sae.cfg.prepend_bos
         else:
-            prepend_bos = self.sae.cfg.metadata.get('prepend_bos', True)
+            prepend_bos = self.sae.cfg.metadata.get("prepend_bos", True)
         tokens = tokens[:, : keep_length - prepend_bos]
 
         if self.cfg.prefix_tokens:

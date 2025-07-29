@@ -1,7 +1,8 @@
-#\!/usr/bin/env python3
+# \!/usr/bin/env python3
 """Minimal test script to verify transcoder loading works"""
 
 import os
+
 from sae_dashboard.neuronpedia.neuronpedia_runner import (
     NeuronpediaRunner,
     NeuronpediaRunnerConfig,

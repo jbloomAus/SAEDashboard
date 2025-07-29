@@ -253,8 +253,13 @@ class FeatureMaskingContext:
         architecture = self.sae.cfg.architecture
         if callable(architecture):
             architecture = architecture()
-        
-        if architecture in ["standard", "standard_transcoder", "transcoder", "skip_transcoder"]:
+
+        if architecture in [
+            "standard",
+            "standard_transcoder",
+            "transcoder",
+            "skip_transcoder",
+        ]:
             ## b_enc
             self.original_weight["b_enc"] = getattr(self.sae, "b_enc").data.clone()
             # mask the weight
