@@ -141,6 +141,12 @@ def to_resid_direction(
 
     elif "hook_z" in model.activation_config.primary_hook_point:
         return direction @ model.W_O[model.hook_layer].flatten(0, 1).to(direction.dtype)
+    
+    elif "hook_resid_post" in model.activation_config.primary_hook_point or "hook_normalized" in model.activation_config.primary_hook_point:
+        # hook_resid_post is always a residual stream direction
+        # hook_normalized refers to the normalized residual stream (e.g. after LayerNorm)
+        # Both are already in the residual stream basis, so no projection needed
+        return direction
 
     # Others not yet supported
     else:

@@ -55,6 +55,12 @@ class NeuronpediaRunnerConfig:
 
     hf_model_path: Optional[str] = None
 
+    # If true, we load a Transcoder (inherits from SAE) instead of a standard SAE.
+    use_transcoder: bool = False
+
+    # If true, we load a SkipTranscoder (inherits from Transcoder) instead.
+    use_skip_transcoder: bool = False
+
 
 @dataclass
 class NeuronpediaVectorRunnerConfig:

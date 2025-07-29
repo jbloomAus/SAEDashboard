@@ -7,7 +7,7 @@ import torch
 from jaxtyping import Float, Int
 from sae_lens import SAE
 from sae_lens.config import DTYPE_MAP as DTYPES
-from sae_lens.sae import TopK
+from sae_lens.saes.topk_sae import TopK
 from torch import Tensor, nn
 from tqdm.auto import tqdm
 
@@ -249,7 +249,12 @@ class FeatureMaskingContext:
         # set the weight
         setattr(self.sae, "W_enc", nn.Parameter(masked_weight))
 
-        if self.sae.cfg.architecture == "standard":
+        # Handle architecture as either attribute or method
+        architecture = self.sae.cfg.architecture
+        if callable(architecture):
+            architecture = architecture()
+        
+        if architecture in ["standard", "standard_transcoder", "transcoder", "skip_transcoder"]:
             ## b_enc
             self.original_weight["b_enc"] = getattr(self.sae, "b_enc").data.clone()
             # mask the weight
@@ -257,7 +262,7 @@ class FeatureMaskingContext:
             # set the weight
             setattr(self.sae, "b_enc", nn.Parameter(masked_weight))
 
-        elif self.sae.cfg.architecture == "jumprelu":
+        elif architecture in ["jumprelu", "jumprelu_transcoder"]:
             ## b_enc
             self.original_weight["b_enc"] = getattr(self.sae, "b_enc").data.clone()
             # mask the weight
@@ -274,7 +279,7 @@ class FeatureMaskingContext:
             # set the weight
             setattr(self.sae, "threshold", nn.Parameter(masked_weight))
 
-        elif self.sae.cfg.architecture == "gated":
+        elif architecture in ["gated", "gated_transcoder"]:
             ## b_gate
             self.original_weight["b_gate"] = getattr(self.sae, "b_gate").data.clone()
             # mask the weight

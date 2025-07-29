@@ -10,7 +10,7 @@ from rich import print
 from rich.align import Align
 from rich.panel import Panel
 from sae_lens.analysis.neuronpedia_integration import NanAndInfReplacer
-from sae_lens.sae import SAE
+from sae_lens import SAE
 
 # from sae_lens.toolkit.pretrained_saes import load_sparsity
 from typing_extensions import Annotated

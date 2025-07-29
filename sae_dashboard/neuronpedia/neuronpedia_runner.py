@@ -11,8 +11,7 @@ import torch
 import wandb
 import wandb.sdk
 from matplotlib import colors
-from sae_lens.sae import SAE
-from sae_lens.training.activations_store import ActivationsStore
+from sae_lens import SAE, ActivationsStore
 from tqdm import tqdm
 from transformer_lens import HookedTransformer
 from transformers import AutoModelForCausalLM
@@ -96,9 +95,69 @@ class NeuronpediaRunner:
             self.cfg.model_n_devices = self.cfg.model_n_devices or 1
             self.cfg.activation_store_device = self.cfg.activation_store_device or "cpu"
 
-        # Initialize SAE, defaulting to SAE dtype unless we override
-        if self.cfg.from_local_sae:
-            self.sae = SAE.load_from_disk(  # type: ignore
+        # Initialize SAE or Transcoder, defaulting to SAE dtype unless we override
+        if self.cfg.use_skip_transcoder:
+            # Dynamically import to avoid dependency issues when Transcoder isn't used
+            try:
+                from sae_lens import SkipTranscoder  # type: ignore
+            except ImportError as e:
+                raise ImportError(
+                    "SkipTranscoder class not found in sae_lens. Install a version of sae_lens that provides it or disable --use-skip-transcoder."
+                ) from e
+            LoaderClass = SkipTranscoder
+            loader_kwargs = {}
+            # TODO: Check if SkipTranscoder supports local loading via path= kwarg
+            # if self.cfg.from_local_sae:
+            #     loader_kwargs["path"] = self.cfg.sae_path
+            # else:
+            loader_kwargs["release"] = self.cfg.sae_set
+            loader_kwargs["sae_id"] = self.cfg.sae_path
+
+            self.sae, _, _ = LoaderClass.from_pretrained(  # type: ignore
+                device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE, **loader_kwargs
+            )
+            # SkipTranscoder doesn't directly support dtype override in from_pretrained, apply after
+            if self.cfg.sae_dtype:
+                try:
+                    dtype_torch = getattr(torch, self.cfg.sae_dtype)
+                    self.sae.to(dtype=dtype_torch)
+                except AttributeError:
+                    raise ValueError(f"Invalid sae_dtype: {self.cfg.sae_dtype}")
+
+        elif self.cfg.use_transcoder:
+            # Dynamically import to avoid dependency issues when Transcoder isn't used
+            try:
+                from sae_lens import Transcoder  # type: ignore
+            except ImportError as e:
+                raise ImportError(
+                    "Transcoder class not found in sae_lens. Install a version of sae_lens that provides Transcoder or disable --use-transcoder."
+                ) from e
+            LoaderClass = Transcoder
+
+            if self.cfg.from_local_sae:
+                # Transcoder might not have load_from_pretrained, use from_pretrained
+                self.sae, _, _ = LoaderClass.from_pretrained(  # type: ignore
+                    path=self.cfg.sae_path,
+                    device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
+                    # dtype=self.cfg.sae_dtype if self.cfg.sae_dtype != "" else None, # Dtype applied after
+                )
+            else:
+                self.sae, _, _ = LoaderClass.from_pretrained(  # type: ignore
+                    release=self.cfg.sae_set,
+                    sae_id=self.cfg.sae_path,
+                    device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
+                )
+            # Apply dtype override after loading for Transcoder as well
+            if self.cfg.sae_dtype:
+                try:
+                    dtype_torch = getattr(torch, self.cfg.sae_dtype)
+                    self.sae.to(dtype=dtype_torch)
+                except AttributeError:
+                    raise ValueError(f"Invalid sae_dtype: {self.cfg.sae_dtype}")
+        else:
+            LoaderClass = SAE
+            if self.cfg.from_local_sae:
+            self.sae = SAE.load_from_pretrained(
                 path=self.cfg.sae_path,
                 device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
                 dtype=self.cfg.sae_dtype if self.cfg.sae_dtype != "" else None,
@@ -175,9 +234,24 @@ class NeuronpediaRunner:
         print(f"Model DType: {self.cfg.model_dtype}")
 
         # Initialize Model
-        self.model_id = self.sae.cfg.model_name
+        # For transcoders, model_name might be in metadata
+        if hasattr(self.sae.cfg, 'model_name'):
+            self.model_id = self.sae.cfg.model_name
+        elif hasattr(self.sae.cfg, 'metadata') and 'model_name' in self.sae.cfg.metadata:
+            self.model_id = self.sae.cfg.metadata['model_name']
+        else:
+            raise ValueError("Could not find model_name in SAE config")
+        
         self.cfg.model_id = self.model_id
-        self.layer = self.sae.cfg.hook_layer
+        
+        # For transcoders, hook_layer might be hook_layer_out
+        if hasattr(self.sae.cfg, 'hook_layer'):
+            self.layer = self.sae.cfg.hook_layer
+        elif hasattr(self.sae.cfg, 'hook_layer_out'):
+            self.layer = self.sae.cfg.hook_layer_out
+        else:
+            raise ValueError("Could not find hook_layer in SAE config")
+            
         self.cfg.layer = self.layer
         # If custom HF model path is provided, load it first
         hf_model = None
@@ -196,17 +270,33 @@ class NeuronpediaRunner:
             dtype=self.cfg.model_dtype,
         )
 
+        # Ensure MLP-in hooks are computed if needed (important for most Transcoders)
+        # Get hook_name based on whether this is a transcoder or SAE
+        if self.cfg.use_transcoder or self.cfg.use_skip_transcoder:
+            # Transcoders have hook_name directly in config
+            self.hook_name = self.sae.cfg.hook_name
+        else:
+            # SAEs have hook_name in metadata
+            self.hook_name = self.sae.cfg.metadata['hook_name']
+        
+        if (
+            self.cfg.use_transcoder or "hook_mlp_in" in self.hook_name
+        ) and hasattr(self.model, "set_use_hook_mlp_in"):
+            # TransformerLens models 1.12+ support this flag
+            self.model.set_use_hook_mlp_in(True)
+
         # Initialize Activations Store
         self.activations_store = ActivationsStore.from_sae(
             model=self.model,
             sae=self.sae,
+            dataset=self.cfg.huggingface_dataset_path,
             streaming=True,
             store_batch_size_prompts=8,  # these don't matter
             n_batches_in_buffer=16,  # these don't matter
             device=self.cfg.activation_store_device or "cpu",
         )
         self.cached_activations_dir = Path(
-            f"./cached_activations/{self.model_id}_{self.cfg.sae_set}_{self.sae.cfg.hook_name}_{self.sae.cfg.d_sae}width_{self.cfg.n_prompts_total}prompts"
+            f"./cached_activations/{self.model_id}_{self.cfg.sae_set}_{self.hook_name}_{self.sae.cfg.d_sae}width_{self.cfg.n_prompts_total}prompts"
         )
 
         # override the number of context tokens if we specified one
@@ -230,7 +320,7 @@ class NeuronpediaRunner:
         Returns:
             Path: The path to the created output directory.
         """
-        outputs_subdir = f"{self.model_id}_{self.cfg.sae_set}_{self.sae.cfg.hook_name}_{self.sae.cfg.d_sae}"
+        outputs_subdir = f"{self.model_id}_{self.cfg.sae_set}_{self.hook_name}_{self.sae.cfg.d_sae}"
         if self.np_sae_id_suffix is not None:
             outputs_subdir += f"_{self.np_sae_id_suffix}"
         outputs_dir = Path(self.cfg.outputs_dir).joinpath(outputs_subdir)
@@ -414,7 +504,7 @@ class NeuronpediaRunner:
         if self.cfg.use_wandb:
             wandb.init(
                 project="sae-dashboard-generation",
-                name=f"{self.model_id}_{set_name}_{self.sae.cfg.hook_name}_{current_time}",
+                name=f"{self.model_id}_{set_name}_{self.hook_name}_{current_time}",
                 save_code=True,
                 mode="online",
                 config=wandb_cfg,
@@ -481,7 +571,7 @@ class NeuronpediaRunner:
                 )
 
                 feature_vis_config_gpt = SaeVisConfig(
-                    hook_point=self.sae.cfg.hook_name,
+                    hook_point=self.hook_name,
                     features=features_to_process,
                     minibatch_size_features=self.cfg.n_features_at_a_time,
                     minibatch_size_tokens=self.cfg.n_prompts_in_forward_pass,
@@ -614,6 +704,16 @@ def main():
         default=None,
         help="Optional: Path to custom HuggingFace model to use instead of default weights",
     )
+    parser.add_argument(
+        "--use-transcoder",
+        action="store_true",
+        help="If set, load a Transcoder instead of a standard SAE",
+    )
+    parser.add_argument(
+        "--use-skip-transcoder",
+        action="store_true",
+        help="If set, load a SkipTranscoder instead of a Transcoder/SAE",
+    )
 
     args = parser.parse_args()
 
@@ -636,6 +736,8 @@ def main():
         end_batch=args.end_batch,
         use_wandb=args.use_wandb,
         hf_model_path=args.hf_model_path,
+        use_transcoder=args.use_transcoder,
+        use_skip_transcoder=args.use_skip_transcoder,
     )
 
     runner = NeuronpediaRunner(cfg)
