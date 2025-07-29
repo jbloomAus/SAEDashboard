@@ -139,7 +139,7 @@ class TestTranscoderEdgeCases:
                 use_transcoder=True,
                 use_wandb=False,
             )
-            runner = NeuronpediaRunner(config)
+            _ = NeuronpediaRunner(config)
 
     def test_transcoder_with_custom_dtype(self, tmp_path):
         """Test transcoder loading with custom dtype."""

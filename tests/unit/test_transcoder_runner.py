@@ -1,15 +1,12 @@
 """Tests specific to transcoder functionality in NeuronpediaRunner."""
 
-from unittest.mock import MagicMock, Mock, PropertyMock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 import torch
 
 from sae_dashboard.feature_data_generator import FeatureMaskingContext
-from sae_dashboard.neuronpedia.neuronpedia_runner import (
-    NeuronpediaRunner,
-    NeuronpediaRunnerConfig,
-)
+from sae_dashboard.neuronpedia.neuronpedia_runner import NeuronpediaRunnerConfig
 
 
 @pytest.fixture
