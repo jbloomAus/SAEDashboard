@@ -113,7 +113,7 @@ class NeuronpediaRunner:
             loader_kwargs["release"] = self.cfg.sae_set
             loader_kwargs["sae_id"] = self.cfg.sae_path
 
-            self.sae, _, _ = LoaderClass.from_pretrained(  # type: ignore
+            self.sae = LoaderClass.from_pretrained(  # type: ignore
                 device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE, **loader_kwargs
             )
             # SkipTranscoder doesn't directly support dtype override in from_pretrained, apply after
@@ -136,13 +136,13 @@ class NeuronpediaRunner:
 
             if self.cfg.from_local_sae:
                 # Transcoder might not have load_from_pretrained, use from_pretrained
-                self.sae, _, _ = LoaderClass.from_pretrained(  # type: ignore
+                self.sae = LoaderClass.from_pretrained(  # type: ignore
                     path=self.cfg.sae_path,
                     device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
                     # dtype=self.cfg.sae_dtype if self.cfg.sae_dtype != "" else None, # Dtype applied after
                 )
             else:
-                self.sae, _, _ = LoaderClass.from_pretrained(  # type: ignore
+                self.sae = LoaderClass.from_pretrained(  # type: ignore
                     release=self.cfg.sae_set,
                     sae_id=self.cfg.sae_path,
                     device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
@@ -163,7 +163,7 @@ class NeuronpediaRunner:
                     dtype=self.cfg.sae_dtype if self.cfg.sae_dtype != "" else None,
                 )
             else:
-                self.sae, _, _ = SAE.from_pretrained(
+                self.sae = SAE.from_pretrained(
                     release=self.cfg.sae_set,
                     sae_id=self.cfg.sae_path,
                     device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
@@ -250,7 +250,15 @@ class NeuronpediaRunner:
         elif hasattr(self.sae.cfg, 'hook_layer_out'):
             self.layer = self.sae.cfg.hook_layer_out
         else:
-            raise ValueError("Could not find hook_layer in SAE config")
+            # Try to extract layer from hook_name (e.g., "blocks.5.hook_resid_pre" -> 5)
+            # We need to get hook_name first
+            hook_name = self.sae.cfg.metadata.get('hook_name', '')
+            import re
+            match = re.search(r'blocks\.(\d+)\.', hook_name)
+            if match:
+                self.layer = int(match.group(1))
+            else:
+                raise ValueError("Could not find hook_layer in SAE config or extract from hook_name")
             
         self.cfg.layer = self.layer
         # If custom HF model path is provided, load it first
@@ -377,13 +385,18 @@ class NeuronpediaRunner:
             raise ValueError("Prefix and suffix are too long for the given tokens.")
 
         # Trim original tokens
-        tokens = tokens[:, : keep_length - self.sae.cfg.prepend_bos]
+        # prepend_bos might be in cfg directly (for tests) or in metadata
+        if hasattr(self.sae.cfg, 'prepend_bos'):
+            prepend_bos = self.sae.cfg.prepend_bos
+        else:
+            prepend_bos = self.sae.cfg.metadata.get('prepend_bos', True)
+        tokens = tokens[:, : keep_length - prepend_bos]
 
         if self.cfg.prefix_tokens:
             prefix = torch.tensor(self.cfg.prefix_tokens).to(tokens.device)
             prefix_repeated = prefix.unsqueeze(0).repeat(tokens.shape[0], 1)
             # if sae.cfg.prepend_bos, then add that before the suffix
-            if self.sae.cfg.prepend_bos:
+            if prepend_bos:
                 bos = bos_tokens.unsqueeze(1)
                 prefix_repeated = torch.cat([bos, prefix_repeated], dim=1)
             tokens = torch.cat([prefix_repeated, tokens], dim=1)
