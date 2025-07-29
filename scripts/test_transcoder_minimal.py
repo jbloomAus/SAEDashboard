@@ -41,5 +41,4 @@ cfg = NeuronpediaRunnerConfig(
 runner = NeuronpediaRunner(cfg)
 runner.run()
 
-print("\nTest completed\! Check the outputs in:", NP_OUTPUT_FOLDER)
-EOF < /dev/null
+print("\nTest completed! Check the outputs in:", NP_OUTPUT_FOLDER)

@@ -157,28 +157,28 @@ class NeuronpediaRunner:
         else:
             LoaderClass = SAE
             if self.cfg.from_local_sae:
-            self.sae = SAE.load_from_pretrained(
-                path=self.cfg.sae_path,
-                device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
-                dtype=self.cfg.sae_dtype if self.cfg.sae_dtype != "" else None,
-            )
-        else:
-            self.sae, _, _ = SAE.from_pretrained(
-                release=self.cfg.sae_set,
-                sae_id=self.cfg.sae_path,
-                device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
-            )
-            if self.cfg.sae_dtype != "":
-                if self.cfg.sae_dtype == "float16":
-                    self.sae.to(dtype=torch.float16)
-                elif self.cfg.sae_dtype == "float32":
-                    self.sae.to(dtype=torch.float32)
-                elif self.cfg.sae_dtype == "bfloat16":
-                    self.sae.to(dtype=torch.bfloat16)
-                else:
-                    raise ValueError(
-                        f"Unsupported dtype: {self.cfg.sae_dtype}, we support float16, float32, bfloat16"
-                    )
+                self.sae = SAE.load_from_pretrained(
+                    path=self.cfg.sae_path,
+                    device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
+                    dtype=self.cfg.sae_dtype if self.cfg.sae_dtype != "" else None,
+                )
+            else:
+                self.sae, _, _ = SAE.from_pretrained(
+                    release=self.cfg.sae_set,
+                    sae_id=self.cfg.sae_path,
+                    device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
+                )
+                if self.cfg.sae_dtype != "":
+                    if self.cfg.sae_dtype == "float16":
+                        self.sae.to(dtype=torch.float16)
+                    elif self.cfg.sae_dtype == "float32":
+                        self.sae.to(dtype=torch.float32)
+                    elif self.cfg.sae_dtype == "bfloat16":
+                        self.sae.to(dtype=torch.bfloat16)
+                    else:
+                        raise ValueError(
+                            f"Unsupported dtype: {self.cfg.sae_dtype}, we support float16, float32, bfloat16"
+                        )
 
         # If we didn't override dtype, then use the SAE's dtype
         if self.cfg.sae_dtype == "":
@@ -271,13 +271,8 @@ class NeuronpediaRunner:
         )
 
         # Ensure MLP-in hooks are computed if needed (important for most Transcoders)
-        # Get hook_name based on whether this is a transcoder or SAE
-        if self.cfg.use_transcoder or self.cfg.use_skip_transcoder:
-            # Transcoders have hook_name directly in config
-            self.hook_name = self.sae.cfg.hook_name
-        else:
-            # SAEs have hook_name in metadata
-            self.hook_name = self.sae.cfg.metadata['hook_name']
+        # Get hook_name - it's always in metadata for both SAEs and Transcoders
+        self.hook_name = self.sae.cfg.metadata['hook_name']
         
         if (
             self.cfg.use_transcoder or "hook_mlp_in" in self.hook_name

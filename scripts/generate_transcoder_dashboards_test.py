@@ -14,8 +14,8 @@ ACT_CACHE_FOLDER = "cached_activations_2"
 NP_SET_NAME = "google/gemma-2-2b"
 SAE_SET = "gemma-scope-2b-pt-transcoders"
 SAE_PATH = "layer_15/width_16k/average_l0_8"
-NUM_FEATURES_PER_BATCH = 16
-NUM_BATCHES = 10
+NUM_FEATURES_PER_BATCH = 2  # Reduced for testing
+NUM_BATCHES = 2
 HF_DATASET_PATH = "monology/pile-uncopyrighted"
 
 
@@ -26,7 +26,7 @@ SAE_DTYPE = "float32"
 MODEL_DTYPE = "bfloat16"
 
 # PERFORMANCE SETTING
-N_PROMPTS = 24576
+N_PROMPTS = 256  # Reduced for testing
 # N_PROMPTS = 4096
 N_TOKENS_IN_PROMPT = 128
 N_PROMPTS_IN_FORWARD_PASS = 128
@@ -57,7 +57,7 @@ if __name__ == "__main__":
         start_batch=0,
         use_wandb=True,
         # TESTING ONLY
-        end_batch=10,
+        end_batch=2,
         use_transcoder=True,  # Enable transcoder loading
     )
 
