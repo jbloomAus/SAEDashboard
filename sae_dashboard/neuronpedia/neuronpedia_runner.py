@@ -67,7 +67,18 @@ class NeuronpediaRunner:
     ):
         self.cfg = cfg
 
-        # Get device defaults. But if we have overrides, then use those.
+        # Initialize core components
+        self.device_count = self._setup_devices()
+        self._load_sae_or_transcoder()
+        self._configure_dtypes()
+        self._extract_model_info()
+        self._initialize_model()
+        self._setup_activation_store()
+        self._setup_output_directory()
+        self.vocab_dict = self.get_vocab_dict()
+
+    def _setup_devices(self) -> int:
+        """Set up device configuration based on available hardware."""
         device_count = 1
         # Set correct device, use multi-GPU if we have it
         if torch.backends.mps.is_available():
@@ -95,7 +106,10 @@ class NeuronpediaRunner:
             self.cfg.model_n_devices = self.cfg.model_n_devices or 1
             self.cfg.activation_store_device = self.cfg.activation_store_device or "cpu"
 
-        # Initialize SAE or Transcoder, defaulting to SAE dtype unless we override
+        return device_count
+
+    def _load_sae_or_transcoder(self):
+        """Load SAE, Transcoder, or SkipTranscoder based on configuration."""
         if self.cfg.use_skip_transcoder:
             # Dynamically import to avoid dependency issues when Transcoder isn't used
             try:
@@ -118,11 +132,7 @@ class NeuronpediaRunner:
             )
             # SkipTranscoder doesn't directly support dtype override in from_pretrained, apply after
             if self.cfg.sae_dtype:
-                try:
-                    dtype_torch = getattr(torch, self.cfg.sae_dtype)
-                    self.sae.to(dtype=dtype_torch)
-                except AttributeError:
-                    raise ValueError(f"Invalid sae_dtype: {self.cfg.sae_dtype}")
+                self._apply_sae_dtype_override()
 
         elif self.cfg.use_transcoder:
             # Dynamically import to avoid dependency issues when Transcoder isn't used
@@ -149,11 +159,7 @@ class NeuronpediaRunner:
                 )
             # Apply dtype override after loading for Transcoder as well
             if self.cfg.sae_dtype:
-                try:
-                    dtype_torch = getattr(torch, self.cfg.sae_dtype)
-                    self.sae.to(dtype=dtype_torch)
-                except AttributeError:
-                    raise ValueError(f"Invalid sae_dtype: {self.cfg.sae_dtype}")
+                self._apply_sae_dtype_override()
         else:
             LoaderClass = SAE
             if self.cfg.from_local_sae:
@@ -169,17 +175,23 @@ class NeuronpediaRunner:
                     device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
                 )
                 if self.cfg.sae_dtype != "":
-                    if self.cfg.sae_dtype == "float16":
-                        self.sae.to(dtype=torch.float16)
-                    elif self.cfg.sae_dtype == "float32":
-                        self.sae.to(dtype=torch.float32)
-                    elif self.cfg.sae_dtype == "bfloat16":
-                        self.sae.to(dtype=torch.bfloat16)
-                    else:
-                        raise ValueError(
-                            f"Unsupported dtype: {self.cfg.sae_dtype}, we support float16, float32, bfloat16"
-                        )
+                    self._apply_sae_dtype_override()
 
+    def _apply_sae_dtype_override(self):
+        """Apply dtype override to SAE."""
+        if self.cfg.sae_dtype == "float16":
+            self.sae.to(dtype=torch.float16)
+        elif self.cfg.sae_dtype == "float32":
+            self.sae.to(dtype=torch.float32)
+        elif self.cfg.sae_dtype == "bfloat16":
+            self.sae.to(dtype=torch.bfloat16)
+        else:
+            raise ValueError(
+                f"Unsupported dtype: {self.cfg.sae_dtype}, we support float16, float32, bfloat16"
+            )
+
+    def _configure_dtypes(self):
+        """Configure data types for SAE and model."""
         # If we didn't override dtype, then use the SAE's dtype
         if self.cfg.sae_dtype == "":
             print(f"Using SAE configured dtype: {self.sae.cfg.dtype}")
@@ -197,7 +209,18 @@ class NeuronpediaRunner:
         if self.cfg.huggingface_dataset_path == "":
             self.cfg.huggingface_dataset_path = self.sae.cfg.dataset_path
 
-        print(f"Device Count: {device_count}")
+        self._print_configuration()
+
+        self.sae.cfg.dataset_path = self.cfg.huggingface_dataset_path
+        self.sae.cfg.context_size = self.cfg.n_tokens_in_prompt
+        self.sae.fold_W_dec_norm()
+
+        print(f"SAE DType: {self.cfg.sae_dtype}")
+        print(f"Model DType: {self.cfg.model_dtype}")
+
+    def _print_configuration(self):
+        """Print configuration details."""
+        print(f"Device Count: {self.device_count}")
         print(f"SAE Device: {self.cfg.sae_device}")
         print(f"Model Device: {self.cfg.model_device}")
         print(f"Model Num Devices: {self.cfg.model_n_devices}")
@@ -211,29 +234,21 @@ class NeuronpediaRunner:
         print(f"Total number of contexts (prompts): {self.cfg.n_prompts_total}")
 
         # get the sae's cfg and check if it has from pretrained kwargs
-        # with open(f"{self.cfg.sae_path}/cfg.json", "r") as f:
         sae_cfg_json = self.sae.cfg.to_dict()
-        sae_from_pretrained_kwargs = sae_cfg_json.get(
+        self.sae_from_pretrained_kwargs = sae_cfg_json.get(
             "model_from_pretrained_kwargs", {}
         )
         print("SAE Config on disk:")
         print(json.dumps(sae_cfg_json, indent=2))
-        if sae_from_pretrained_kwargs != {}:
-            print("SAE has from_pretrained_kwargs", sae_from_pretrained_kwargs)
+        if self.sae_from_pretrained_kwargs != {}:
+            print("SAE has from_pretrained_kwargs", self.sae_from_pretrained_kwargs)
         else:
             print(
                 "SAE does not have from_pretrained_kwargs. Standard TransformerLens Loading"
             )
 
-        self.sae.cfg.dataset_path = self.cfg.huggingface_dataset_path
-        self.sae.cfg.context_size = self.cfg.n_tokens_in_prompt
-
-        self.sae.fold_W_dec_norm()
-
-        print(f"SAE DType: {self.cfg.sae_dtype}")
-        print(f"Model DType: {self.cfg.model_dtype}")
-
-        # Initialize Model
+    def _extract_model_info(self):
+        """Extract model ID and layer information from SAE configuration."""
         # For transcoders, model_name might be in metadata
         if hasattr(self.sae.cfg, "model_name"):
             self.model_id = self.sae.cfg.model_name
@@ -266,6 +281,9 @@ class NeuronpediaRunner:
                 )
 
         self.cfg.layer = self.layer
+
+    def _initialize_model(self):
+        """Initialize the transformer model."""
         # If custom HF model path is provided, load it first
         hf_model = None
         if self.cfg.hf_model_path:
@@ -279,7 +297,7 @@ class NeuronpediaRunner:
             device=self.cfg.model_device,
             n_devices=self.cfg.model_n_devices or 1,
             hf_model=hf_model,  # Pass the custom model if provided
-            **sae_from_pretrained_kwargs,
+            **self.sae_from_pretrained_kwargs,
             dtype=self.cfg.model_dtype,
         )
 
@@ -293,7 +311,8 @@ class NeuronpediaRunner:
             # TransformerLens models 1.12+ support this flag
             self.model.set_use_hook_mlp_in(True)
 
-        # Initialize Activations Store
+    def _setup_activation_store(self):
+        """Set up the activation store for data generation."""
         self.activations_store = ActivationsStore.from_sae(
             model=self.model,
             sae=self.sae,
@@ -312,14 +331,14 @@ class NeuronpediaRunner:
         if self.cfg.n_tokens_in_prompt is not None:
             self.activations_store.context_size = self.cfg.n_tokens_in_prompt
 
+    def _setup_output_directory(self):
+        """Set up the output directory for results."""
         # if we have additional info, add it to the outputs subdir
         self.np_sae_id_suffix = self.cfg.np_sae_id_suffix
 
-        if not os.path.exists(cfg.outputs_dir):
-            os.makedirs(cfg.outputs_dir)
+        if not os.path.exists(self.cfg.outputs_dir):
+            os.makedirs(self.cfg.outputs_dir)
         self.cfg.outputs_dir = self.create_output_directory()
-
-        self.vocab_dict = self.get_vocab_dict()
 
     def create_output_directory(self) -> str:
         """
