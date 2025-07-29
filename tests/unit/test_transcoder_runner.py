@@ -71,19 +71,23 @@ def mock_transcoder():
 class TestTranscoderLoading:
     """Test transcoder loading functionality."""
 
-    def test_transcoder_config_enables_transcoder(self, transcoder_config):
+    def test_transcoder_config_enables_transcoder(
+        self, transcoder_config: NeuronpediaRunnerConfig
+    ):
         """Test that transcoder config properly enables transcoder loading."""
         assert transcoder_config.use_transcoder is True
         assert transcoder_config.use_skip_transcoder is False
 
-    def test_skip_transcoder_config(self, transcoder_config):
+    def test_skip_transcoder_config(self, transcoder_config: NeuronpediaRunnerConfig):
         """Test skip transcoder configuration."""
         transcoder_config.use_transcoder = False
         transcoder_config.use_skip_transcoder = True
         assert transcoder_config.use_transcoder is False
         assert transcoder_config.use_skip_transcoder is True
 
-    def test_transcoder_vs_sae_config_differences(self, transcoder_config):
+    def test_transcoder_vs_sae_config_differences(
+        self, transcoder_config: NeuronpediaRunnerConfig
+    ):
         """Test that transcoder config has different settings than SAE config."""
         # Create SAE config
         sae_config = NeuronpediaRunnerConfig(
@@ -230,7 +234,7 @@ class TestTranscoderMetadataHandling:
 
         # Create a runner instance (we'll mock everything else)
         with patch.object(NeuronpediaRunner, "__init__", lambda x, y: None):
-            runner = NeuronpediaRunner(None)
+            runner = NeuronpediaRunner(None)  # type: ignore
             runner.sae = mock_sae
             runner.cfg = Mock()
             runner.cfg.prefix_tokens = [1, 2, 3]
@@ -260,7 +264,7 @@ class TestTranscoderMetadataHandling:
 
         # Create a runner instance
         with patch.object(NeuronpediaRunner, "__init__", lambda x, y: None):
-            runner = NeuronpediaRunner(None)
+            runner = NeuronpediaRunner(None)  # type: ignore
             runner.sae = mock_sae
             runner.cfg = Mock()
             runner.cfg.prefix_tokens = [1, 2, 3]
