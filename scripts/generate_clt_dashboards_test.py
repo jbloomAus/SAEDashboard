@@ -14,36 +14,38 @@ from sae_dashboard.neuronpedia.neuronpedia_runner import (
 # --- Crucial Parameters ---
 # This MUST be the path to the LOCAL directory containing the saved CLT model
 # and its 'cfg.json'. Loading from HF release is not yet supported for CLTs.
-SAE_PATH = "/Users/curttigges/Projects/SAEDashboard/clt_test_pythia_160m"
+SAE_PATH = "/Users/curttigges/Projects/SAEDashboard/clt_test_gpt2"
 # The main script will now loop over layers 0-11.
 # CLT_LAYER_IDX = 1  # Example: Choose the layer index you want to visualize features for
 # Optional: Specify the exact weights filename. If empty, the script will search
 # for the first .safetensors file, then model.safetensors, then model.pt.
-CLT_WEIGHTS_FILENAME = "pythia_160m_clt_jumprelu.safetensors"  # or "model.pt"
+CLT_WEIGHTS_FILENAME = "untied_global_batchtopk_jumprelu.safetensors"
 
 # --- Output & Naming ---
 # These will be set dynamically in the main loop for each layer.
-# NP_OUTPUT_FOLDER = f"neuronpedia_outputs_clt_pythia_160m_L{CLT_LAYER_IDX}/"
-# ACT_CACHE_FOLDER = f"cached_activations_clt_pythia_160m_L{CLT_LAYER_IDX}"
+# NP_OUTPUT_FOLDER = f"neuronpedia_outputs_clt_gpt2_L{CLT_LAYER_IDX}/"
+# ACT_CACHE_FOLDER = f"cached_activations_clt_gpt2_L{CLT_LAYER_IDX}"
 # This name is primarily for organizing Neuronpedia outputs
 # NP_SET_NAME = f"decode-clt-32k"
 # This is less relevant for local loading but still required by the config
-SAE_SET = "pythia-160m-clt-32k"
+SAE_SET = "gpt2-clt-32k"
 
 # --- Data & Model ---
 # The base model ID should match the one the CLT was trained on (in cfg.json)
 # GPT-2 is used as an example here.
-BASE_MODEL_ID = "EleutherAI/pythia-160m"  # Ensure this matches your CLT's base model
+BASE_MODEL_ID = "gpt2"  # Matches the model_name in cfg.json
 HF_DATASET_PATH = "monology/pile-uncopyrighted"  # Dataset for generating activations
 
 # --- Performance & Batching ---
 # Adjust these based on your hardware and desired speed/granularity
-NUM_FEATURES_PER_BATCH = 128  # How many features to process in one dashboard batch
+NUM_FEATURES_PER_BATCH = 10  # Reduced for testing
 START_BATCH = 0
-NUM_BATCHES_TO_RUN = None  # How many batches to generate (set to None for all)
-N_PROMPTS = 65536  # Total number of prompts for activation generation
+NUM_BATCHES_TO_RUN = 10  # Just run 1 batch for testing
+# Also update the NeuronpediaRunnerConfig to limit batches
+LIMIT_TO_BATCH = 0  # Only process batch 0
+N_PROMPTS = 24576 // 4  # Reduced for testing
 N_TOKENS_IN_PROMPT = 128  # Context size for activation generation
-N_PROMPTS_IN_FORWARD_PASS = 64  # Batch size for model forward passes
+N_PROMPTS_IN_FORWARD_PASS = 128  # Batch size for model forward passes
 
 # --- Dtypes ---
 # Specify dtypes for the base model and the CLT.
@@ -57,11 +59,7 @@ SPARSITY_THRESHOLD = 1  # Set to 1 to disable sparsity filtering for testing
 USE_WANDB = False  # Enable WandB logging if desired
 
 # %%
-from transformer_lens import HookedTransformer  # type: ignore
-
-model = HookedTransformer.from_pretrained("EleutherAI/pythia-160m")
-
-print(model)
+# Model loading is handled by the runner, no need to test here
 
 
 def copy_output_folder(source: str, destination: str):
@@ -101,13 +99,14 @@ if __name__ == "__main__":
         )
         exit(1)
 
-    for clt_layer_idx in range(12):
+    # Test on a single layer (layer 5)
+    for clt_layer_idx in [5]:  # Changed to test just layer 5
         print(f"\n\n--- Starting Dashboard Generation for Layer {clt_layer_idx} ---")
 
         # --- Dynamic Configuration for each layer ---
-        NP_OUTPUT_FOLDER = f"neuronpedia_outputs_clt_pythia_160m_L{clt_layer_idx}/"
-        ACT_CACHE_FOLDER = f"cached_activations_clt_pythia_160m_L{clt_layer_idx}"
-        NP_SET_NAME = f"decode-clt-32k"
+        NP_OUTPUT_FOLDER = f"neuronpedia_outputs_clt_gpt2_L{clt_layer_idx}/"
+        ACT_CACHE_FOLDER = f"cached_activations_clt_gpt2_L{clt_layer_idx}"
+        NP_SET_NAME = f"gpt2-clt-32k-L{clt_layer_idx}"
 
         print("--- Running CLT Dashboard Generation ---")
         print(f"CLT Model Path: {SAE_PATH}")
@@ -144,11 +143,10 @@ if __name__ == "__main__":
             n_prompts_total=N_PROMPTS,
             n_tokens_in_prompt=N_TOKENS_IN_PROMPT,
             n_prompts_in_forward_pass=N_PROMPTS_IN_FORWARD_PASS,
-            cache_dir=ACT_CACHE_FOLDER,
             # Batching and Processing Settings
             n_features_at_a_time=NUM_FEATURES_PER_BATCH,
-            # start_batch=START_BATCH,
-            # end_batch=START_BATCH + NUM_BATCHES_TO_RUN,
+            start_batch=START_BATCH,
+            end_batch=START_BATCH + NUM_BATCHES_TO_RUN,
             # Dtype Settings
             # sae_dtype=SAE_DTYPE, # Can be omitted if clt_dtype is primary
             model_dtype=MODEL_DTYPE,
@@ -160,10 +158,10 @@ if __name__ == "__main__":
         runner = NeuronpediaRunner(cfg)
         runner.run()
 
-        # Copy the output folder to /workspace/NP_OUTPUT_FOLDER
-        copy_output_folder(NP_OUTPUT_FOLDER, f"/workspace/{NP_OUTPUT_FOLDER}")
+        # Copy the output folder to /workspace/NP_OUTPUT_FOLDER (disabled for local testing)
+        # copy_output_folder(NP_OUTPUT_FOLDER, f"/workspace/{NP_OUTPUT_FOLDER}")
         print(f"--- CLT Dashboard Generation Complete for Layer {clt_layer_idx} ---")
-        print(f"Output saved to: {NP_OUTPUT_FOLDER} and /workspace/{NP_OUTPUT_FOLDER}")
+        print(f"Output saved to: {NP_OUTPUT_FOLDER}")
 
 
 # Example CLI usage (conceptual - requires local path):
