@@ -80,10 +80,17 @@ class SaeVisRunner:
 
         # add extra method to SAE which is not yet provided by SAE Lens.
         # encoder = self.mock_feature_acts_subset_for_now(encoder)
-        encoder.fold_W_dec_norm()
+        
+        # Skip fold_W_dec_norm for CLT wrappers as they don't support this method
+        if "CLTLayerWrapper" in str(type(encoder)):
+            print("SaeVisRunner: Skipping fold_W_dec_norm() for CLT wrapper.")
+        else:
+            encoder.fold_W_dec_norm()
 
         # turn off reshaping mode since that's not useful if we're caching activations on disk
-        if encoder.hook_z_reshaping_mode:
+        if "CLTLayerWrapper" in str(type(encoder)):
+            print("SaeVisRunner: Skipping hook_z_reshaping_mode check for CLT wrapper.")
+        elif encoder.hook_z_reshaping_mode:
             encoder.turn_off_forward_pass_hook_z_reshaping()
 
         # set precision on encoders and model

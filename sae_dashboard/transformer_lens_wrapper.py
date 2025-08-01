@@ -130,6 +130,7 @@ def to_resid_direction(
     if (
         "resid" in model.activation_config.primary_hook_point
         or "_out" in model.activation_config.primary_hook_point
+        or "hook_mlp_in" in model.activation_config.primary_hook_point
     ):
         return direction
 
@@ -142,13 +143,25 @@ def to_resid_direction(
     elif "hook_z" in model.activation_config.primary_hook_point:
         return direction @ model.W_O[model.hook_layer].flatten(0, 1).to(direction.dtype)
 
-    elif (
-        "hook_resid_post" in model.activation_config.primary_hook_point
-        or "hook_normalized" in model.activation_config.primary_hook_point
-    ):
-        # hook_resid_post is always a residual stream direction
-        # hook_normalized refers to the normalized residual stream (e.g. after LayerNorm)
-        # Both are already in the residual stream basis, so no projection needed
+    # For hook_mlp_out (output of MLP)
+    elif "hook_mlp_out" in model.activation_config.primary_hook_point:
+        return direction
+
+    # For hook_attn_out (output of attention layer)
+    elif "hook_attn_out" in model.activation_config.primary_hook_point:
+        return direction
+
+    # For hook_resid_post (always a residual stream direction)
+    elif "hook_resid_post" in model.activation_config.primary_hook_point:
+        return direction
+
+    # For hook_normalized (e.g. ln1.hook_normalized, ln2.hook_normalized)
+    # These are normalized residual stream, already in residual stream basis
+    elif "hook_normalized" in model.activation_config.primary_hook_point:
+        return direction
+
+    # For hook_resid_pre (residual stream before MLP)
+    elif "hook_resid_pre" in model.activation_config.primary_hook_point:
         return direction
 
     # Others not yet supported
