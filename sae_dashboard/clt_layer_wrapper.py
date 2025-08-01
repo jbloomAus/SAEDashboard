@@ -15,8 +15,7 @@ from typing import (
 )  # Added Optional, Union and List
 
 # Added dataclass, field, asdict
-# field and asdict are unused
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 
 if TYPE_CHECKING:
     from clt.models.clt import CrossLayerTranscoder  # type: ignore
@@ -82,6 +81,18 @@ except ImportError:
 
 
 @dataclass
+class CLTMetadata:
+    """Simple metadata class for CLT wrapper compatibility."""
+    hook_name: str
+    hook_layer: int
+    model_name: Optional[str] = None
+    context_size: Optional[int] = None
+    prepend_bos: bool = True
+    hook_head_index: Optional[int] = None
+    seqpos_slice: Optional[slice] = None
+
+
+@dataclass
 class CLTWrapperConfig:
     """Configuration dataclass for the CLTLayerWrapper."""
 
@@ -103,10 +114,11 @@ class CLTWrapperConfig:
     dataset_trust_remote_code: bool = False
     seqpos_slice: Optional[slice] = None
     model_from_pretrained_kwargs: dict = field(default_factory=dict)
+    metadata: Optional[CLTMetadata] = None
 
-    # Optional: Add a to_dict method if needed elsewhere, but vars() works too
-    # def to_dict(self) -> dict:
-    #     return asdict(self)
+    def to_dict(self) -> dict:
+        """Convert config to dictionary for compatibility with SAE interface."""
+        return asdict(self)
 
 
 class CLTLayerWrapper:
@@ -144,7 +156,7 @@ class CLTLayerWrapper:
         # Try to get model_name from the underlying clt config if it exists
         clt_model_name = getattr(clt.config, "model_name", None)
         clt_dataset_path = getattr(clt.config, "dataset_path", None)
-        clt_context_size = getattr(clt.config, "context_size", None)
+        clt_context_size = getattr(clt.config, "context_size", 128)  # Default to 128 if not set
         clt_prepend_bos = getattr(clt.config, "prepend_bos", True)
         # Use the activation_fn from CLT config for the wrapper's architecture and encode method
         self.activation_fn = getattr(clt.config, "activation_fn", "jumprelu")
@@ -310,6 +322,15 @@ class CLTLayerWrapper:
             dataset_trust_remote_code=False,
             seqpos_slice=None,
             model_from_pretrained_kwargs=clt_model_from_pretrained_kwargs,
+            metadata=CLTMetadata(
+                hook_name=hook_name,
+                hook_layer=layer_idx,
+                model_name=clt_model_name,
+                context_size=clt_context_size,
+                prepend_bos=clt_prepend_bos,
+                hook_head_index=None,
+                seqpos_slice=None,
+            )
         )
         # --- End Config Creation ---
 

@@ -437,7 +437,10 @@ class NeuronpediaRunner:
 
         # Ensure MLP-in hooks are computed if needed (important for most Transcoders)
         # Get hook_name - it's always in metadata for both SAEs and Transcoders
-        self.hook_name = self.sae.cfg.metadata["hook_name"]
+        if hasattr(self.sae.cfg.metadata, "hook_name"):
+            self.hook_name = self.sae.cfg.metadata.hook_name
+        else:
+            self.hook_name = self.sae.cfg.metadata["hook_name"]
 
         if (
             self.cfg.use_transcoder 
