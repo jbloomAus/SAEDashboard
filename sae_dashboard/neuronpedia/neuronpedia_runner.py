@@ -109,7 +109,20 @@ class NeuronpediaRunner:
         return device_count
 
     def _load_sae_or_transcoder(self):
-        """Load SAE, Transcoder, or SkipTranscoder based on configuration."""
+        """Load SAE, Transcoder, SkipTranscoder, or CLT based on configuration."""
+        # Validate that only one loader type is specified
+        flags = [
+            self.cfg.use_transcoder,
+            self.cfg.use_skip_transcoder,
+            self.cfg.use_clt,
+        ]
+        if sum(flags) > 1:
+            raise ValueError(
+                "Only one of --use-transcoder, --use-skip-transcoder, or --use-clt can be set."
+            )
+        if self.cfg.use_clt and self.cfg.clt_layer_idx is None:
+            raise ValueError("--clt-layer-idx must be specified when using --use-clt.")
+        
         if self.cfg.use_skip_transcoder:
             # Dynamically import to avoid dependency issues when Transcoder isn't used
             try:
@@ -160,6 +173,67 @@ class NeuronpediaRunner:
             # Apply dtype override after loading for Transcoder as well
             if self.cfg.sae_dtype:
                 self._apply_sae_dtype_override()
+        elif self.cfg.use_clt:
+            # Dynamically import CLT components only when needed
+            try:
+                from clt.models.clt import CrossLayerTranscoder  # type: ignore
+                from clt.config.clt_config import CLTConfig  # type: ignore
+            except ImportError as e:
+                raise ImportError(
+                    "CLT components (CrossLayerTranscoder, CLTConfig) not found. "
+                    "Ensure the 'clt' package is installed and available."
+                ) from e
+
+            if self.cfg.from_local_sae:
+                # Load CLT config from local path
+                try:
+                    clt_config_path = Path(self.cfg.sae_path) / "cfg.json"
+                    if not clt_config_path.is_file():
+                        raise FileNotFoundError(
+                            f"CLT config file not found at {clt_config_path}"
+                        )
+                    clt_cfg = CLTConfig.from_json(clt_config_path)
+                except Exception as e:
+                    raise ValueError(
+                        f"Failed to load CLT config from {clt_config_path}: {e}"
+                    ) from e
+
+                # Create CLT instance
+                self.clt = CrossLayerTranscoder(
+                    config=clt_cfg,
+                    process_group=None,
+                    device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
+                )
+
+                # Load weights
+                self._load_clt_weights()
+
+                # Apply dtype override if specified
+                if self.cfg.clt_dtype:
+                    try:
+                        dtype_torch = getattr(torch, self.cfg.clt_dtype)
+                        self.clt.to(dtype=dtype_torch)
+                        print(f"Overriding CLT dtype to {self.cfg.clt_dtype}")
+                    except AttributeError:
+                        raise ValueError(f"Invalid clt_dtype: {self.cfg.clt_dtype}")
+                elif hasattr(self.clt.config, "dtype") and self.clt.config.dtype:
+                    self.cfg.clt_dtype = str(self.clt.config.dtype).replace("torch.", "")
+                    print(f"Using CLT configured dtype: {self.cfg.clt_dtype}")
+                else:
+                    self.cfg.clt_dtype = "float32"
+                    print(f"CLT dtype not specified, defaulting to {self.cfg.clt_dtype}")
+
+                # Create wrapper for the specific layer
+                from sae_dashboard.clt_layer_wrapper import CLTLayerWrapper
+                assert self.cfg.clt_layer_idx is not None  # Already validated above
+                self.sae = CLTLayerWrapper(
+                    self.clt, self.cfg.clt_layer_idx, clt_model_dir_path=self.cfg.sae_path
+                )
+                print(f"Created CLTLayerWrapper for layer {self.cfg.clt_layer_idx}")
+            else:
+                raise NotImplementedError(
+                    "Loading CLT from non-local path (e.g., HF release) is not yet implemented."
+                )
         else:
             LoaderClass = SAE
             if self.cfg.from_local_sae:
@@ -176,6 +250,61 @@ class NeuronpediaRunner:
                 )
                 if self.cfg.sae_dtype != "":
                     self._apply_sae_dtype_override()
+
+    def _load_clt_weights(self):
+        """Load CLT weights from file."""
+        from pathlib import Path
+        from typing import Optional, List
+        
+        # Determine which file to load
+        explicit_filename = self.cfg.clt_weights_filename if self.cfg.clt_weights_filename else ""
+        
+        candidate_paths: List[Path] = []
+        if explicit_filename:
+            candidate_paths.append(Path(self.cfg.sae_path) / explicit_filename)
+        
+        # If no explicit filename or the file doesn't exist, search common patterns
+        if not candidate_paths or not candidate_paths[0].is_file():
+            # Find any *.safetensors file in directory
+            candidate_paths.extend(
+                sorted(Path(self.cfg.sae_path).glob("*.safetensors"))
+            )
+            # Add common filenames
+            candidate_paths.append(Path(self.cfg.sae_path) / "model.safetensors")
+            candidate_paths.append(Path(self.cfg.sae_path) / "model.pt")
+            candidate_paths.append(Path(self.cfg.sae_path) / "model.bin")
+        
+        # Pick the first existing path
+        weights_path: Optional[Path] = None
+        for cand in candidate_paths:
+            if cand.is_file():
+                weights_path = cand
+                break
+        
+        if weights_path is None:
+            raise FileNotFoundError(
+                f"No CLT weights file found in {self.cfg.sae_path}. "
+                f"Expected one of: {', '.join(str(p) for p in candidate_paths)}"
+            )
+        
+        print(f"Loading CLT state dict from: {weights_path}")
+        
+        # Choose loader based on file extension
+        if weights_path.suffix == ".safetensors":
+            try:
+                from safetensors.torch import load_file as safe_load_file
+            except ImportError as e:
+                raise ImportError(
+                    "safetensors library is required to load .safetensors files. "
+                    "Install via `pip install safetensors`."
+                ) from e
+            state_dict = safe_load_file(weights_path)
+        else:
+            state_dict = torch.load(weights_path, map_location=self.cfg.sae_device)
+        
+        # Load the state dict
+        self.clt.load_state_dict(state_dict)
+        print("CLT state dict loaded successfully.")
 
     def _apply_sae_dtype_override(self):
         """Apply dtype override to SAE."""
@@ -213,7 +342,12 @@ class NeuronpediaRunner:
 
         self.sae.cfg.dataset_path = self.cfg.huggingface_dataset_path
         self.sae.cfg.context_size = self.cfg.n_tokens_in_prompt
-        self.sae.fold_W_dec_norm()
+        
+        # Skip fold_W_dec_norm for CLT wrappers as they don't support this method
+        if "CLTLayerWrapper" in str(type(self.sae)):
+            print("NeuronpediaRunner: Skipping fold_W_dec_norm() for CLT wrapper.")
+        else:
+            self.sae.fold_W_dec_norm()
 
         print(f"SAE DType: {self.cfg.sae_dtype}")
         print(f"Model DType: {self.cfg.model_dtype}")
@@ -305,9 +439,12 @@ class NeuronpediaRunner:
         # Get hook_name - it's always in metadata for both SAEs and Transcoders
         self.hook_name = self.sae.cfg.metadata["hook_name"]
 
-        if (self.cfg.use_transcoder or "hook_mlp_in" in self.hook_name) and hasattr(
-            self.model, "set_use_hook_mlp_in"
-        ):
+        if (
+            self.cfg.use_transcoder 
+            or self.cfg.use_skip_transcoder 
+            or self.cfg.use_clt
+            or "hook_mlp_in" in self.hook_name
+        ) and hasattr(self.model, "set_use_hook_mlp_in"):
             # TransformerLens models 1.12+ support this flag
             self.model.set_use_hook_mlp_in(True)
 
@@ -748,6 +885,29 @@ def main():
         action="store_true",
         help="If set, load a SkipTranscoder instead of a Transcoder/SAE",
     )
+    parser.add_argument(
+        "--use-clt",
+        action="store_true",
+        help="If set, load a CrossLayerTranscoder instead of a standard SAE/Transcoder",
+    )
+    parser.add_argument(
+        "--clt-layer-idx",
+        type=int,
+        default=None,
+        help="Layer index to use for CLT encoder (required if --use-clt)",
+    )
+    parser.add_argument(
+        "--clt-dtype",
+        type=str,
+        default="",
+        help="Optional override for CLT data type (e.g., 'float16')",
+    )
+    parser.add_argument(
+        "--clt-weights-filename",
+        type=str,
+        default="",
+        help="Filename of the CLT weights file (supports .safetensors / .pt). If omitted, script will search for a suitable file automatically.",
+    )
 
     args = parser.parse_args()
 
@@ -772,6 +932,10 @@ def main():
         hf_model_path=args.hf_model_path,
         use_transcoder=args.use_transcoder,
         use_skip_transcoder=args.use_skip_transcoder,
+        use_clt=args.use_clt,
+        clt_layer_idx=args.clt_layer_idx,
+        clt_dtype=args.clt_dtype,
+        clt_weights_filename=args.clt_weights_filename,
     )
 
     runner = NeuronpediaRunner(cfg)
