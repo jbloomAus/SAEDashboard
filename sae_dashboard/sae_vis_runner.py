@@ -80,7 +80,7 @@ class SaeVisRunner:
 
         # add extra method to SAE which is not yet provided by SAE Lens.
         # encoder = self.mock_feature_acts_subset_for_now(encoder)
-        
+
         # Skip fold_W_dec_norm for CLT wrappers as they don't support this method
         if "CLTLayerWrapper" in str(type(encoder)):
             print("SaeVisRunner: Skipping fold_W_dec_norm() for CLT wrapper.")

@@ -1,25 +1,26 @@
-import torch
-import torch.nn.functional as F
-from clt.models.activations import BatchTopK  # type: ignore
-from pathlib import Path
 import json
+
+# Added dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
 
 # import torch.nn as nn # Unused
 # from torch.distributed import ProcessGroup # Unused
 # from types import SimpleNamespace # Unused import
-from typing import (
+from typing import (  # Added Optional, Union and List
     TYPE_CHECKING,
+    List,
     Optional,
     Union,
-    List,
-)  # Added Optional, Union and List
+)
 
-# Added dataclass, field, asdict
-from dataclasses import dataclass, field, asdict
+import torch
+import torch.nn.functional as F
+from clt.models.activations import BatchTopK  # type: ignore
 
 if TYPE_CHECKING:
-    from clt.models.clt import CrossLayerTranscoder  # type: ignore
     import torch.distributed  # Import for ProcessGroup type hint
+    from clt.models.clt import CrossLayerTranscoder  # type: ignore
 
 
 # Placeholder for dist if torch.distributed is not available or initialized
@@ -83,6 +84,7 @@ except ImportError:
 @dataclass
 class CLTMetadata:
     """Simple metadata class for CLT wrapper compatibility."""
+
     hook_name: str
     hook_layer: int
     model_name: Optional[str] = None
@@ -156,7 +158,9 @@ class CLTLayerWrapper:
         # Try to get model_name from the underlying clt config if it exists
         clt_model_name = getattr(clt.config, "model_name", None)
         clt_dataset_path = getattr(clt.config, "dataset_path", None)
-        clt_context_size = getattr(clt.config, "context_size", 128)  # Default to 128 if not set
+        clt_context_size = getattr(
+            clt.config, "context_size", 128
+        )  # Default to 128 if not set
         clt_prepend_bos = getattr(clt.config, "prepend_bos", True)
         # Use the activation_fn from CLT config for the wrapper's architecture and encode method
         self.activation_fn = getattr(clt.config, "activation_fn", "jumprelu")
@@ -330,7 +334,7 @@ class CLTLayerWrapper:
                 prepend_bos=clt_prepend_bos,
                 hook_head_index=None,
                 seqpos_slice=None,
-            )
+            ),
         )
         # --- End Config Creation ---
 

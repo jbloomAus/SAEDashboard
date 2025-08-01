@@ -29,7 +29,6 @@ class TestCLTLoading:
         assert cfg.use_clt is True
         assert cfg.clt_layer_idx == 5
 
-
     def test_clt_requires_layer_idx(self):
         """Test that CLT requires layer index to be specified."""
         cfg = NeuronpediaRunnerConfig(
@@ -74,7 +73,9 @@ class TestCLTWrapperIntegration:
         mock_clt.config.tl_input_template = "blocks.{}.ln2.hook_normalized"
         mock_clt.device = torch.device("cpu")
         mock_clt.dtype = torch.float32
-        mock_clt.log_threshold = torch.log(torch.ones(12, 32768) * 0.1)  # Mock log_threshold
+        mock_clt.log_threshold = torch.log(
+            torch.ones(12, 32768) * 0.1
+        )  # Mock log_threshold
 
         # Mock encoder and decoder modules
         mock_encoder = MagicMock()
@@ -277,7 +278,9 @@ class TestCLTFeatureMasking:
         mock_clt.dtype = torch.float32
 
         # Mock log_threshold
-        mock_clt.log_threshold = torch.log(torch.ones(12, 10) * 0.1)  # 12 layers, 10 features
+        mock_clt.log_threshold = torch.log(
+            torch.ones(12, 10) * 0.1
+        )  # 12 layers, 10 features
 
         # Mock encoder and decoder
         mock_encoder = MagicMock()

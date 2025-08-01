@@ -122,7 +122,7 @@ class NeuronpediaRunner:
             )
         if self.cfg.use_clt and self.cfg.clt_layer_idx is None:
             raise ValueError("--clt-layer-idx must be specified when using --use-clt.")
-        
+
         if self.cfg.use_skip_transcoder:
             # Dynamically import to avoid dependency issues when Transcoder isn't used
             try:
@@ -176,8 +176,8 @@ class NeuronpediaRunner:
         elif self.cfg.use_clt:
             # Dynamically import CLT components only when needed
             try:
-                from clt.models.clt import CrossLayerTranscoder  # type: ignore
                 from clt.config.clt_config import CLTConfig  # type: ignore
+                from clt.models.clt import CrossLayerTranscoder  # type: ignore
             except ImportError as e:
                 raise ImportError(
                     "CLT components (CrossLayerTranscoder, CLTConfig) not found. "
@@ -217,17 +217,24 @@ class NeuronpediaRunner:
                     except AttributeError:
                         raise ValueError(f"Invalid clt_dtype: {self.cfg.clt_dtype}")
                 elif hasattr(self.clt.config, "dtype") and self.clt.config.dtype:
-                    self.cfg.clt_dtype = str(self.clt.config.dtype).replace("torch.", "")
+                    self.cfg.clt_dtype = str(self.clt.config.dtype).replace(
+                        "torch.", ""
+                    )
                     print(f"Using CLT configured dtype: {self.cfg.clt_dtype}")
                 else:
                     self.cfg.clt_dtype = "float32"
-                    print(f"CLT dtype not specified, defaulting to {self.cfg.clt_dtype}")
+                    print(
+                        f"CLT dtype not specified, defaulting to {self.cfg.clt_dtype}"
+                    )
 
                 # Create wrapper for the specific layer
                 from sae_dashboard.clt_layer_wrapper import CLTLayerWrapper
+
                 assert self.cfg.clt_layer_idx is not None  # Already validated above
                 self.sae = CLTLayerWrapper(
-                    self.clt, self.cfg.clt_layer_idx, clt_model_dir_path=self.cfg.sae_path
+                    self.clt,
+                    self.cfg.clt_layer_idx,
+                    clt_model_dir_path=self.cfg.sae_path,
                 )
                 print(f"Created CLTLayerWrapper for layer {self.cfg.clt_layer_idx}")
             else:
@@ -254,15 +261,17 @@ class NeuronpediaRunner:
     def _load_clt_weights(self):
         """Load CLT weights from file."""
         from pathlib import Path
-        from typing import Optional, List
-        
+        from typing import List, Optional
+
         # Determine which file to load
-        explicit_filename = self.cfg.clt_weights_filename if self.cfg.clt_weights_filename else ""
-        
+        explicit_filename = (
+            self.cfg.clt_weights_filename if self.cfg.clt_weights_filename else ""
+        )
+
         candidate_paths: List[Path] = []
         if explicit_filename:
             candidate_paths.append(Path(self.cfg.sae_path) / explicit_filename)
-        
+
         # If no explicit filename or the file doesn't exist, search common patterns
         if not candidate_paths or not candidate_paths[0].is_file():
             # Find any *.safetensors file in directory
@@ -273,22 +282,22 @@ class NeuronpediaRunner:
             candidate_paths.append(Path(self.cfg.sae_path) / "model.safetensors")
             candidate_paths.append(Path(self.cfg.sae_path) / "model.pt")
             candidate_paths.append(Path(self.cfg.sae_path) / "model.bin")
-        
+
         # Pick the first existing path
         weights_path: Optional[Path] = None
         for cand in candidate_paths:
             if cand.is_file():
                 weights_path = cand
                 break
-        
+
         if weights_path is None:
             raise FileNotFoundError(
                 f"No CLT weights file found in {self.cfg.sae_path}. "
                 f"Expected one of: {', '.join(str(p) for p in candidate_paths)}"
             )
-        
+
         print(f"Loading CLT state dict from: {weights_path}")
-        
+
         # Choose loader based on file extension
         if weights_path.suffix == ".safetensors":
             try:
@@ -301,7 +310,7 @@ class NeuronpediaRunner:
             state_dict = safe_load_file(weights_path)
         else:
             state_dict = torch.load(weights_path, map_location=self.cfg.sae_device)
-        
+
         # Load the state dict
         self.clt.load_state_dict(state_dict)
         print("CLT state dict loaded successfully.")
@@ -342,7 +351,7 @@ class NeuronpediaRunner:
 
         self.sae.cfg.dataset_path = self.cfg.huggingface_dataset_path
         self.sae.cfg.context_size = self.cfg.n_tokens_in_prompt
-        
+
         # Skip fold_W_dec_norm for CLT wrappers as they don't support this method
         if "CLTLayerWrapper" in str(type(self.sae)):
             print("NeuronpediaRunner: Skipping fold_W_dec_norm() for CLT wrapper.")
@@ -443,8 +452,8 @@ class NeuronpediaRunner:
             self.hook_name = self.sae.cfg.metadata["hook_name"]
 
         if (
-            self.cfg.use_transcoder 
-            or self.cfg.use_skip_transcoder 
+            self.cfg.use_transcoder
+            or self.cfg.use_skip_transcoder
             or self.cfg.use_clt
             or "hook_mlp_in" in self.hook_name
         ) and hasattr(self.model, "set_use_hook_mlp_in"):
