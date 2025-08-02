@@ -11,7 +11,7 @@ import torch
 import wandb
 import wandb.sdk
 from matplotlib import colors
-from sae_lens.training.activations_store import ActivationsStore
+from sae_lens import ActivationsStore
 from tqdm import tqdm
 from transformer_lens import HookedTransformer
 
