@@ -190,3 +190,11 @@ prof/
 dfa_tests.ipynb
 
 .DS_Store
+
+# Test and temporary directories
+crosslayer-coding/
+SAELens/
+clt_test*/
+test_output/
+test_outputs/
+clt-technical-description.md

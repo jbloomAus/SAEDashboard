@@ -1,7 +1,7 @@
 import pytest
 import torch
 from jaxtyping import Int
-from sae_lens import SAE, SAEConfig
+from sae_lens.saes import StandardSAE, StandardSAEConfig
 from torch import Tensor
 from transformer_lens import HookedTransformer
 
@@ -24,29 +24,17 @@ def tokens(model: HookedTransformer) -> Int[Tensor, "batch seq"]:
 
 
 @pytest.fixture
-def autoencoder() -> SAE:
-    cfg = SAEConfig(
-        architecture="standard",
+def autoencoder() -> StandardSAE:
+    cfg = StandardSAEConfig(
         d_in=64,
         d_sae=128,
         apply_b_dec_to_input=False,
-        context_size=128,
-        model_name="TEST",
-        hook_name="test",
-        hook_layer=0,
-        prepend_bos=True,
-        dataset_path="test/test",
         dtype="float32",
-        activation_fn_str="relu",
-        finetuning_scaling_factor=False,
-        hook_head_index=None,
         normalize_activations="none",
         device="cpu",
-        sae_lens_training_version=None,
-        dataset_trust_remote_code=True,
     )
 
-    autoencoder = SAE(cfg)
+    autoencoder = StandardSAE(cfg)
     # set weights and biases to hardcoded values so tests are consistent
     seed1 = torch.tensor([0.1, -0.2, 0.3, -0.4] * 16)  # 64
     seed2 = torch.tensor([0.2, -0.1, 0.4, -0.2] * 32)  # 64 x 2

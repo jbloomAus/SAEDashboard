@@ -55,6 +55,19 @@ class NeuronpediaRunnerConfig:
 
     hf_model_path: Optional[str] = None
 
+    # If true, we load a Transcoder (inherits from SAE) instead of a standard SAE.
+    use_transcoder: bool = False
+
+    # If true, we load a SkipTranscoder (inherits from Transcoder) instead.
+    use_skip_transcoder: bool = False
+
+    # CLT (Cross-Layer Transcoder) specific parameters
+    use_clt: bool = False
+    clt_layer_idx: Optional[int] = None
+    clt_dtype: str = ""
+    # Optional filename for CLT weights (supports .safetensors or .pt). If empty, default search order will be used.
+    clt_weights_filename: str = ""
+
 
 @dataclass
 class NeuronpediaVectorRunnerConfig:
