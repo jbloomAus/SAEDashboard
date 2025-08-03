@@ -61,9 +61,7 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.semantic_release]
-version_variables = [
-    "sae_dashboard/__init__.py:__version__",
-    "pyproject.toml:version",
-]
-branch = "main"
+version_variables = ["sae_dashboard/__init__.py:__version__"]
+version_toml = ["pyproject.toml:tool.poetry.version"]
 build_command = "pip install poetry && poetry build"
+branches = { main = { match = "main" } }
