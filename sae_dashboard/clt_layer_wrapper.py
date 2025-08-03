@@ -174,7 +174,7 @@ class CLTLayerWrapper:
         wrapper_will_normalize_specifically = False
         clt_norm_method = getattr(clt.config, "normalization_method", "none")
 
-        if clt_norm_method in ["auto", "estimated_mean_std"]:
+        if clt_norm_method in ["auto", "estimated_mean_std", "mean_std"]:
             if clt_model_dir_path:
                 norm_stats_file = Path(clt_model_dir_path) / "norm_stats.json"
                 if norm_stats_file.exists():
@@ -297,17 +297,6 @@ class CLTLayerWrapper:
                     f"Warning: Neither tl_input_template nor mlp_input_template found. Falling back to hardcoded: {hook_name}"
                 )
 
-        # Determine normalize_activations flag based on CLT config
-        clt_norm_method = getattr(clt.config, "normalization_method", "none")
-        normalize_activations_flag = clt_norm_method != "none"
-        if normalize_activations_flag:
-            print(
-                f"CLT normalization_method is '{clt_norm_method}', setting normalize_activations=True for ActivationsStore."
-            )
-        else:
-            print(
-                "CLT normalization_method is 'none', setting normalize_activations=False for ActivationsStore."
-            )
 
         self.cfg = CLTWrapperConfig(
             d_sae=clt.config.num_features,  # This is the d_sae of the *entire* CLT layer, not a sub-batch
