@@ -38,12 +38,11 @@ HF_DATASET_PATH = "monology/pile-uncopyrighted"  # Dataset for generating activa
 
 # --- Performance & Batching ---
 # Adjust these based on your hardware and desired speed/granularity
-NUM_FEATURES_PER_BATCH = 10  # Reduced for testing
+NUM_FEATURES_PER_BATCH = 50  # Test first 50 features
 START_BATCH = 0
-NUM_BATCHES_TO_RUN = 10  # Just run 1 batch for testing
+NUM_BATCHES_TO_RUN = 1  # Just test 1 batch for quick results
 # Also update the NeuronpediaRunnerConfig to limit batches
-LIMIT_TO_BATCH = 0  # Only process batch 0
-N_PROMPTS = 24576 // 4  # Reduced for testing
+N_PROMPTS = 24576
 N_TOKENS_IN_PROMPT = 128  # Context size for activation generation
 N_PROMPTS_IN_FORWARD_PASS = 128  # Batch size for model forward passes
 
@@ -99,8 +98,8 @@ if __name__ == "__main__":
         )
         exit(1)
 
-    # Test on a single layer (layer 5)
-    for clt_layer_idx in [5]:  # Changed to test just layer 5
+    # Test on layer 0 which has features with very low thresholds
+    for clt_layer_idx in [5]:  # Test layer 5
         print(f"\n\n--- Starting Dashboard Generation for Layer {clt_layer_idx} ---")
 
         # --- Dynamic Configuration for each layer ---

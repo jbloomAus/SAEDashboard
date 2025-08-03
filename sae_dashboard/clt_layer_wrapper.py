@@ -297,7 +297,6 @@ class CLTLayerWrapper:
                     f"Warning: Neither tl_input_template nor mlp_input_template found. Falling back to hardcoded: {hook_name}"
                 )
 
-
         self.cfg = CLTWrapperConfig(
             d_sae=clt.config.num_features,  # This is the d_sae of the *entire* CLT layer, not a sub-batch
             d_in=clt.config.d_model,
