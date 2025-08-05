@@ -1,10 +1,20 @@
 # CHANGELOG
 
+## v0.6.11 (2025-08-05)
 
+### Fix
+
+* fix: fixes tool.semantic_release subtable (#66) ([`eb36157`](https://github.com/jbloomAus/SAEDashboard/commit/eb361571550a4653f7fbcc5a9cc2c98c329aaf41))
+
+### Unknown
+
+* upgrades python-semantic-release (#65) ([`fcdae8b`](https://github.com/jbloomAus/SAEDashboard/commit/fcdae8b0e18bbf2c5184977bdf14cc14280fb6bc))
 
 ## v0.6.10 (2025-07-16)
 
 ### Fix
+
+* fix: relax SAELens requirement ([`a83147e`](https://github.com/jbloomAus/SAEDashboard/commit/a83147efbf30ef4c4380f306a03468a0c8d41be0))
 
 * fix: Merge pull request #45 from Hzfinfdu/main
 
@@ -48,8 +58,11 @@ fix: relax SAELens and einops requirements ([`6c71bbf`](https://github.com/jbloo
 
 * Merge branch &#39;main&#39; into relax-saelens-dep ([`3e6c870`](https://github.com/jbloomAus/SAEDashboard/commit/3e6c8703afd5ce80c29ec1ed0fc729def3f7f8fa))
 
-* Fixing deprecated fn call ([`f1da0e6`](https://github.com/jbloomAus/SAEDashboard/commit/f1da0e6ea7d663e5ff54612d7979d1b1ed9a6b77))
+* also relax einops ([`62614ac`](https://github.com/jbloomAus/SAEDashboard/commit/62614ac27ca50527556cc7c891e589e63a14e9bc))
 
+* fix type checks ([`5a2cca0`](https://github.com/jbloomAus/SAEDashboard/commit/5a2cca0334a0907e7685cbef798cda71cd249ba4))
+
+* Fixing deprecated fn call ([`f1da0e6`](https://github.com/jbloomAus/SAEDashboard/commit/f1da0e6ea7d663e5ff54612d7979d1b1ed9a6b77))
 
 ## v0.6.9 (2025-02-25)
 
@@ -69,7 +82,6 @@ fix: don&#39;t use sparsity ([`f30a19b`](https://github.com/jbloomAus/SAEDashboa
 
 fix: update SAELens version and remove unsupported load_sparsity ([`c083723`](https://github.com/jbloomAus/SAEDashboard/commit/c083723237090165725e587f8bdb8f01338394b4))
 
-
 ## v0.6.8 (2025-02-15)
 
 ### Fix
@@ -81,7 +93,6 @@ fix: update SAELens version and remove unsupported load_sparsity ([`c083723`](ht
 * Merge pull request #42 from jbloomAus/prepend_text_fix
 
 fix: prepended chat template text should not be in activations ([`eea0b83`](https://github.com/jbloomAus/SAEDashboard/commit/eea0b830e97e791571986cf1ccae1605606ddb4f))
-
 
 ## v0.6.7 (2025-02-13)
 
@@ -101,7 +112,6 @@ feat: Prepend chat template and activation threshold ([`c7347fa`](https://github
 
 * prepend chat template text ([`c8829a1`](https://github.com/jbloomAus/SAEDashboard/commit/c8829a14d6351b5cfd52af927942af5c6897db60))
 
-
 ## v0.6.6 (2025-02-11)
 
 ### Fix
@@ -114,14 +124,11 @@ feat: Prepend chat template and activation threshold ([`c7347fa`](https://github
 
 fix: run_settings.json should properly log model_id and layer ([`f3bde39`](https://github.com/jbloomAus/SAEDashboard/commit/f3bde395843720674d4c60e21bc2453d958ff402))
 
-
 ## v0.6.5 (2025-02-11)
 
 ### Fix
 
 * fix: Force Build ([`2e4979c`](https://github.com/jbloomAus/SAEDashboard/commit/2e4979c07ad8bcd2760ee0981ee415d17fef2e5a))
-
-* fix: relax SAELens requirement ([`a83147e`](https://github.com/jbloomAus/SAEDashboard/commit/a83147efbf30ef4c4380f306a03468a0c8d41be0))
 
 ### Unknown
 
@@ -155,14 +162,9 @@ enable passing custom HF model to replace model weights ([`5d98417`](https://git
 
 * enable passing custom HF model to replace model weights ([`b2d6ae5`](https://github.com/jbloomAus/SAEDashboard/commit/b2d6ae5446fb79f4662bcdac6030cb6072b09b60))
 
-* also relax einops ([`62614ac`](https://github.com/jbloomAus/SAEDashboard/commit/62614ac27ca50527556cc7c891e589e63a14e9bc))
-
-* fix type checks ([`5a2cca0`](https://github.com/jbloomAus/SAEDashboard/commit/5a2cca0334a0907e7685cbef798cda71cd249ba4))
-
 * Don&#39;t copy to output folder by default ([`4dbde12`](https://github.com/jbloomAus/SAEDashboard/commit/4dbde1214d49eaaf9b591f083f34e57c8c0c1dbd))
 
 * Don&#39;t save html file for NP outputs ([`a160bff`](https://github.com/jbloomAus/SAEDashboard/commit/a160bff204b7464d2de00e3f80c255123d11171b))
-
 
 ## v0.6.4 (2024-10-24)
 
@@ -174,23 +176,31 @@ Fix/topk selection purview ([`afccd5a`](https://github.com/jbloomAus/SAEDashboar
 
 ### Unknown
 
-* Update README.md ([`8235a9e`](https://github.com/jbloomAus/SAEDashboard/commit/8235a9e3adaea50b6b9f26f575e25a254d67a135))
-
 * updated formatting/typing ([`fb141ae`](https://github.com/jbloomAus/SAEDashboard/commit/fb141ae991261408d296286bf6777b2ec5f1f319))
+
+* TopK will now select from all latents regardless of feature batch size ([`c1f0e14`](https://github.com/jbloomAus/SAEDashboard/commit/c1f0e14dda7aa3364bfd78ca2b8c04c95b2d14b3))
+
+* Update README.md ([`8235a9e`](https://github.com/jbloomAus/SAEDashboard/commit/8235a9e3adaea50b6b9f26f575e25a254d67a135))
 
 * Merge pull request #32 from jbloomAus/docs/readme-update
 
 docs: updated readme ([`b5e5480`](https://github.com/jbloomAus/SAEDashboard/commit/b5e54808ee05fc75e68d74ec319bf49826b45508))
 
-* TopK will now select from all latents regardless of feature batch size ([`c1f0e14`](https://github.com/jbloomAus/SAEDashboard/commit/c1f0e14dda7aa3364bfd78ca2b8c04c95b2d14b3))
+* Update README.md ([`a1546fd`](https://github.com/jbloomAus/SAEDashboard/commit/a1546fdef32745cdc862a5a2dd0478e57e45320d))
 
+* Removed outdated vis type ([`b0676af`](https://github.com/jbloomAus/SAEDashboard/commit/b0676afcca0845b73a54d983eaa9d72b0e9dff05))
+
+* Update README.md ([`9b8446a`](https://github.com/jbloomAus/SAEDashboard/commit/9b8446aa47f287ba80bf0ac4a39f7c77f0492990))
+
+* Updated format ([`90e4a09`](https://github.com/jbloomAus/SAEDashboard/commit/90e4a09eedd7f428b64e58d5ca2fd1cfa658b0da))
+
+* Updated readme ([`f6819a6`](https://github.com/jbloomAus/SAEDashboard/commit/f6819a6da594673cad65c9ccd3a4f67746de796d))
 
 ## v0.6.3 (2024-10-23)
 
 ### Fix
 
 * fix: update cached_activations directory to include number of prompts ([`0308cb1`](https://github.com/jbloomAus/SAEDashboard/commit/0308cb146bf2eb9cee26f03d3098511d03022485))
-
 
 ## v0.6.2 (2024-10-23)
 
@@ -202,19 +212,13 @@ docs: updated readme ([`b5e5480`](https://github.com/jbloomAus/SAEDashboard/comm
 
 * Merge branch &#39;main&#39; of https://github.com/jbloomAus/SAEDashboard ([`8f74a96`](https://github.com/jbloomAus/SAEDashboard/commit/8f74a969f48a7e0fd8de17cc983acf3886db95ef))
 
-* Fix: divide by zero, cached_activations folder name ([`1792298`](https://github.com/jbloomAus/SAEDashboard/commit/179229805ae6489d86e235240c65d26db64b5cd7))
-
-
 ## v0.6.1 (2024-10-22)
-
-### Fix
-
-* fix: update saelens to v4 ([`ef1a330`](https://github.com/jbloomAus/SAEDashboard/commit/ef1a3302d0483eddb247defab5c88816850f7f63))
 
 ### Unknown
 
-* Merge branch &#39;main&#39; of https://github.com/jbloomAus/SAEDashboard ([`508a74d`](https://github.com/jbloomAus/SAEDashboard/commit/508a74df8ff279716501e4179c501b5089a8d706))
+* Fix: divide by zero, cached_activations folder name ([`1792298`](https://github.com/jbloomAus/SAEDashboard/commit/179229805ae6489d86e235240c65d26db64b5cd7))
 
+* Merge branch &#39;main&#39; of https://github.com/jbloomAus/SAEDashboard ([`508a74d`](https://github.com/jbloomAus/SAEDashboard/commit/508a74df8ff279716501e4179c501b5089a8d706))
 
 ## v0.6.0 (2024-10-21)
 
@@ -222,17 +226,11 @@ docs: updated readme ([`b5e5480`](https://github.com/jbloomAus/SAEDashboard/comm
 
 * feat: np sae id suffix ([`448b14e`](https://github.com/jbloomAus/SAEDashboard/commit/448b14e0b3aea8ff854a5365f164b6ce5f419f0d))
 
+### Fix
+
+* fix: update saelens to v4 ([`ef1a330`](https://github.com/jbloomAus/SAEDashboard/commit/ef1a3302d0483eddb247defab5c88816850f7f63))
+
 ### Unknown
-
-* Update README.md ([`a1546fd`](https://github.com/jbloomAus/SAEDashboard/commit/a1546fdef32745cdc862a5a2dd0478e57e45320d))
-
-* Removed outdated vis type ([`b0676af`](https://github.com/jbloomAus/SAEDashboard/commit/b0676afcca0845b73a54d983eaa9d72b0e9dff05))
-
-* Update README.md ([`9b8446a`](https://github.com/jbloomAus/SAEDashboard/commit/9b8446aa47f287ba80bf0ac4a39f7c77f0492990))
-
-* Updated format ([`90e4a09`](https://github.com/jbloomAus/SAEDashboard/commit/90e4a09eedd7f428b64e58d5ca2fd1cfa658b0da))
-
-* Updated readme ([`f6819a6`](https://github.com/jbloomAus/SAEDashboard/commit/f6819a6da594673cad65c9ccd3a4f67746de796d))
 
 * Merge pull request #31 from jbloomAus/fix/reduce-mem
 
@@ -266,6 +264,10 @@ Sped up DFA calculation 60x ([`f992e3c`](https://github.com/jbloomAus/SAEDashboa
 
 Feature/np topk size arg ([`c5c1365`](https://github.com/jbloomAus/SAEDashboard/commit/c5c136576609991177d3a8924b5bf75a42b66399))
 
+* Simply updated default value for top K ([`5c855fe`](https://github.com/jbloomAus/SAEDashboard/commit/5c855fec0e58a114a537590d1400eaa42dd3610c))
+
+* Testing variable topk sizes ([`79fe14b`](https://github.com/jbloomAus/SAEDashboard/commit/79fe14b840991bd1f8ada8462aeb65d72821c4aa))
+
 * Merge pull request #25 from jbloomAus/fix/dfa-for-gqa
 
 Fix/dfa for gqa ([`85c345f`](https://github.com/jbloomAus/SAEDashboard/commit/85c345f3ad8069a59be8d495242395c50381ab01))
@@ -275,6 +277,58 @@ Fix/dfa for gqa ([`85c345f`](https://github.com/jbloomAus/SAEDashboard/commit/85
 * Removed redundant code from rebase ([`a71fb9d`](https://github.com/jbloomAus/SAEDashboard/commit/a71fb9dde6e880b0f4297277d27696c9d524d052))
 
 * fixed rebase ([`57ee280`](https://github.com/jbloomAus/SAEDashboard/commit/57ee28021efd3678bcd9d12d55e048c14a2f2d47))
+
+* Added tests for DFA for GQA ([`3b99e36`](https://github.com/jbloomAus/SAEDashboard/commit/3b99e36c74d2c61617cfed107bee3b0eb3b63294))
+
+* Removed duplicate code ([`7093773`](https://github.com/jbloomAus/SAEDashboard/commit/7093773d079cd235aea99273a1365363a5bf8b6d))
+
+* More rebasing stuff ([`59c6cd8`](https://github.com/jbloomAus/SAEDashboard/commit/59c6cd85ead287b2774aa591463d131840c7f270))
+
+* Fixed formatting ([`ed7d3b1`](https://github.com/jbloomAus/SAEDashboard/commit/ed7d3b16a99e3e3a272e73356cc0509b2c59a292))
+
+* Removed debugging statements ([`6489d1c`](https://github.com/jbloomAus/SAEDashboard/commit/6489d1c5b52ed86cb280c237c08e10238e0d0564))
+
+* more debug prints x3 ([`5ba2b8a`](https://github.com/jbloomAus/SAEDashboard/commit/5ba2b8a69f1881b901131976c7d52f142068dbd2))
+
+* more debug prints x2 ([`e124ff9`](https://github.com/jbloomAus/SAEDashboard/commit/e124ff906ec7b37083af4e4721b9e33902146e47))
+
+* more debug prints ([`e2b0c35`](https://github.com/jbloomAus/SAEDashboard/commit/e2b0c35467e5d405abd3cca664dfd1960dbba0eb))
+
+* temp print statements ([`95df55b`](https://github.com/jbloomAus/SAEDashboard/commit/95df55b29f9250f67c5b986216e587c37f72aa9e))
+
+* Lowered default threshold ([`dc1f31a`](https://github.com/jbloomAus/SAEDashboard/commit/dc1f31a55400231e46feb58a8c100f66472baa1b))
+
+* updated ignore ([`eb0d56a`](https://github.com/jbloomAus/SAEDashboard/commit/eb0d56a9f813b9cf82742093fae00bb0ccfdac45))
+
+* Reduced memory load of GQA DFA ([`05867f1`](https://github.com/jbloomAus/SAEDashboard/commit/05867f1d0c8b5f2a5b76f3ea45ab9c87eaae9c09))
+
+* DFA will now work for models with grouped query attention ([`91a5dd1`](https://github.com/jbloomAus/SAEDashboard/commit/91a5dd17a2e567efa7d8a89d228eb7de47ae6766))
+
+* Added head attr weights functionality for when DFA is use ([`03a615f`](https://github.com/jbloomAus/SAEDashboard/commit/03a615f7c70a6f6e634845dab4051874698fac5b))
+
+* Edited default chunk size ([`7d68f9e`](https://github.com/jbloomAus/SAEDashboard/commit/7d68f9e7131b8c5558e886022625dac267f20aab))
+
+* Fixed formatting ([`4d5f38b`](https://github.com/jbloomAus/SAEDashboard/commit/4d5f38beca15f2ce05c89f83eb3e955c291f9687))
+
+* Removed debugging statements and added device changes ([`76e17c9`](https://github.com/jbloomAus/SAEDashboard/commit/76e17c91a41b5df6047baa5bcfa33d253b029d29))
+
+* more debug prints x3 ([`06535d3`](https://github.com/jbloomAus/SAEDashboard/commit/06535d3df168d92ac79d2f5a14b345c757dfd9de))
+
+* more debug prints x2 ([`26e8297`](https://github.com/jbloomAus/SAEDashboard/commit/26e8297888de066f0097e3b73245eb149bfb327f))
+
+* more debug prints ([`9ded356`](https://github.com/jbloomAus/SAEDashboard/commit/9ded356ea8c3c5dd841bf5a45ea65ae8c67935f5))
+
+* temp print statements ([`024ad57`](https://github.com/jbloomAus/SAEDashboard/commit/024ad578b65b8f3592b42b66dc6a56aeae2a3116))
+
+* Lowered default threshold ([`a3b5977`](https://github.com/jbloomAus/SAEDashboard/commit/a3b5977c0f1bb7a865f7349304a5dd8092f7c2e8))
+
+* updated ignore ([`d5d325a`](https://github.com/jbloomAus/SAEDashboard/commit/d5d325a63b3b26b890c2bab512f2a8473bdc926a))
+
+* Reduced memory load of GQA DFA ([`93eb1a9`](https://github.com/jbloomAus/SAEDashboard/commit/93eb1a9a92320d9f4645b500e22a566135918e3d))
+
+* DFA will now work for models with grouped query attention ([`6594155`](https://github.com/jbloomAus/SAEDashboard/commit/65941559bac03a3e4fb128d5327033e01f19c18d))
+
+* Added head attr weights functionality for when DFA is use ([`9312d90`](https://github.com/jbloomAus/SAEDashboard/commit/9312d901bf17e14400199c86e0284be6c750162a))
 
 * Added tests for DFA for GQA ([`fcfac37`](https://github.com/jbloomAus/SAEDashboard/commit/fcfac37e148461e585f38fddf868ad2a32d908a8))
 
@@ -322,12 +376,6 @@ Fix/dfa for gqa ([`85c345f`](https://github.com/jbloomAus/SAEDashboard/commit/85
 
 * Added head attr weights functionality for when DFA is use ([`234ea32`](https://github.com/jbloomAus/SAEDashboard/commit/234ea3211ce7dbf84d101c4e8bfe844c3903b16a))
 
-* Added tests for DFA for GQA ([`3b99e36`](https://github.com/jbloomAus/SAEDashboard/commit/3b99e36c74d2c61617cfed107bee3b0eb3b63294))
-
-* Simply updated default value for top K ([`5c855fe`](https://github.com/jbloomAus/SAEDashboard/commit/5c855fec0e58a114a537590d1400eaa42dd3610c))
-
-* Testing variable topk sizes ([`79fe14b`](https://github.com/jbloomAus/SAEDashboard/commit/79fe14b840991bd1f8ada8462aeb65d72821c4aa))
-
 * Merge pull request #27 from jbloomAus/fix/resolve-duplication
 
 Removed sources of duplicate sequences ([`525bffe`](https://github.com/jbloomAus/SAEDashboard/commit/525bffee516a630c4b4f033d3971fad8c6dd5a74))
@@ -340,35 +388,6 @@ Removed sources of duplicate sequences ([`525bffe`](https://github.com/jbloomAus
 
 * Removed sources of duplicate sequences ([`853306c`](https://github.com/jbloomAus/SAEDashboard/commit/853306c4e08d9ec95674fdc5c87f807019055d0d))
 
-* Removed duplicate code ([`7093773`](https://github.com/jbloomAus/SAEDashboard/commit/7093773d079cd235aea99273a1365363a5bf8b6d))
-
-* More rebasing stuff ([`59c6cd8`](https://github.com/jbloomAus/SAEDashboard/commit/59c6cd85ead287b2774aa591463d131840c7f270))
-
-* Edited default chunk size ([`7d68f9e`](https://github.com/jbloomAus/SAEDashboard/commit/7d68f9e7131b8c5558e886022625dac267f20aab))
-
-* Fixed formatting ([`4d5f38b`](https://github.com/jbloomAus/SAEDashboard/commit/4d5f38beca15f2ce05c89f83eb3e955c291f9687))
-
-* Removed debugging statements and added device changes ([`76e17c9`](https://github.com/jbloomAus/SAEDashboard/commit/76e17c91a41b5df6047baa5bcfa33d253b029d29))
-
-* more debug prints x3 ([`06535d3`](https://github.com/jbloomAus/SAEDashboard/commit/06535d3df168d92ac79d2f5a14b345c757dfd9de))
-
-* more debug prints x2 ([`26e8297`](https://github.com/jbloomAus/SAEDashboard/commit/26e8297888de066f0097e3b73245eb149bfb327f))
-
-* more debug prints ([`9ded356`](https://github.com/jbloomAus/SAEDashboard/commit/9ded356ea8c3c5dd841bf5a45ea65ae8c67935f5))
-
-* temp print statements ([`024ad57`](https://github.com/jbloomAus/SAEDashboard/commit/024ad578b65b8f3592b42b66dc6a56aeae2a3116))
-
-* Lowered default threshold ([`a3b5977`](https://github.com/jbloomAus/SAEDashboard/commit/a3b5977c0f1bb7a865f7349304a5dd8092f7c2e8))
-
-* updated ignore ([`d5d325a`](https://github.com/jbloomAus/SAEDashboard/commit/d5d325a63b3b26b890c2bab512f2a8473bdc926a))
-
-* Reduced memory load of GQA DFA ([`93eb1a9`](https://github.com/jbloomAus/SAEDashboard/commit/93eb1a9a92320d9f4645b500e22a566135918e3d))
-
-* DFA will now work for models with grouped query attention ([`6594155`](https://github.com/jbloomAus/SAEDashboard/commit/65941559bac03a3e4fb128d5327033e01f19c18d))
-
-* Added head attr weights functionality for when DFA is use ([`9312d90`](https://github.com/jbloomAus/SAEDashboard/commit/9312d901bf17e14400199c86e0284be6c750162a))
-
-
 ## v0.5.1 (2024-08-27)
 
 ### Fix
@@ -378,31 +397,6 @@ Removed sources of duplicate sequences ([`525bffe`](https://github.com/jbloomAus
 fix: handle multiple tlens devices ([`ed1e967`](https://github.com/jbloomAus/SAEDashboard/commit/ed1e967d44b887f4b99d2257934ca920d5c6a508))
 
 * fix: handle multiple tlens devices ([`ba5368f`](https://github.com/jbloomAus/SAEDashboard/commit/ba5368f9999f08332c153816ba5836f8a1eb9ba1))
-
-### Unknown
-
-* Fixed formatting ([`ed7d3b1`](https://github.com/jbloomAus/SAEDashboard/commit/ed7d3b16a99e3e3a272e73356cc0509b2c59a292))
-
-* Removed debugging statements ([`6489d1c`](https://github.com/jbloomAus/SAEDashboard/commit/6489d1c5b52ed86cb280c237c08e10238e0d0564))
-
-* more debug prints x3 ([`5ba2b8a`](https://github.com/jbloomAus/SAEDashboard/commit/5ba2b8a69f1881b901131976c7d52f142068dbd2))
-
-* more debug prints x2 ([`e124ff9`](https://github.com/jbloomAus/SAEDashboard/commit/e124ff906ec7b37083af4e4721b9e33902146e47))
-
-* more debug prints ([`e2b0c35`](https://github.com/jbloomAus/SAEDashboard/commit/e2b0c35467e5d405abd3cca664dfd1960dbba0eb))
-
-* temp print statements ([`95df55b`](https://github.com/jbloomAus/SAEDashboard/commit/95df55b29f9250f67c5b986216e587c37f72aa9e))
-
-* Lowered default threshold ([`dc1f31a`](https://github.com/jbloomAus/SAEDashboard/commit/dc1f31a55400231e46feb58a8c100f66472baa1b))
-
-* updated ignore ([`eb0d56a`](https://github.com/jbloomAus/SAEDashboard/commit/eb0d56a9f813b9cf82742093fae00bb0ccfdac45))
-
-* Reduced memory load of GQA DFA ([`05867f1`](https://github.com/jbloomAus/SAEDashboard/commit/05867f1d0c8b5f2a5b76f3ea45ab9c87eaae9c09))
-
-* DFA will now work for models with grouped query attention ([`91a5dd1`](https://github.com/jbloomAus/SAEDashboard/commit/91a5dd17a2e567efa7d8a89d228eb7de47ae6766))
-
-* Added head attr weights functionality for when DFA is use ([`03a615f`](https://github.com/jbloomAus/SAEDashboard/commit/03a615f7c70a6f6e634845dab4051874698fac5b))
-
 
 ## v0.5.0 (2024-08-25)
 
@@ -420,7 +414,6 @@ Refactor/accelerate caching ([`6027d0a`](https://github.com/jbloomAus/SAEDashboa
 
 * Increased cache loading speed ([`83fe5f4`](https://github.com/jbloomAus/SAEDashboard/commit/83fe5f4bdf1252d533f203bc3f53ea9f71880ab8))
 
-
 ## v0.4.0 (2024-08-22)
 
 ### Feature
@@ -431,11 +424,11 @@ JSON writer has been refactored for reusability and readability ([`664f487`](htt
 
 ### Unknown
 
+* Refactored JSON creation from the neuronpedia runner ([`d6bb24b`](https://github.com/jbloomAus/SAEDashboard/commit/d6bb24b6d773874d8e99be4d84402d559741907b))
+
 * Merge pull request #20 from jbloomAus/feature/dfa
 
 SAEVisRunner DFA Implementation ([`926ea87`](https://github.com/jbloomAus/SAEDashboard/commit/926ea87dd344548489201f68cc92b33662430813))
-
-* Refactored JSON creation from the neuronpedia runner ([`d6bb24b`](https://github.com/jbloomAus/SAEDashboard/commit/d6bb24b6d773874d8e99be4d84402d559741907b))
 
 * Update ci.yaml ([`4b2807d`](https://github.com/jbloomAus/SAEDashboard/commit/4b2807dd865904120d236b355c0ccb1680c2919e))
 
@@ -471,7 +464,6 @@ Removed precision reduction option ([`a5f8df1`](https://github.com/jbloomAus/SAE
 
 * Removed precision reduction option ([`cd03ffb`](https://github.com/jbloomAus/SAEDashboard/commit/cd03ffb182e93a42480c01408b47ebae94d4c349))
 
-
 ## v0.3.0 (2024-08-15)
 
 ### Feature
@@ -484,11 +476,11 @@ Removed precision reduction option ([`a5f8df1`](https://github.com/jbloomAus/SAE
 
 Removed all encoder B code ([`67c9c3f`](https://github.com/jbloomAus/SAEDashboard/commit/67c9c3fdc8bd220938f65c1f97214034cc7528b4))
 
+* Removed all encoder B code ([`5174e2e`](https://github.com/jbloomAus/SAEDashboard/commit/5174e2e161030dc756c148f1740e50c52baf6a91))
+
 * Merge pull request #18 from jbloomAus/feat-seperate-files-per-html-dashboard
 
 feat: seperate files per dashboard html ([`8ff69ba`](https://github.com/jbloomAus/SAEDashboard/commit/8ff69ba207692d4acb8d5fc19d038090067690df))
-
-* Removed all encoder B code ([`5174e2e`](https://github.com/jbloomAus/SAEDashboard/commit/5174e2e161030dc756c148f1740e50c52baf6a91))
 
 * Merge pull request #16 from jbloomAus/performance_refactor
 
@@ -544,7 +536,6 @@ Use sae lens loading ([`89bba3e`](https://github.com/jbloomAus/SAEDashboard/comm
 
 * first step towards sae_lens remote loading ([`415a2d1`](https://github.com/jbloomAus/SAEDashboard/commit/415a2d1e484e9ea2351bf98de221f6a83a805107))
 
-
 ## v0.2.3 (2024-08-06)
 
 ### Fix
@@ -582,7 +573,6 @@ fix: neuronpedia uses api_key for uploading features, and update sae_id -&gt; sa
 * Better support for huggingface dataset path ([`3dc4b78`](https://github.com/jbloomAus/SAEDashboard/commit/3dc4b783a1ced7b938ab45c4d10effedd148a829))
 
 * Docker tweak ([`a1a70cb`](https://github.com/jbloomAus/SAEDashboard/commit/a1a70cb28c726887de9439024b7b1d01082d3932))
-
 
 ## v0.2.2 (2024-07-12)
 
@@ -650,7 +640,6 @@ feat: performance improvement ([`f98b3dc`](https://github.com/jbloomAus/SAEDashb
 
 * add isort ([`3ab0fda`](https://github.com/jbloomAus/SAEDashboard/commit/3ab0fdaf75f735ec2eedc904529909111d0db0de))
 
-
 ## v0.2.1 (2024-07-08)
 
 ### Fix
@@ -699,13 +688,11 @@ feat: Multiple devices ([`535e6c9`](https://github.com/jbloomAus/SAEDashboard/co
 
 * multi-gpu-support ([`5e24e4e`](https://github.com/jbloomAus/SAEDashboard/commit/5e24e4e6598dd7943f8d677042dcf84bc6f7a0a6))
 
-
 ## v0.2.0 (2024-06-10)
 
 ### Feature
 
 * feat: experimental release 2 ([`e264f97`](https://github.com/jbloomAus/SAEDashboard/commit/e264f97d90299f6ade294db8ed03aed9cd7491ee))
-
 
 ## v0.1.0 (2024-06-10)
 
@@ -833,7 +820,6 @@ feat: Multiple devices ([`535e6c9`](https://github.com/jbloomAus/SAEDashboard/co
 
 * commit current demo html ([`00a03a0`](https://github.com/jbloomAus/SAEDashboard/commit/00a03a02fbf181caa55704defac25578b4444452))
 
-
 ## v0.0.1 (2024-04-25)
 
 ### Chore
@@ -862,25 +848,21 @@ Remove dependency on saelens from pyproject, add to demo.ipynb ([`147d87e`](http
 
 * Merge branch &#39;main&#39; of https://github.com/callummcdougall/sae_vis ([`4e7a24c`](https://github.com/jbloomAus/SAEDashboard/commit/4e7a24c37444f11d718035eede68ac728d949a20))
 
-* fix conflicts ([`ea3d624`](https://github.com/jbloomAus/SAEDashboard/commit/ea3d624013b9aa7cbd2d6eaa7212a1f7c4ee8e28))
-
 * Merge pull request #41 from callummcdougall/allow_disable_buffer
 
 oops I forgot to switch back to main before pushing ([`1312cd0`](https://github.com/jbloomAus/SAEDashboard/commit/1312cd09d6e274b1163e79d2ac01f2df54c65157))
 
 * Merge branch &#39;main&#39; into allow_disable_buffer ([`e7edf5a`](https://github.com/jbloomAus/SAEDashboard/commit/e7edf5a9bae4714bf4983ce6a19a0fe6fdf1f118))
 
-* 16 ([`64e7018`](https://github.com/jbloomAus/SAEDashboard/commit/64e701849570d9e172dc065812c9a3e7149a9176))
-
 * Merge pull request #40 from chanind/semantic-release-autodeploy
 
 chore: setting up semantic-release for auto-deploy ([`a4d44d1`](https://github.com/jbloomAus/SAEDashboard/commit/a4d44d1a0e86055fb82ef41f51f0adbb7868df3c))
 
-* version 0.2.16 ([`afca0be`](https://github.com/jbloomAus/SAEDashboard/commit/afca0be8826e0c007b5730fa9fa18454699d16a3))
-
 * Merge pull request #38 from chanind/type-checking
 
 Enabling type checking with Pyright ([`f1fd792`](https://github.com/jbloomAus/SAEDashboard/commit/f1fd7926f46f00dca46024377f53aa8f2db98773))
+
+* enabling type checking with Pyright ([`05d14ea`](https://github.com/jbloomAus/SAEDashboard/commit/05d14eafea707d3db81e78b4be87199087cb8e37))
 
 * Merge pull request #39 from callummcdougall/fix_loading_saelens_sae
 
@@ -890,13 +872,9 @@ FIX: SAELens new format has &#34;scaling_factor&#34; key, which causes assert to
 
 * Merge branch &#39;main&#39; into fix_loading_saelens_sae ([`21b0086`](https://github.com/jbloomAus/SAEDashboard/commit/21b0086b8af3603441795e925a15e7cded122acb))
 
-* Allow SAELens autoencoder keys to be superset of required keys, instead of exact match ([`6852170`](https://github.com/jbloomAus/SAEDashboard/commit/6852170d55e7d3cf22632c5807cfab219516da98))
-
-* enabling type checking with Pyright ([`05d14ea`](https://github.com/jbloomAus/SAEDashboard/commit/05d14eafea707d3db81e78b4be87199087cb8e37))
-
-* Fix version ([`5a43916`](https://github.com/jbloomAus/SAEDashboard/commit/5a43916cbd9836396f051f7a258fdca8664e05e9))
-
 * format ([`8f1506b`](https://github.com/jbloomAus/SAEDashboard/commit/8f1506b6eb7dc0a2d4437d2aa23a0898c46a156d))
+
+* Allow SAELens autoencoder keys to be superset of required keys, instead of exact match ([`6852170`](https://github.com/jbloomAus/SAEDashboard/commit/6852170d55e7d3cf22632c5807cfab219516da98))
 
 * v0.2.17 ([`2bb14da`](https://github.com/jbloomAus/SAEDashboard/commit/2bb14daa88a0af601e13f4e51b50a2b00cd75b48))
 
@@ -908,13 +886,23 @@ FIX: SAELens new format has &#34;scaling_factor&#34; key, which causes assert to
 
 FEATURE: Allow setting buffer to None, which gives the whole activation sequence ([`f5f9594`](https://github.com/jbloomAus/SAEDashboard/commit/f5f9594fcaf5edb6036a85446e092278004ea200))
 
+* 16 ([`64e7018`](https://github.com/jbloomAus/SAEDashboard/commit/64e701849570d9e172dc065812c9a3e7149a9176))
+
+* version 0.2.16 ([`afca0be`](https://github.com/jbloomAus/SAEDashboard/commit/afca0be8826e0c007b5730fa9fa18454699d16a3))
+
+* Fix version ([`5a43916`](https://github.com/jbloomAus/SAEDashboard/commit/5a43916cbd9836396f051f7a258fdca8664e05e9))
+
 * fix all indices view ([`5f87d52`](https://github.com/jbloomAus/SAEDashboard/commit/5f87d52154d6a8e8c8984836bbe8f85ee25f279d))
+
+* Merge branch &#39;fix_gpt2_demo&#39; into allow_disable_buffer ([`ea57bfc`](https://github.com/jbloomAus/SAEDashboard/commit/ea57bfc2ee1e23666810982abf32e6e9cbb74193))
+
+* Allow disabling the buffer ([`c1be9f8`](https://github.com/jbloomAus/SAEDashboard/commit/c1be9f8e4b8ee6d8f18c4a1a0445840304440c1d))
+
+* fix conflicts ([`ea3d624`](https://github.com/jbloomAus/SAEDashboard/commit/ea3d624013b9aa7cbd2d6eaa7212a1f7c4ee8e28))
 
 * Merge pull request #35 from callummcdougall/fix_gpt2_demo
 
 Fix usage of SAELens and demo notebook ([`88b5933`](https://github.com/jbloomAus/SAEDashboard/commit/88b59338d3cadbd5c70f0c1117dff00f01a54e6a))
-
-* Merge branch &#39;fix_gpt2_demo&#39; into allow_disable_buffer ([`ea57bfc`](https://github.com/jbloomAus/SAEDashboard/commit/ea57bfc2ee1e23666810982abf32e6e9cbb74193))
 
 * Import updated SAELens, use correct tokens, fix missing file cfg.json file error. ([`14ba9b0`](https://github.com/jbloomAus/SAEDashboard/commit/14ba9b03d4ce791ba8f4cac553fb82a93c47dfb8))
 
@@ -932,8 +920,6 @@ Setting up poetry / ruff / github actions ([`287f30f`](https://github.com/jbloom
 
 * fix feature vis demo gpt ([`821781e`](https://github.com/jbloomAus/SAEDashboard/commit/821781e96b732a5909d8735714482c965891b2ea))
 
-* Allow disabling the buffer ([`c1be9f8`](https://github.com/jbloomAus/SAEDashboard/commit/c1be9f8e4b8ee6d8f18c4a1a0445840304440c1d))
-
 * add scatter plot support ([`6eab28b`](https://github.com/jbloomAus/SAEDashboard/commit/6eab28bef9ef5cd9360fef73e02763301fa1a028))
 
 * update setup ([`8d2ca53`](https://github.com/jbloomAus/SAEDashboard/commit/8d2ca53e8a6bba860fe71368741d06a718adaa27))
@@ -942,23 +928,23 @@ Setting up poetry / ruff / github actions ([`287f30f`](https://github.com/jbloom
 
 * Merge branch &#39;main&#39; of https://github.com/callummcdougall/sae_vis ([`ed8f8cb`](https://github.com/jbloomAus/SAEDashboard/commit/ed8f8cb7ad1fba2383dcdd471c33ce4a1b9f32e3))
 
-* fix sae bug ([`247d14b`](https://github.com/jbloomAus/SAEDashboard/commit/247d14b55f209ed9ccf50e5ce091ed66ffbf19d2))
-
 * Merge pull request #27 from wllgrnt/will-add-eindex-dependency
 
 Update setup.py with eindex dependency ([`8d7ed12`](https://github.com/jbloomAus/SAEDashboard/commit/8d7ed123505ac7ecf93dd310f57888547aead1d7))
-
-* Merge pull request #32 from hijohnnylin/pin_older_sae_training
-
-Demo notebook errors under &#34;Multi-layer models&#34; vis ([`9ac1dac`](https://github.com/jbloomAus/SAEDashboard/commit/9ac1dac51af32909666977cb5b3794965c70f62f))
-
-* Pin older commit of mats_sae_training ([`8ca7ac1`](https://github.com/jbloomAus/SAEDashboard/commit/8ca7ac14b919fedb91240630ac7072cac40a6d6a))
 
 * two more deps ([`7f231a8`](https://github.com/jbloomAus/SAEDashboard/commit/7f231a83acfef2494c1866249f57e10c21a1a443))
 
 * Update setup.py with eindex
 
 Without this, &#39;pip install sae-vis&#39; will cause errors when e.g. you do &#39;from sae_vis.data_fetching_fns import get_feature_data&#39; ([`a9d7de9`](https://github.com/jbloomAus/SAEDashboard/commit/a9d7de90b492f7305758e15303ba890fb9b503d0))
+
+* fix sae bug ([`247d14b`](https://github.com/jbloomAus/SAEDashboard/commit/247d14b55f209ed9ccf50e5ce091ed66ffbf19d2))
+
+* Merge pull request #32 from hijohnnylin/pin_older_sae_training
+
+Demo notebook errors under &#34;Multi-layer models&#34; vis ([`9ac1dac`](https://github.com/jbloomAus/SAEDashboard/commit/9ac1dac51af32909666977cb5b3794965c70f62f))
+
+* Pin older commit of mats_sae_training ([`8ca7ac1`](https://github.com/jbloomAus/SAEDashboard/commit/8ca7ac14b919fedb91240630ac7072cac40a6d6a))
 
 * update version number ([`72e584b`](https://github.com/jbloomAus/SAEDashboard/commit/72e584b6492ed1ef3989968f6588a17fca758650))
 
@@ -988,13 +974,13 @@ Update and add some HTML_ANOMALIES ([`1874a47`](https://github.com/jbloomAus/SAE
 
 * Merge branch &#39;main&#39; of https://github.com/callummcdougall/sae_vis ([`ca5efcd`](https://github.com/jbloomAus/SAEDashboard/commit/ca5efcdc81074d3c3002bd997b35e326a44a4a25))
 
-* re-fix html anomalies ([`2fbae4c`](https://github.com/jbloomAus/SAEDashboard/commit/2fbae4c9a7dd663737bae25e73e978d40c59064a))
-
 * Merge pull request #24 from chanind/fix-pypi-repo-link
 
 fixing repo URL in setup.py ([`14a0be5`](https://github.com/jbloomAus/SAEDashboard/commit/14a0be54a57b1bc73ac4741611f9c8d1bd229e6f))
 
 * fixing repo URL in setup.py ([`4faeca5`](https://github.com/jbloomAus/SAEDashboard/commit/4faeca5da06c0bb4384e202a91d895a217365d30))
+
+* re-fix html anomalies ([`2fbae4c`](https://github.com/jbloomAus/SAEDashboard/commit/2fbae4c9a7dd663737bae25e73e978d40c59064a))
 
 * fix hook point bug ([`9b573b2`](https://github.com/jbloomAus/SAEDashboard/commit/9b573b27590db1cbd6c8ef08fca7ff8c9d26b340))
 
@@ -1016,13 +1002,13 @@ supporting mlp and attn out hooks ([`1c5463b`](https://github.com/jbloomAus/SAED
 
 * Merge branch &#39;main&#39; of https://github.com/callummcdougall/sae_vis ([`083aeba`](https://github.com/jbloomAus/SAEDashboard/commit/083aeba0e4048d9976ec5cbee8df7dc8fd4db4e9))
 
-* fix variable naming ([`2507918`](https://github.com/jbloomAus/SAEDashboard/commit/25079186b3f31d2271b1ecdb11f26904af7146d2))
-
 * Merge pull request #18 from chanind/remove-build-artifacts
 
 removing Python build artifacts and adding to .gitignore ([`b0e0594`](https://github.com/jbloomAus/SAEDashboard/commit/b0e0594590b4472b34052c6eb3ebceb6c9f58a11))
 
 * removing Python build artifacts and adding to .gitignore ([`b6486f5`](https://github.com/jbloomAus/SAEDashboard/commit/b6486f56bea9d4bb7544c36afe70e6f891101b63))
+
+* fix variable naming ([`2507918`](https://github.com/jbloomAus/SAEDashboard/commit/25079186b3f31d2271b1ecdb11f26904af7146d2))
 
 * update readme ([`0ee3608`](https://github.com/jbloomAus/SAEDashboard/commit/0ee3608af396a1a6586dfb809f2f6480bb4f6390))
 
@@ -1036,11 +1022,11 @@ removing Python build artifacts and adding to .gitignore ([`b0e0594`](https://gi
 
 Added SAE class agnostic functions ([`0039c6f`](https://github.com/jbloomAus/SAEDashboard/commit/0039c6f8f99d6e8a1b2ff56aa85f60a3eba3afb0))
 
-* add to pypi ([`02a5b9a`](https://github.com/jbloomAus/SAEDashboard/commit/02a5b9acd15433cc59d438271b9bd5e12d62b662))
-
 * Added sae class agnostic functions
 
 Added parse_feature_data() and parse_prompt_data() ([`e2709d0`](https://github.com/jbloomAus/SAEDashboard/commit/e2709d0b4c55d73d6026f3b9ce534f59ce61f344))
+
+* add to pypi ([`02a5b9a`](https://github.com/jbloomAus/SAEDashboard/commit/02a5b9acd15433cc59d438271b9bd5e12d62b662))
 
 * update notebook images ([`b87ad4d`](https://github.com/jbloomAus/SAEDashboard/commit/b87ad4d256f12c23605b0e7db307ee56913c93ef))
 
@@ -1092,13 +1078,19 @@ Compatibility with TransformerLens models ([`8d59c6c`](https://github.com/jbloom
 
 Added support for residual-adjacent SAEs ([`b02e98b`](https://github.com/jbloomAus/SAEDashboard/commit/b02e98b3b852c0613a890f8949d04b5560fb6fd6))
 
+* Added support for residual-adjacent SAEs ([`89aacf1`](https://github.com/jbloomAus/SAEDashboard/commit/89aacf1b22aa81b393b10eca8611c9dbf406c638))
+
 * Merge pull request #7 from lucyfarnik/fix-histogram-div-zero
 
 Fixed division by zero in histogram calculation ([`3aee20e`](https://github.com/jbloomAus/SAEDashboard/commit/3aee20ea7f99cc07e6c5085fddb70cadd8327f4d))
 
+* Fixed division by zero in histogram calculation ([`e986e90`](https://github.com/jbloomAus/SAEDashboard/commit/e986e907cc42790efc93ce75ebf7b28a0278aaa2))
+
 * Merge pull request #6 from lucyfarnik/handling-dead-features
 
 Edge case handling for dead features ([`9e43c30`](https://github.com/jbloomAus/SAEDashboard/commit/9e43c308e58769828234e1505f1c1102ba651dfd))
+
+* Edge case handling for dead features ([`5197aee`](https://github.com/jbloomAus/SAEDashboard/commit/5197aee2c9f92bce7c5fd6d22201152a68c2e6ca))
 
 * add features argument ([`f24ef7e`](https://github.com/jbloomAus/SAEDashboard/commit/f24ef7ebebb3d4fd92e299858dbd5b968b78c69e))
 
@@ -1108,19 +1100,13 @@ Edge case handling for dead features ([`9e43c30`](https://github.com/jbloomAus/S
 
 Fixed readme links pointing to the old colab ([`86f8e20`](https://github.com/jbloomAus/SAEDashboard/commit/86f8e2012e376b6c498e5e708324f812af6fbc98))
 
-* Fixed division by zero in histogram calculation ([`e986e90`](https://github.com/jbloomAus/SAEDashboard/commit/e986e907cc42790efc93ce75ebf7b28a0278aaa2))
-
-* Added readme section about models ([`7523e7f`](https://github.com/jbloomAus/SAEDashboard/commit/7523e7f6363e030196496b3c6a3dc70b234c2d9a))
-
 * Fixed readme links pointing to the old colab ([`28ef1cb`](https://github.com/jbloomAus/SAEDashboard/commit/28ef1cbd1b91f6c09c842f48e1f997d189ca04e7))
 
-* Edge case handling for dead features ([`5197aee`](https://github.com/jbloomAus/SAEDashboard/commit/5197aee2c9f92bce7c5fd6d22201152a68c2e6ca))
+* Added readme section about models ([`7523e7f`](https://github.com/jbloomAus/SAEDashboard/commit/7523e7f6363e030196496b3c6a3dc70b234c2d9a))
 
 * Compatibility with TransformerLens models ([`ba708e9`](https://github.com/jbloomAus/SAEDashboard/commit/ba708e987be6cc7a09d34ea8fb83de009312684d))
 
 * Added support for MPS ([`196c0a2`](https://github.com/jbloomAus/SAEDashboard/commit/196c0a24d0e8277b327eb2d57662075f9106990b))
-
-* Added support for residual-adjacent SAEs ([`89aacf1`](https://github.com/jbloomAus/SAEDashboard/commit/89aacf1b22aa81b393b10eca8611c9dbf406c638))
 
 * black font ([`d81e74d`](https://github.com/jbloomAus/SAEDashboard/commit/d81e74d575326ef786881fb9182a768f9de2cb70))
 
