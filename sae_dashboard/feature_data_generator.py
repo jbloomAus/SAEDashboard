@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import einops
 import numpy as np
@@ -7,7 +7,7 @@ import torch
 from jaxtyping import Float, Int
 from sae_lens import SAE
 from sae_lens.config import DTYPE_MAP as DTYPES
-from sae_lens.sae import TopK
+from sae_lens.saes.topk_sae import TopK
 from torch import Tensor, nn
 from tqdm.auto import tqdm
 
@@ -28,7 +28,7 @@ class FeatureDataGenerator:
         cfg: SaeVisConfig,
         tokens: Int[Tensor, "batch seq"],
         model: TransformerLensWrapper,
-        encoder: SAE,
+        encoder: SAE[Any],
     ):
         self.cfg = cfg
         self.model = model
@@ -228,7 +228,7 @@ def load_tensor_dict_torch(filename: Path, device: str) -> Dict[str, torch.Tenso
 
 
 class FeatureMaskingContext:
-    def __init__(self, sae: SAE, feature_idxs: List[int]):
+    def __init__(self, sae: SAE[Any], feature_idxs: List[int]):
         self.sae = sae
         self.feature_idxs = feature_idxs
         self.original_weight = {}
@@ -249,18 +249,24 @@ class FeatureMaskingContext:
         # set the weight
         setattr(self.sae, "W_enc", nn.Parameter(masked_weight))
 
-        if self.sae.cfg.architecture == "standard":
+        if self.sae.cfg.architecture() == "standard":
             ## b_enc
             self.original_weight["b_enc"] = getattr(self.sae, "b_enc").data.clone()
             # mask the weight
+            assert isinstance(
+                self.sae.b_enc, nn.Parameter
+            )  # get pyright checks to pass
             masked_weight = self.sae.b_enc[self.feature_idxs]
             # set the weight
             setattr(self.sae, "b_enc", nn.Parameter(masked_weight))
 
-        elif self.sae.cfg.architecture == "jumprelu":
+        elif self.sae.cfg.architecture() == "jumprelu":
             ## b_enc
             self.original_weight["b_enc"] = getattr(self.sae, "b_enc").data.clone()
             # mask the weight
+            assert isinstance(
+                self.sae.b_enc, nn.Parameter
+            )  # get pyright checks to pass
             masked_weight = self.sae.b_enc[self.feature_idxs]
             # set the weight
             setattr(self.sae, "b_enc", nn.Parameter(masked_weight))
@@ -270,14 +276,20 @@ class FeatureMaskingContext:
                 self.sae, "threshold"
             ).data.clone()
             # mask the weight
+            assert isinstance(
+                self.sae.threshold, nn.Parameter
+            )  # get pyright checks to pass
             masked_weight = self.sae.threshold[self.feature_idxs]
             # set the weight
             setattr(self.sae, "threshold", nn.Parameter(masked_weight))
 
-        elif self.sae.cfg.architecture == "gated":
+        elif self.sae.cfg.architecture() == "gated":
             ## b_gate
             self.original_weight["b_gate"] = getattr(self.sae, "b_gate").data.clone()
             # mask the weight
+            assert isinstance(
+                self.sae.b_gate, nn.Parameter
+            )  # get pyright checks to pass
             masked_weight = self.sae.b_gate[self.feature_idxs]
             # set the weight
             setattr(self.sae, "b_gate", nn.Parameter(masked_weight))
@@ -285,6 +297,9 @@ class FeatureMaskingContext:
             ## r_mag
             self.original_weight["r_mag"] = getattr(self.sae, "r_mag").data.clone()
             # mask the weight
+            assert isinstance(
+                self.sae.r_mag, nn.Parameter
+            )  # get pyright checks to pass
             masked_weight = self.sae.r_mag[self.feature_idxs]
             # set the weight
             setattr(self.sae, "r_mag", nn.Parameter(masked_weight))
@@ -292,6 +307,9 @@ class FeatureMaskingContext:
             ## b_mag
             self.original_weight["b_mag"] = getattr(self.sae, "b_mag").data.clone()
             # mask the weight
+            assert isinstance(
+                self.sae.b_mag, nn.Parameter
+            )  # get pyright checks to pass
             masked_weight = self.sae.b_mag[self.feature_idxs]
             # set the weight
             setattr(self.sae, "b_mag", nn.Parameter(masked_weight))

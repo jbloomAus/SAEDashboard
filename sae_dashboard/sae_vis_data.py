@@ -144,7 +144,7 @@ class SaeVisData:
     feature_stats: FeatureStatistics = field(default_factory=FeatureStatistics)
 
     model: HookedTransformer | None = None
-    encoder: SAE | None = None
+    encoder: SAE[Any] | None = None
 
     def update(self, other: "SaeVisData") -> None:
         """
@@ -179,7 +179,7 @@ class SaeVisData:
         filename: str | Path,
         cfg: SaeVisConfig,
         model: HookedTransformer,
-        encoder: SAE,
+        encoder: SAE[Any],
     ) -> "SaeVisData":
         """
         Loads an SaeVisData instance from JSON file. The config, model & encoder arguments must be user-supplied.

@@ -156,7 +156,6 @@ class NeuronpediaVectorRunner:
             dataset=self.cfg.huggingface_dataset_path,
             streaming=True,
             hook_name=self.vector_set.hook_point,
-            hook_layer=self.vector_set.hook_layer,
             hook_head_index=self.vector_set.hook_head_index,
             context_size=self.cfg.n_tokens_in_prompt,
             d_in=self.vector_set.cfg.d_in,

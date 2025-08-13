@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 from jaxtyping import Int
@@ -68,7 +69,7 @@ def cfg(request: pytest.FixtureRequest, cache_path: Path) -> SaeVisConfig:
 def sae_vis_data(
     cfg: SaeVisConfig,
     model: HookedTransformer,
-    autoencoder: SAE,
+    autoencoder: SAE[Any],
     tokens: Int[Tensor, "batch seq"],
 ) -> SaeVisData:
     autoencoder.cfg.device = TEST_DEVICE
@@ -80,7 +81,7 @@ def sae_vis_data(
 def test_SaeVisData_create_results_look_reasonable(
     tokens: Int[Tensor, "batch seq"],
     model: HookedTransformer,
-    autoencoder: SAE,
+    autoencoder: SAE[Any],
     cfg: SaeVisConfig,
 ):
     sae_vis_data = SaeVisRunner(cfg).run(

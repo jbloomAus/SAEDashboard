@@ -10,7 +10,7 @@ from transformer_lens import ActivationCache, HookedTransformer
 class DFACalculator:
     """Calculate DFA values for a given layer and set of feature indices."""
 
-    def __init__(self, model: HookedTransformer, sae: SAE):
+    def __init__(self, model: HookedTransformer, sae: SAE[Any]):
         self.model = model
         self.sae = sae
         if (
