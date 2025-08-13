@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, List, Optional
 
 import numpy as np
@@ -35,27 +35,15 @@ def equalish(a: Any, b: Any, tol: float = EQUAL_VALUE_TOLERANCE):
 
 @dataclass
 class NeuronpediaDashboardActivation:
-    def __init__(
-        self,
-        bin_min: float = 0,
-        bin_max: float = 0,
-        bin_contains: float = 0,
-        tokens: list[str] = [],
-        values: list[float] = [],
-        qualifying_token_index: int = 0,
-        dfa_values: Optional[List[float]] = None,
-        dfa_maxValue: Optional[float] = None,
-        dfa_targetIndex: Optional[int] = None,
-    ):
-        self.bin_min = bin_min
-        self.bin_max = bin_max
-        self.bin_contains = bin_contains
-        self.tokens = tokens
-        self.values = values
-        self.qualifying_token_index = qualifying_token_index
-        self.dfa_values = dfa_values
-        self.dfa_maxValue = dfa_maxValue
-        self.dfa_targetIndex = dfa_targetIndex
+    bin_min: float = 0
+    bin_max: float = 0
+    bin_contains: float = 0
+    tokens: list[str] = field(default_factory=list)
+    values: list[float] = field(default_factory=list)
+    qualifying_token_index: int = 0
+    dfa_values: Optional[List[float]] = None
+    dfa_maxValue: Optional[float] = None
+    dfa_targetIndex: Optional[int] = None
 
     def __eq__(self, other: Any):
         if equalish(self.bin_min, other.bin_min) is False:
@@ -98,61 +86,40 @@ class NeuronpediaDashboardActivation:
 
 @dataclass
 class NeuronpediaDashboardFeature:
-    def __init__(
-        self,
-        feature_index: int = 0,
-        neuron_alignment_indices: list[int] = [],
-        neuron_alignment_values: list[float] = [],
-        neuron_alignment_l1: list[float] = [],
-        correlated_neurons_indices: list[int] = [],
-        correlated_neurons_l1: list[float] = [],
-        correlated_neurons_pearson: list[float] = [],
-        correlated_features_indices: list[int] = [],
-        correlated_features_l1: list[float] = [],
-        correlated_features_pearson: list[float] = [],
-        neg_str: list[str] = [],
-        neg_values: list[float] = [],
-        pos_str: list[str] = [],
-        pos_values: list[float] = [],
-        frac_nonzero: float = 0,
-        freq_hist_data_bar_values: list[float] = [],
-        freq_hist_data_bar_heights: list[float] = [],
-        logits_hist_data_bar_heights: list[float] = [],
-        logits_hist_data_bar_values: list[float] = [],
-        n_prompts_total: int = 0,
-        n_tokens_in_prompt: int = 0,
-        dataset: str = "",
-        activations: list[dict[str, Any]] = [],
-        decoder_weights_dist: list[float] = [],
-        vector: list[float] = [],
-    ):
-        self.feature_index = feature_index
-        self.neuron_alignment_indices = neuron_alignment_indices
-        self.neuron_alignment_values = neuron_alignment_values
-        self.neuron_alignment_l1 = neuron_alignment_l1
-        self.correlated_neurons_indices = correlated_neurons_indices
-        self.correlated_neurons_l1 = correlated_neurons_l1
-        self.correlated_neurons_pearson = correlated_neurons_pearson
-        self.correlated_features_indices = correlated_features_indices
-        self.correlated_features_l1 = correlated_features_l1
-        self.correlated_features_pearson = correlated_features_pearson
-        self.neg_str = neg_str
-        self.neg_values = neg_values
-        self.pos_str = pos_str
-        self.pos_values = pos_values
-        self.frac_nonzero = frac_nonzero
-        self.freq_hist_data_bar_values = freq_hist_data_bar_values
-        self.freq_hist_data_bar_heights = freq_hist_data_bar_heights
-        self.logits_hist_data_bar_heights = logits_hist_data_bar_heights
-        self.logits_hist_data_bar_values = logits_hist_data_bar_values
-        self.n_prompts_total = n_prompts_total
-        self.n_tokens_in_prompt = n_tokens_in_prompt
-        self.dataset = dataset
-        self.activations: list[NeuronpediaDashboardActivation] = []
-        self.decoder_weights_dist = decoder_weights_dist
-        self.vector = vector
-        for activation in activations:
-            self.activations.append(NeuronpediaDashboardActivation(**activation))
+    feature_index: int = 0
+    neuron_alignment_indices: list[int] = field(default_factory=list)
+    neuron_alignment_values: list[float] = field(default_factory=list)
+    neuron_alignment_l1: list[float] = field(default_factory=list)
+    correlated_neurons_indices: list[int] = field(default_factory=list)
+    correlated_neurons_l1: list[float] = field(default_factory=list)
+    correlated_neurons_pearson: list[float] = field(default_factory=list)
+    correlated_features_indices: list[int] = field(default_factory=list)
+    correlated_features_l1: list[float] = field(default_factory=list)
+    correlated_features_pearson: list[float] = field(default_factory=list)
+    neg_str: list[str] = field(default_factory=list)
+    neg_values: list[float] = field(default_factory=list)
+    pos_str: list[str] = field(default_factory=list)
+    pos_values: list[float] = field(default_factory=list)
+    frac_nonzero: float = 0
+    freq_hist_data_bar_values: list[float] = field(default_factory=list)
+    freq_hist_data_bar_heights: list[float] = field(default_factory=list)
+    logits_hist_data_bar_heights: list[float] = field(default_factory=list)
+    logits_hist_data_bar_values: list[float] = field(default_factory=list)
+    n_prompts_total: int = 0
+    n_tokens_in_prompt: int = 0
+    dataset: str = ""
+    activations: list[NeuronpediaDashboardActivation] = field(default_factory=list)
+    decoder_weights_dist: list[float] = field(default_factory=list)
+    vector: list[float] = field(default_factory=list)
+
+    def __post_init__(self):
+        activation_objects = []
+        for activation in self.activations:
+            if isinstance(activation, dict):
+                activation_objects.append(NeuronpediaDashboardActivation(**activation))
+            else:
+                activation_objects.append(activation)
+        self.activations = activation_objects
 
     def __eq__(self, other: Any):
         if self.feature_index != other.feature_index:
@@ -293,49 +260,20 @@ class NeuronpediaDashboardFeature:
 
 @dataclass
 class NeuronpediaDashboardBatch:
-    def __init__(
-        self,
-        model_id: str = "",
-        layer: int = 0,
-        sae_set: str = "",
-        sae_id_suffix: Optional[str] = None,
-        features: list[dict[str, Any]] = [],
-        # settings: NeuronpediaDashboardSettings = NeuronpediaDashboardSettings(),
-    ):
-        self.model_id = model_id
-        self.layer = layer
-        self.sae_set = sae_set
-        self.sae_id_suffix = sae_id_suffix
-        self.features: list[NeuronpediaDashboardFeature] = []
-        for feature in features:
-            self.features.append(NeuronpediaDashboardFeature(**feature))
-        # self.settings = settings
+    model_id: str = ""
+    layer: int = 0
+    sae_set: str = ""
+    sae_id_suffix: Optional[str] = None
+    features: list[NeuronpediaDashboardFeature] = field(default_factory=list)
 
-    def __eq__(self, other: Any):
-        if self.model_id != other.model_id:
-            print(f"model_id does not match: {self.model_id} and {other.model_id}")
-            return False
-        if self.layer != other.layer:
-            print(f"layer does not match: {self.layer} and {other.layer}")
-            return False
-        if self.sae_set != other.sae_set:
-            print(f"sae_set does not match: {self.sae_set} and {other.sae_set}")
-            return False
-        if self.sae_id_suffix != other.sae:
-            print(
-                f"sae_id_suffix does not match: {self.sae_id_suffix} and {other.sae_id_suffix}"
-            )
-            return False
-        for i, feature in enumerate(self.features):
-            if feature != other.features[i]:
-                print(
-                    f"feature {feature.feature_index} does not match: {feature} and {other.features[i]}"
-                )
-                return False
-        # if self.settings != other.settings:
-        #     print(f"settings does not match: {self.settings} and {other.settings}")
-        #     return False
-        return True
+    def __post_init__(self):
+        feature_objects = []
+        for feature in self.features:
+            if isinstance(feature, dict):
+                feature_objects.append(NeuronpediaDashboardFeature(**feature))
+            else:
+                feature_objects.append(feature)
+        self.features = feature_objects
 
     def to_dict(self):
         return {
