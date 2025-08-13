@@ -15,7 +15,8 @@ def check_list_floats(li: list[float]):
 
 
 def equalish(a: Any, b: Any, tol: float = EQUAL_VALUE_TOLERANCE):
-    assert type(a) == type(b), f"types do not match: {type(a)} and {type(b)}"
+    if type(a) != type(b):
+        raise TypeError(f"types do not match: {type(a)} and {type(b)}")
 
     if (
         isinstance(a, list)

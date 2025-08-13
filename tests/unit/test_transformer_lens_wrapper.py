@@ -46,7 +46,7 @@ def test_validate_hook_points_invalid(real_model: HookedTransformer) -> None:
         primary_hook_point="blocks.15.invalid_hook",
         auxiliary_hook_points=["blocks.0.hook_resid_pre"],
     )
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         TransformerLensWrapper(real_model, invalid_config)
 
 
@@ -55,7 +55,7 @@ def test_get_layer(
 ) -> None:
     wrapper = TransformerLensWrapper(real_model, valid_activation_config)
     assert wrapper.get_layer("blocks.2.hook_mlp_out") == 2
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         wrapper.get_layer("invalid_hook_point")
 
 

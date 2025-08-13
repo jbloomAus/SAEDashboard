@@ -29,7 +29,10 @@ class SequenceDataGenerator:
         W_U: Float[Tensor, "d_model d_vocab"],
     ):
         self.cfg = cfg
-        assert self.cfg.feature_centric_layout.seq_cfg is not None
+        if self.cfg.feature_centric_layout.seq_cfg is None:
+            raise ValueError(
+                "Feature centric layout sequence config is required but not provided"
+            )
         self.seq_cfg = self.cfg.feature_centric_layout.seq_cfg
         self.tokens = tokens
         self.W_U = W_U
@@ -227,7 +230,10 @@ class SequenceDataGenerator:
                 dim=-1,
             )
 
-        assert indices_buf.shape == (n_bold, padded_buffer_width, 2)
+        if indices_buf.shape != (n_bold, padded_buffer_width, 2):
+            raise ValueError(
+                f"Expected indices_buf shape {(n_bold, padded_buffer_width, 2)}, got {indices_buf.shape}"
+            )
 
         return indices_buf
 
