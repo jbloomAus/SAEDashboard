@@ -10,11 +10,10 @@ import torch
 from jaxtyping import Int
 from rich import print as rprint
 from rich.table import Table
-from sae_lens import SAE
+from sae_lens import SAE, HookedSAETransformer
 from sae_lens.config import DTYPE_MAP as DTYPES
 from torch import Tensor
 from tqdm.auto import tqdm
-from transformer_lens import HookedTransformer
 
 from sae_dashboard.components import (
     ActsHistogramData,
@@ -41,7 +40,7 @@ class FeatureDataGeneratorFactory:
     @staticmethod
     def create(
         cfg: SaeVisConfig,
-        model: HookedTransformer,
+        model: HookedSAETransformer,
         encoder: SAE,
         tokens: Int[Tensor, "batch seq"],
     ) -> FeatureDataGenerator:
@@ -73,7 +72,10 @@ class SaeVisRunner:
 
     @torch.inference_mode()
     def run(
-        self, encoder: SAE, model: HookedTransformer, tokens: Int[Tensor, "batch seq"]
+        self,
+        encoder: SAE,
+        model: HookedSAETransformer,
+        tokens: Int[Tensor, "batch seq"],
     ) -> SaeVisData:
         # Apply random seed
         self.set_seeds()
@@ -336,7 +338,7 @@ class SaeVisRunner:
 
 def get_decoder_weights_distribution(
     encoder: SAE,
-    model: HookedTransformer,
+    model: HookedSAETransformer,
     feature_idx: Union[int, List[int]],
 ) -> List[DecoderWeightsDistribution]:
     if not isinstance(feature_idx, list):

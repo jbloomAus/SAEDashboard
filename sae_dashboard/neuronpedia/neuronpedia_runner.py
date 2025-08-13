@@ -11,9 +11,8 @@ import torch
 import wandb
 import wandb.sdk
 from matplotlib import colors
-from sae_lens import SAE, ActivationsStore
+from sae_lens import SAE, ActivationsStore, HookedSAETransformer
 from tqdm import tqdm
-from transformer_lens import HookedTransformer
 from transformers import AutoModelForCausalLM
 
 from sae_dashboard.components_config import (
@@ -435,7 +434,7 @@ class NeuronpediaRunner:
                 self.cfg.hf_model_path,
             )
 
-        self.model = HookedTransformer.from_pretrained(
+        self.model = HookedSAETransformer.from_pretrained(
             model_name=self.model_id,
             device=self.cfg.model_device,
             n_devices=self.cfg.model_n_devices or 1,
@@ -561,20 +560,23 @@ class NeuronpediaRunner:
 
         # Trim original tokens
         # prepend_bos might be in cfg directly (for tests) or in metadata
-        if hasattr(self.sae.cfg, "prepend_bos"):
-            prepend_bos = self.sae.cfg.prepend_bos
-        else:
-            prepend_bos = self.sae.cfg.metadata.get("prepend_bos", True)
-        tokens = tokens[:, : keep_length - prepend_bos]
+        # if hasattr(self.sae.cfg, "prepend_bos"):
+        #     prepend_bos = self.sae.cfg.prepend_bos
+        # else:
+        #     prepend_bos = self.sae.cfg.metadata.get("prepend_bos", True)
+        # tokens = tokens[:, : keep_length - prepend_bos]
 
         if self.cfg.prefix_tokens:
             prefix = torch.tensor(self.cfg.prefix_tokens).to(tokens.device)
             prefix_repeated = prefix.unsqueeze(0).repeat(tokens.shape[0], 1)
             # if sae.cfg.prepend_bos, then add that before the suffix
-            if prepend_bos:
-                bos = bos_tokens.unsqueeze(1)
-                prefix_repeated = torch.cat([bos, prefix_repeated], dim=1)
-            tokens = torch.cat([prefix_repeated, tokens], dim=1)
+            # don't prepend bos for now - eg it doesn't make sense for instruct models
+            # if prepend_bos:
+            #     bos = bos_tokens.unsqueeze(1)
+            #     prefix_repeated = torch.cat([bos, prefix_repeated], dim=1)
+            # Remove prefix_repeated number of tokens from the end of original tokens
+            tokens_trimmed = tokens[:, : -prefix_repeated.shape[1]]
+            tokens = torch.cat([prefix_repeated, tokens_trimmed], dim=1)
 
         if self.cfg.suffix_tokens:
             suffix = torch.tensor(self.cfg.suffix_tokens).to(tokens.device)

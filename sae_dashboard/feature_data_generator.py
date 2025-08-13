@@ -5,7 +5,7 @@ import einops
 import numpy as np
 import torch
 from jaxtyping import Float, Int
-from sae_lens import SAE
+from sae_lens import SAE, HookedSAETransformer
 from sae_lens.config import DTYPE_MAP as DTYPES
 from sae_lens.saes.topk_sae import TopK
 from torch import Tensor, nn
@@ -13,10 +13,7 @@ from tqdm.auto import tqdm
 
 from sae_dashboard.dfa_calculator import DFACalculator
 from sae_dashboard.sae_vis_data import SaeVisConfig
-from sae_dashboard.transformer_lens_wrapper import (
-    TransformerLensWrapper,
-    to_resid_direction,
-)
+from sae_dashboard.transformer_lens_wrapper import to_resid_direction
 from sae_dashboard.utils_fns import RollingCorrCoef
 
 Arr = np.ndarray
@@ -27,7 +24,7 @@ class FeatureDataGenerator:
         self,
         cfg: SaeVisConfig,
         tokens: Int[Tensor, "batch seq"],
-        model: TransformerLensWrapper,
+        model: HookedSAETransformer,
         encoder: SAE,
     ):
         self.cfg = cfg

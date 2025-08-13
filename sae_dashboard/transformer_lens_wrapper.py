@@ -5,8 +5,8 @@ from typing import Callable, Dict, List, Sequence, Tuple
 import torch
 import torch.nn as nn
 from jaxtyping import Float, Int
+from sae_lens import HookedSAETransformer
 from torch import Tensor
-from transformer_lens import HookedTransformer
 from transformer_lens.hook_points import HookPoint
 
 DTYPES = {
@@ -28,7 +28,9 @@ class TransformerLensWrapper(nn.Module):
     function have a standardized signature.
     """
 
-    def __init__(self, model: HookedTransformer, activation_config: ActivationConfig):
+    def __init__(
+        self, model: HookedSAETransformer, activation_config: ActivationConfig
+    ):
         super().__init__()
         self.model = model
         self.activation_config = activation_config
@@ -131,6 +133,7 @@ def to_resid_direction(
         "resid" in model.activation_config.primary_hook_point
         or "_out" in model.activation_config.primary_hook_point
         or "hook_mlp_in" in model.activation_config.primary_hook_point
+        or "mlp.hook_in" in model.activation_config.primary_hook_point
     ):
         return direction
 

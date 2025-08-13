@@ -10,7 +10,7 @@ license = "MIT"
 python = "^3.10"
 torch = "^2.0.0"
 einops = ">=0.7.0"
-datasets = "^2.0.0"
+datasets = "^3.0.0"
 dataclasses-json = "^0.6.4"
 jaxtyping = "^0.2.28"
 transformer-lens = "^2.2.0,<3.0.0"
@@ -19,7 +19,9 @@ rich = "^13.7.1"
 matplotlib = "^3.8.4"
 safetensors = "^0.4.3"
 typer = "^0.12.3"
-sae-lens = "^5.0.0"
+sae-lens = {git = "https://github.com/jbloomAus/SAELens.git", branch = "qwen-transcoders"}
+clt = {git = "https://github.com/curt-tigges/crosslayer-coding.git", branch = "main"}
+
 
 [tool.poetry.group.dev.dependencies]
 isort = "^5.13.2"
