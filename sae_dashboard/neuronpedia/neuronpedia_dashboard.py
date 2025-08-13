@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, List, Optional
+from typing import Any
 
 import numpy as np
 
@@ -8,14 +8,11 @@ EQUAL_VALUE_TOLERANCE = 0.1
 
 # function to check that each value in a list is a float
 def check_list_floats(li: list[float]):
-    for i in range(len(li)):
-        if not isinstance(li[i], float):
-            return False
-    return True
+    return all(isinstance(li[i], float) for i in range(len(li)))
 
 
 def equalish(a: Any, b: Any, tol: float = EQUAL_VALUE_TOLERANCE):
-    assert type(a) == type(b), f"types do not match: {type(a)} and {type(b)}"
+    assert type(a) is type(b), f"types do not match: {type(a)} and {type(b)}"
 
     if (
         isinstance(a, list)
@@ -27,10 +24,9 @@ def equalish(a: Any, b: Any, tol: float = EQUAL_VALUE_TOLERANCE):
         if not close:
             print(f"Does not match within tolerance: {a} and {b} with tolerance {tol}")
         return close
-    elif isinstance(a, float) and isinstance(b, float):
+    if isinstance(a, float) and isinstance(b, float):
         return abs(a - b) < tol
-    else:
-        return a == b
+    return a == b
 
 
 @dataclass
@@ -43,9 +39,9 @@ class NeuronpediaDashboardActivation:
         tokens: list[str] = [],
         values: list[float] = [],
         qualifying_token_index: int = 0,
-        dfa_values: Optional[List[float]] = None,
-        dfa_maxValue: Optional[float] = None,
-        dfa_targetIndex: Optional[int] = None,
+        dfa_values: list[float] | None = None,
+        dfa_maxValue: float | None = None,
+        dfa_targetIndex: int | None = None,
     ):
         self.bin_min = bin_min
         self.bin_max = bin_max
@@ -298,7 +294,7 @@ class NeuronpediaDashboardBatch:
         model_id: str = "",
         layer: int = 0,
         sae_set: str = "",
-        sae_id_suffix: Optional[str] = None,
+        sae_id_suffix: str | None = None,
         features: list[dict[str, Any]] = [],
         # settings: NeuronpediaDashboardSettings = NeuronpediaDashboardSettings(),
     ):

@@ -63,14 +63,11 @@ jobs:
       - name: List installed packages
         run: poetry run pip list
 
-      - name: Check flake8 installation
-        run: poetry run which flake8
-
       - name: check linting
-        run: poetry run flake8 .
+        run: poetry run ruff check .
 
       - name: check formatting
-        run: poetry run black --check .
+        run: poetry run ruff format --check .
 
       - name: check types
         run: poetry run pyright .

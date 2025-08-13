@@ -1,7 +1,7 @@
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, List
+from typing import Any, Callable
 
 import numpy as np
 from dataclasses_json import dataclass_json
@@ -28,7 +28,7 @@ PRECISION = 4
 @dataclass
 class DecoderWeightsDistribution:
     n_heads: int
-    allocation_by_head: List[float]
+    allocation_by_head: list[float]
 
 
 @dataclass_json
@@ -282,14 +282,14 @@ class LogitsTableData:
                 {
                     "symbol": unprocess_str_tok(neg_str[i]),
                     "value": round(bottom_logits[i], 2),
-                    "color": f"rgba(255,{int(255*(1-neg_bg_values[i]))},{int(255*(1-neg_bg_values[i]))},0.5)",
+                    "color": f"rgba(255,{int(255 * (1 - neg_bg_values[i]))},{int(255 * (1 - neg_bg_values[i]))},0.5)",
                 }
             )
             data["posLogits"].append(
                 {
                     "symbol": unprocess_str_tok(pos_str[i]),
                     "value": round(top_logits[i], 2),
-                    "color": f"rgba({int(255*(1-pos_bg_values[i]))},{int(255*(1-pos_bg_values[i]))},255,0.5)",
+                    "color": f"rgba({int(255 * (1 - pos_bg_values[i]))},{int(255 * (1 - pos_bg_values[i]))},255,0.5)",
                 }
             )
 
@@ -377,18 +377,16 @@ class SequenceData:
                 The data for this sequence, in the form of a list of dicts for each token (where the dict stores things
                 like token, feature activations, etc).
         """
-        assert isinstance(
-            cfg, (PromptConfig, SequencesConfig)
-        ), f"Invalid config type: {type(cfg)}"
-        seq_group_id = component_specific_kwargs.get("seq_group_id", None)
-        max_feat_act = component_specific_kwargs.get("max_feat_act", None)
-        max_loss_contribution = component_specific_kwargs.get(
-            "max_loss_contribution", None
+        assert isinstance(cfg, (PromptConfig, SequencesConfig)), (
+            f"Invalid config type: {type(cfg)}"
         )
-        bold_idx = component_specific_kwargs.get("bold_idx", None)
+        seq_group_id = component_specific_kwargs.get("seq_group_id")
+        max_feat_act = component_specific_kwargs.get("max_feat_act")
+        max_loss_contribution = component_specific_kwargs.get("max_loss_contribution")
+        bold_idx = component_specific_kwargs.get("bold_idx")
         permanent_line = component_specific_kwargs.get("permanent_line", False)
         first_in_group = component_specific_kwargs.get("first_in_group", True)
-        title = component_specific_kwargs.get("title", None)
+        title = component_specific_kwargs.get("title")
         hover_above = component_specific_kwargs.get("hover_above", False)
 
         # If we didn't supply a sequence group ID, then we assume this sequence is on its own, and give it a unique ID
@@ -458,7 +456,9 @@ class SequenceData:
                 == len(pos_val)
                 == len(neg_val)
                 == len(self.token_ids) - 1
-            ), "If this is a single prompt, these lists must be the same length as token_ids or 1 less"
+            ), (
+                "If this is a single prompt, these lists must be the same length as token_ids or 1 less"
+            )
             pos_ids = [[]] + pos_ids
             neg_ids = [[]] + neg_ids
             pos_val = [[]] + pos_val
@@ -470,7 +470,9 @@ class SequenceData:
             == len(pos_val)
             == len(neg_val)
             == len(self.token_ids)
-        ), "If this is part of a sequence group etc are given, they must be the same length as token_ids"
+        ), (
+            "If this is part of a sequence group etc are given, they must be the same length as token_ids"
+        )
 
         # Process the tokens to get str toks
         toks = to_str_tokens(decode_fn, self.token_ids)
@@ -627,8 +629,8 @@ class SequenceGroupData:
         Returns:
             html_obj:       Object containing the HTML and JavaScript data for this seq group.
         """
-        seq_group_id = component_specific_kwargs.get("seq_group_id", None)
-        group_size = component_specific_kwargs.get("group_size", None)
+        seq_group_id = component_specific_kwargs.get("seq_group_id")
+        group_size = component_specific_kwargs.get("group_size")
         max_feat_act = component_specific_kwargs.get("max_feat_act", self.max_feat_act)
         max_loss_contribution = component_specific_kwargs.get(
             "max_loss_contribution", self.max_loss_contribution

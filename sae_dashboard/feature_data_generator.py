@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Dict, List
 
 import einops
 import numpy as np
@@ -39,9 +38,9 @@ class FeatureDataGenerator:
         )
 
         if cfg.use_dfa:
-            assert (
-                "hook_z" in encoder.cfg.hook_name
-            ), f"DFAs are only supported for hook_z, but got {encoder.cfg.hook_name}"
+            assert "hook_z" in encoder.cfg.hook_name, (
+                f"DFAs are only supported for hook_z, but got {encoder.cfg.hook_name}"
+            )
 
     @torch.inference_mode()
     def batch_tokens(
@@ -53,9 +52,7 @@ class FeatureDataGenerator:
             if self.cfg.minibatch_size_tokens is None
             else tokens.split(self.cfg.minibatch_size_tokens)
         )
-        token_minibatches = [tok.to(self.cfg.device) for tok in token_minibatches]
-
-        return token_minibatches
+        return [tok.to(self.cfg.device) for tok in token_minibatches]
 
     @torch.inference_mode()
     def get_feature_data(  # type: ignore
@@ -84,9 +81,7 @@ class FeatureDataGenerator:
             model_activation_dict = self.get_model_acts(i, minibatch)
             primary_acts = model_activation_dict[
                 self.model.activation_config.primary_hook_point
-            ].to(
-                self.encoder.device
-            )  # make sure acts are on the correct device
+            ].to(self.encoder.device)  # make sure acts are on the correct device
 
             # For TopK, compute all activations first, then select features
             if isinstance(self.encoder.activation_fn, TopK):
@@ -161,7 +156,7 @@ class FeatureDataGenerator:
         minibatch_index: int,
         minibatch_tokens: torch.Tensor,
         use_cache: bool = True,
-    ) -> Dict[str, torch.Tensor]:
+    ) -> dict[str, torch.Tensor]:
         """
         A function that gets the model activations for a given minibatch of tokens.
         Uses np.memmap for efficient caching.
@@ -217,18 +212,18 @@ class FeatureDataGenerator:
             )
 
 
-def save_tensor_dict_torch(tensor_dict: Dict[str, torch.Tensor], filename: Path):
+def save_tensor_dict_torch(tensor_dict: dict[str, torch.Tensor], filename: Path):
     torch.save(tensor_dict, filename)
 
 
-def load_tensor_dict_torch(filename: Path, device: str) -> Dict[str, torch.Tensor]:
+def load_tensor_dict_torch(filename: Path, device: str) -> dict[str, torch.Tensor]:
     return torch.load(
         filename, map_location=torch.device(device)
     )  # Directly load to GPU
 
 
 class FeatureMaskingContext:
-    def __init__(self, sae: SAE, feature_idxs: List[int]):
+    def __init__(self, sae: SAE, feature_idxs: list[int]):
         self.sae = sae
         self.feature_idxs = feature_idxs
         self.original_weight = {}

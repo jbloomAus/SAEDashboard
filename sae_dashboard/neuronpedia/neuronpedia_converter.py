@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import numpy as np
 import torch
@@ -29,7 +29,7 @@ class NpEncoder(json.JSONEncoder):
             return float(o)
         if isinstance(o, np.ndarray):
             return o.tolist()
-        return super(NpEncoder, self).default(o)
+        return super().default(o)
 
 
 class FeatureProcessor:
@@ -38,18 +38,18 @@ class FeatureProcessor:
     """
 
     @staticmethod
-    def round_list(to_round: List[float]) -> List[float]:
+    def round_list(to_round: list[float]) -> list[float]:
         """Round a list of floats to 3 decimal places."""
         return list(np.round(to_round, 3))
 
     @staticmethod
-    def ensure_list(input_value: Any) -> List[Any]:
+    def ensure_list(input_value: Any) -> list[Any]:
         """Ensure the input is a list."""
         return [input_value] if not isinstance(input_value, list) else input_value
 
     @staticmethod
     def to_str_tokens_safe(
-        model: HookedTransformer, vocab_dict: Dict[int, str], tokens: Any
+        model: HookedTransformer, vocab_dict: dict[int, str], tokens: Any
     ) -> Any:
         """Convert tokens to string tokens safely."""
         OUT_OF_RANGE_TOKEN = "<|outofrange|>"
@@ -79,10 +79,10 @@ class NeuronpediaConverter:
     @staticmethod
     def convert_to_np_json(
         model: HookedTransformer,
-        vis_data: Union[SaeVisData, VectorVisData],
-        np_cfg: Union[NeuronpediaRunnerConfig, NeuronpediaVectorRunnerConfig],
-        vocab_dict: Dict[int, str],
-        original_vectors: Optional[torch.Tensor] = None,
+        vis_data: SaeVisData | VectorVisData,
+        np_cfg: NeuronpediaRunnerConfig | NeuronpediaVectorRunnerConfig,
+        vocab_dict: dict[int, str],
+        original_vectors: torch.Tensor | None = None,
     ) -> str:
         """
         Convert SaeVisData to Neuronpedia JSON format.
@@ -113,11 +113,11 @@ class NeuronpediaConverter:
     @staticmethod
     def _process_features(
         model: HookedTransformer,
-        data_dict: Dict[int, FeatureData],  # Update to use data_dict directly
-        np_cfg: Union[NeuronpediaRunnerConfig, NeuronpediaVectorRunnerConfig],
-        vocab_dict: Dict[int, str],
-        original_vectors: Optional[torch.Tensor] = None,
-    ) -> List[NeuronpediaDashboardFeature]:
+        data_dict: dict[int, FeatureData],  # Update to use data_dict directly
+        np_cfg: NeuronpediaRunnerConfig | NeuronpediaVectorRunnerConfig,
+        vocab_dict: dict[int, str],
+        original_vectors: torch.Tensor | None = None,
+    ) -> list[NeuronpediaDashboardFeature]:
         """Process all features and create NeuronpediaDashboardFeature objects."""
         features_outputs = []
         for feature_index, feature_data in data_dict.items():
@@ -187,7 +187,7 @@ class NeuronpediaConverter:
         feature_output: NeuronpediaDashboardFeature,
         feature_data: FeatureData,
         model: HookedTransformer,
-        vocab_dict: Dict[int, str],
+        vocab_dict: dict[int, str],
     ) -> None:
         """Process feature logits data and update the feature output."""
         top_logits = FeatureProcessor.round_list(
@@ -257,7 +257,7 @@ class NeuronpediaConverter:
         feature_output: NeuronpediaDashboardFeature,
         feature_data: FeatureData,
         model: HookedTransformer,
-        vocab_dict: Dict[int, str],
+        vocab_dict: dict[int, str],
     ) -> None:
         """Process feature activations data and update the feature output."""
         activations = []
@@ -317,9 +317,9 @@ class NeuronpediaConverter:
         bin_contains: float,
         feature_data: FeatureData,
         model: HookedTransformer,
-        vocab_dict: Dict[int, str],
+        vocab_dict: dict[int, str],
         feature_index: int,
-        activation_thresholds: Optional[dict[int, float | int]] = None,
+        activation_thresholds: dict[int, float | int] | None = None,
     ) -> NeuronpediaDashboardActivation:
         """Create a NeuronpediaDashboardActivation object from sequence data."""
         activation = NeuronpediaDashboardActivation()
@@ -365,8 +365,8 @@ class NeuronpediaConverter:
 
     @staticmethod
     def _create_batch_data(
-        np_cfg: Union[NeuronpediaRunnerConfig, NeuronpediaVectorRunnerConfig],
-        features_outputs: List[NeuronpediaDashboardFeature],
+        np_cfg: NeuronpediaRunnerConfig | NeuronpediaVectorRunnerConfig,
+        features_outputs: list[NeuronpediaDashboardFeature],
     ) -> NeuronpediaDashboardBatch:
         """Create a NeuronpediaDashboardBatch object from processed features."""
         batch_data = NeuronpediaDashboardBatch()

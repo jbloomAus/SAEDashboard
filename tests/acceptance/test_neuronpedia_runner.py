@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Type, TypeVar
+from typing import TypeVar
 
 from sae_dashboard.neuronpedia.neuronpedia_dashboard import NeuronpediaDashboardBatch
 from sae_dashboard.neuronpedia.neuronpedia_runner import (
@@ -17,8 +17,8 @@ CORRECT_VALUE_TOLERANCE = 0.1
 T = TypeVar("T")
 
 
-def json_to_class(json_file: str, cls: Type[T]) -> T:
-    with open(json_file, "r") as file:
+def json_to_class(json_file: str, cls: type[T]) -> T:
+    with open(json_file) as file:
         data = json.load(file)
     return cls(**data)
 

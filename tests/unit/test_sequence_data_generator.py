@@ -60,12 +60,12 @@ def test_get_sequences_data_expected_duplicates(
 
     # Assertions
     assert not duplicates_in_same_group, "Duplicates found within the same group"
-    assert num_duplicates <= len(
-        sequence_multi_group_data.seq_group_data
-    ), f"Too many duplicates: {num_duplicates}"
-    assert (
-        len(sequence_multi_group_data.seq_group_data[0].seq_data) == 20
-    ), "TOP ACTIVATIONS group should have 20 sequences"
+    assert num_duplicates <= len(sequence_multi_group_data.seq_group_data), (
+        f"Too many duplicates: {num_duplicates}"
+    )
+    assert len(sequence_multi_group_data.seq_group_data[0].seq_data) == 20, (
+        "TOP ACTIVATIONS group should have 20 sequences"
+    )
 
     # Check that duplicates only occur between TOP ACTIVATIONS and one other group
     for pair, count in pair_counts.items():
@@ -73,12 +73,12 @@ def test_get_sequences_data_expected_duplicates(
             groups_with_pair = [
                 i for i, oi, qti in group_sequence_pairs if (oi, qti) == pair
             ]
-            assert (
-                0 in groups_with_pair
-            ), f"Duplicate {pair} not in TOP ACTIVATIONS group"
-            assert (
-                len(groups_with_pair) == 2
-            ), f"Duplicate {pair} found in more than two groups: {groups_with_pair}"
+            assert 0 in groups_with_pair, (
+                f"Duplicate {pair} not in TOP ACTIVATIONS group"
+            )
+            assert len(groups_with_pair) == 2, (
+                f"Duplicate {pair} found in more than two groups: {groups_with_pair}"
+            )
 
 
 def test_package_sequences_data_no_duplicates(
@@ -98,9 +98,7 @@ def test_package_sequences_data_no_duplicates(
     )
 
     all_sequence_data = []
-    for (
-        group
-    ) in (
+    for group in (
         sequence_multi_group_data.seq_group_data
     ):  # Changed from sequence_groups to seq_group_data
         all_sequence_data.extend(group.seq_data)  # Changed from sequences to seq_data

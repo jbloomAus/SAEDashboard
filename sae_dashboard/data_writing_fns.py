@@ -145,7 +145,7 @@ def save_prompt_centric_vis(
     metric_list = ["act_quantile", "act_size", "loss_effect"]
 
     # Get default values for dropdowns
-    first_metric = "act_quantile" or metric
+    first_metric = "act_quantile" or metric  # noqa: SIM222
     first_seq_pos = str_toks_list[0 if seq_pos is None else seq_pos]
     first_key = f"{first_metric}|{first_seq_pos}"
 
