@@ -52,6 +52,7 @@ class NeuronpediaRunnerConfig:
     prefix_tokens: Optional[List[int]] = None
     suffix_tokens: Optional[List[int]] = None
     ignore_positions: Optional[List[int]] = None
+    prepend_bos: Optional[bool] = None  # Override SAE default if specified
 
     hf_model_path: Optional[str] = None
 

@@ -69,6 +69,12 @@ class NeuronpediaRunner:
         # Initialize core components
         self.device_count = self._setup_devices()
         self._load_sae_or_transcoder()
+        if cfg.prepend_bos is not None:
+            self.sae.cfg.prepend_bos = cfg.prepend_bos
+            # if metadata doesnt exist, create it
+            if not hasattr(self.sae.cfg, "metadata"):
+                self.sae.cfg["metadata"] = {}
+            self.sae.cfg.metadata["prepend_bos"] = cfg.prepend_bos
         self._configure_dtypes()
         self._extract_model_info()
         self._initialize_model()
@@ -468,6 +474,7 @@ class NeuronpediaRunner:
             streaming=True,
             store_batch_size_prompts=8,  # these don't matter
             n_batches_in_buffer=16,  # these don't matter
+            disable_concat_sequences=True,
             device=self.cfg.activation_store_device or "cpu",
         )
         self.cached_activations_dir = Path(
@@ -559,24 +566,19 @@ class NeuronpediaRunner:
             raise ValueError("Prefix and suffix are too long for the given tokens.")
 
         # Trim original tokens
-        # prepend_bos might be in cfg directly (for tests) or in metadata
-        # if hasattr(self.sae.cfg, "prepend_bos"):
-        #     prepend_bos = self.sae.cfg.prepend_bos
-        # else:
-        #     prepend_bos = self.sae.cfg.metadata.get("prepend_bos", True)
-        # tokens = tokens[:, : keep_length - prepend_bos]
+        if hasattr(self.sae.cfg, "prepend_bos") and self.sae.cfg.prepend_bos:
+            tokens = tokens[:, : keep_length - self.sae.cfg.prepend_bos]
+        else:
+            tokens = tokens[:, :keep_length]
 
         if self.cfg.prefix_tokens:
             prefix = torch.tensor(self.cfg.prefix_tokens).to(tokens.device)
             prefix_repeated = prefix.unsqueeze(0).repeat(tokens.shape[0], 1)
             # if sae.cfg.prepend_bos, then add that before the suffix
-            # don't prepend bos for now - eg it doesn't make sense for instruct models
-            # if prepend_bos:
-            #     bos = bos_tokens.unsqueeze(1)
-            #     prefix_repeated = torch.cat([bos, prefix_repeated], dim=1)
-            # Remove prefix_repeated number of tokens from the end of original tokens
-            tokens_trimmed = tokens[:, : -prefix_repeated.shape[1]]
-            tokens = torch.cat([prefix_repeated, tokens_trimmed], dim=1)
+            if hasattr(self.sae.cfg, "prepend_bos") and self.sae.cfg.prepend_bos:
+                bos = bos_tokens.unsqueeze(1)
+                prefix_repeated = torch.cat([bos, prefix_repeated], dim=1)
+            tokens = torch.cat([prefix_repeated, tokens], dim=1)
 
         if self.cfg.suffix_tokens:
             suffix = torch.tensor(self.cfg.suffix_tokens).to(tokens.device)
@@ -897,6 +899,20 @@ def main():
         help="Optional list of token IDs to prepend to each prompt. Example: --prefix-tokens 151644 872 198",
     )
     parser.add_argument(
+        "--no-prepend-bos",
+        action="store_false",
+        dest="prepend_bos",
+        default=None,
+        help="Don't prepend BOS token to sequences (overrides SAE default)",
+    )
+    parser.add_argument(
+        "--prepend-bos",
+        action="store_true",
+        dest="prepend_bos",
+        default=None,
+        help="Prepend BOS token to sequences (overrides SAE default)",
+    )
+    parser.add_argument(
         "--use-transcoder",
         action="store_true",
         help="If set, load a Transcoder instead of a standard SAE",
@@ -944,6 +960,7 @@ def main():
         outputs_dir=args.output_dir,
         sparsity_threshold=args.sparsity_threshold,
         prefix_tokens=args.prefix_tokens,
+        prepend_bos=args.prepend_bos,
         n_prompts_total=args.n_prompts,
         n_tokens_in_prompt=args.n_tokens_in_prompt,
         n_prompts_in_forward_pass=args.n_prompts_in_forward_pass,
