@@ -8,13 +8,13 @@ from typing import Dict, Set, Tuple
 
 import numpy as np
 import torch
-import wandb
-import wandb.sdk
 from matplotlib import colors
 from sae_lens import SAE, ActivationsStore, HookedSAETransformer
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM
 
+import wandb
+import wandb.sdk
 from sae_dashboard.components_config import (
     ActsHistogramConfig,
     Column,
@@ -888,6 +888,13 @@ def main():
         type=str,
         default=None,
         help="Optional: Path to custom HuggingFace model to use instead of default weights",
+    )
+    parser.add_argument(
+        "--prefix-tokens",
+        type=int,
+        nargs="*",
+        default=None,
+        help="Optional list of token IDs to prepend to each prompt. Example: --prefix-tokens 151644 872 198",
     )
     parser.add_argument(
         "--use-transcoder",
