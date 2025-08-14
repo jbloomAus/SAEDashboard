@@ -943,6 +943,7 @@ def main():
         model_dtype=args.model_dtype,
         outputs_dir=args.output_dir,
         sparsity_threshold=args.sparsity_threshold,
+        prefix_tokens=args.prefix_tokens,
         n_prompts_total=args.n_prompts,
         n_tokens_in_prompt=args.n_tokens_in_prompt,
         n_prompts_in_forward_pass=args.n_prompts_in_forward_pass,
