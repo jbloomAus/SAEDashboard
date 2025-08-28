@@ -10,23 +10,21 @@ from sae_dashboard.neuronpedia.neuronpedia_runner import (
 
 
 NP_OUTPUT_FOLDER = "neuronpedia_outputs/"
-ACT_CACHE_FOLDER = "cached_activations_2"
-NP_SET_NAME = "google/gemma-2-2b"
-SAE_SET = "gemma-scope-2b-pt-transcoders"
-SAE_PATH = "layer_15/width_16k/average_l0_8"
+ACT_CACHE_FOLDER = "cached_activations"
+NP_SET_NAME = "clt-hp"
+SAE_SET = "mntss/clt-gemma-2-2b-2.5M"
+SAE_PATH = "0"
 NUM_FEATURES_PER_BATCH = 10  # Reduced for testing
 NUM_BATCHES = 10
 HF_DATASET_PATH = "monology/pile-uncopyrighted"
-
-
 SPARSITY_THRESHOLD = 1
 
 # IMPORTANT
-SAE_DTYPE = "float32"
+SAE_DTYPE = "bfloat16"
 MODEL_DTYPE = "bfloat16"
 
 # PERFORMANCE SETTING
-N_PROMPTS = 24576  # Reduced for testing
+N_PROMPTS = 8000  # Reduced for testing
 # N_PROMPTS = 4096
 N_TOKENS_IN_PROMPT = 128
 N_PROMPTS_IN_FORWARD_PASS = 128

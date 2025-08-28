@@ -1,5 +1,6 @@
 import argparse
 import gc
+import importlib
 import json
 import os
 from datetime import datetime
@@ -59,6 +60,12 @@ HTML_ANOMALIES = {
 }
 
 
+def get_sae_loader(loader_name):
+    module = importlib.import_module("sae_lens.loading.pretrained_sae_loaders")
+    loader_function = getattr(module, loader_name)
+    return loader_function
+
+
 class NeuronpediaRunner:
     def __init__(
         self,
@@ -70,7 +77,6 @@ class NeuronpediaRunner:
         self.device_count = self._setup_devices()
         self._load_sae_or_transcoder()
         if cfg.prepend_bos is not None:
-            self.sae.cfg.prepend_bos = cfg.prepend_bos
             # if metadata doesnt exist, create it
             if not hasattr(self.sae.cfg, "metadata"):
                 self.sae.cfg["metadata"] = {}
@@ -174,6 +180,11 @@ class NeuronpediaRunner:
                     release=self.cfg.sae_set,
                     sae_id=self.cfg.sae_path,
                     device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
+                    converter=(
+                        get_sae_loader(self.cfg.sae_converter_name)
+                        if self.cfg.sae_converter_name
+                        else None
+                    ),
                 )
             # Apply dtype override after loading for Transcoder as well
             if self.cfg.sae_dtype:
@@ -467,11 +478,14 @@ class NeuronpediaRunner:
 
     def _setup_activation_store(self):
         """Set up the activation store for data generation."""
+        # set the context size to the number of tokens in the prompt
+        self.sae.cfg.metadata.context_size = self.cfg.n_tokens_in_prompt
         self.activations_store = ActivationsStore.from_sae(
             model=self.model,
             sae=self.sae,
             dataset=self.cfg.huggingface_dataset_path,
             streaming=True,
+            context_size=self.cfg.n_tokens_in_prompt,
             store_batch_size_prompts=8,  # these don't matter
             n_batches_in_buffer=16,  # these don't matter
             disable_concat_sequences=True,
@@ -480,11 +494,6 @@ class NeuronpediaRunner:
         self.cached_activations_dir = Path(
             f"./cached_activations/{self.model_id}_{self.cfg.sae_set}_{self.hook_name}_{self.sae.cfg.d_sae}width_{self.cfg.n_prompts_total}prompts"
         )
-
-        # override the number of context tokens if we specified one
-        # this is useful because sometimes the default context tokens is too large for us to quickly generate
-        if self.cfg.n_tokens_in_prompt is not None:
-            self.activations_store.context_size = self.cfg.n_tokens_in_prompt
 
     def _setup_output_directory(self):
         """Set up the output directory for results."""
@@ -552,65 +561,58 @@ class NeuronpediaRunner:
     def add_prefix_suffix_to_tokens(self, tokens: torch.Tensor) -> torch.Tensor:
         original_length = tokens.shape[1]
         bos_tokens = tokens[:, 0]  # might not be if sae.cfg.prepend_bos is False
-        prefix_length = len(self.cfg.prefix_tokens) if self.cfg.prefix_tokens else 0
-        suffix_length = len(self.cfg.suffix_tokens) if self.cfg.suffix_tokens else 0
 
         # return tokens if no prefix or suffix
-        if self.cfg.prefix_tokens is None and self.cfg.suffix_tokens is None:
+        if self.cfg.prefix_str is None and self.cfg.suffix_str is None:
             return tokens
 
+        # generate tokens for the prefix and suffix
+        prefix_tokens = (
+            self.model.tokenizer.encode(self.cfg.prefix_str)
+            if self.cfg.prefix_str is not None
+            else []
+        )
+        suffix_tokens = (
+            self.model.tokenizer.encode(self.cfg.suffix_str)
+            if self.cfg.suffix_str is not None
+            else []
+        )
+
         # Calculate how many tokens to keep from the original
-        keep_length = original_length - prefix_length - suffix_length
+        keep_length = original_length - len(prefix_tokens) - len(suffix_tokens)
 
         if keep_length <= 0:
             raise ValueError("Prefix and suffix are too long for the given tokens.")
 
         # Trim original tokens
-        if hasattr(self.sae.cfg, "prepend_bos") and self.sae.cfg.prepend_bos:
-            tokens = tokens[:, : keep_length - self.sae.cfg.prepend_bos]
+        if (
+            hasattr(self.sae.cfg.metadata, "prepend_bos")
+            and self.sae.cfg.metadata.prepend_bos
+        ):
+            tokens = tokens[:, : keep_length - self.sae.cfg.metadata.prepend_bos]
         else:
             tokens = tokens[:, :keep_length]
 
-        if self.cfg.prefix_tokens:
-            prefix = torch.tensor(self.cfg.prefix_tokens).to(tokens.device)
+        if self.cfg.prefix_str:
+            prefix = torch.tensor(prefix_tokens).to(tokens.device)
             prefix_repeated = prefix.unsqueeze(0).repeat(tokens.shape[0], 1)
             # if sae.cfg.prepend_bos, then add that before the suffix
-            if hasattr(self.sae.cfg, "prepend_bos") and self.sae.cfg.prepend_bos:
+            if (
+                hasattr(self.sae.cfg.metadata, "prepend_bos")
+                and self.sae.cfg.metadata.prepend_bos
+            ):
                 bos = bos_tokens.unsqueeze(1)
                 prefix_repeated = torch.cat([bos, prefix_repeated], dim=1)
             tokens = torch.cat([prefix_repeated, tokens], dim=1)
 
-        if self.cfg.suffix_tokens:
-            suffix = torch.tensor(self.cfg.suffix_tokens).to(tokens.device)
+        if self.cfg.suffix_str:
+            suffix = torch.tensor(suffix_tokens).to(tokens.device)
             suffix_repeated = suffix.unsqueeze(0).repeat(tokens.shape[0], 1)
             tokens = torch.cat([tokens, suffix_repeated], dim=1)
 
         # assert length hasn't changed
         assert tokens.shape[1] == original_length
         return tokens
-
-    def get_alive_features(self) -> list[int]:
-        # skip sparsity
-        target_feature_indexes = list(range(self.sae.cfg.d_sae))
-        print("Warning: Sparsity option is not implemented, running all features.")
-        # TODO: post-refactor the load_sparsity no longer exists
-        # if self.cfg.sparsity_threshold == 1:
-        #     print("Skipping sparsity because sparsity_threshold was set to 1")
-        #     target_feature_indexes = list(range(self.sae.cfg.d_sae))
-        # else:
-        #     # if we have feature sparsity, then use it to only generate outputs for non-dead features
-        #     self.target_feature_indexes: list[int] = []
-        #     # sparsity = load_sparsity(self.cfg.sae_path)
-        #     # convert sparsity to logged sparsity if it's not
-        #     # TODO: standardize the sparsity file format
-        #     # if len(sparsity) > 0 and sparsity[0] >= 0:
-        #     #     sparsity = torch.log10(sparsity + 1e-10)
-        #     # target_feature_indexes = (
-        #     #     (sparsity > self.cfg.sparsity_threshold)
-        #     #     .nonzero(as_tuple=True)[0]
-        #     #     .tolist()
-        #     # )
-        return target_feature_indexes
 
     def get_feature_batches(self):
         # divide into batches
@@ -700,7 +702,7 @@ class NeuronpediaRunner:
         self.n_features = self.sae.cfg.d_sae
         assert self.n_features is not None
 
-        self.target_feature_indexes = self.get_alive_features()
+        self.target_feature_indexes = list(range(self.n_features))
 
         feature_idx = self.get_feature_batches()
         if self.cfg.start_batch >= len(feature_idx):
@@ -784,27 +786,6 @@ class NeuronpediaRunner:
                     tokens=tokens,
                 )
 
-                # if feature_batch_count == 0:
-                #     html_save_path = (
-                #         f"{self.cfg.outputs_dir}/batch-{feature_batch_count}.html"
-                #     )
-                #     save_feature_centric_vis(
-                #         sae_vis_data=feature_data,
-                #         filename=html_save_path,
-                #         # use only the first 10 features for the dashboard
-                #         include_only=features_to_process[
-                #             : max(10, len(features_to_process))
-                #         ],
-                #     )
-
-                #     if self.cfg.use_wandb:
-                #         wandb.log(
-                #             data={
-                #                 "batch": feature_batch_count,
-                #                 "dashboard": wandb.Html(open(html_save_path)),
-                #             },
-                #             step=feature_batch_count,
-                #         )
                 self.cfg.model_id = self.model_id
                 self.cfg.layer = self.layer
                 json_object = NeuronpediaConverter.convert_to_np_json(
@@ -892,11 +873,10 @@ def main():
         help="Optional: Path to custom HuggingFace model to use instead of default weights",
     )
     parser.add_argument(
-        "--prefix-tokens",
-        type=int,
-        nargs="*",
+        "--prefix-str",
+        type=str,
         default=None,
-        help="Optional list of token IDs to prepend to each prompt. Example: --prefix-tokens 151644 872 198",
+        help="Optional string to prepend to each prompt. Example: --prefix-str '<|im_start|>user\n'",
     )
     parser.add_argument(
         "--no-prepend-bos",
@@ -945,6 +925,12 @@ def main():
         default="",
         help="Filename of the CLT weights file (supports .safetensors / .pt). If omitted, script will search for a suitable file automatically.",
     )
+    parser.add_argument(
+        "--sae-converter-name",
+        type=str,
+        default=None,
+        help="Name of the SAE converter to use, for SAE.from_pretrained's converter argument",
+    )
 
     args = parser.parse_args()
 
@@ -959,7 +945,7 @@ def main():
         model_dtype=args.model_dtype,
         outputs_dir=args.output_dir,
         sparsity_threshold=args.sparsity_threshold,
-        prefix_tokens=args.prefix_tokens,
+        prefix_str=args.prefix_str,
         prepend_bos=args.prepend_bos,
         n_prompts_total=args.n_prompts,
         n_tokens_in_prompt=args.n_tokens_in_prompt,
@@ -975,6 +961,7 @@ def main():
         clt_layer_idx=args.clt_layer_idx,
         clt_dtype=args.clt_dtype,
         clt_weights_filename=args.clt_weights_filename,
+        sae_converter_name=args.sae_converter_name,
     )
 
     runner = NeuronpediaRunner(cfg)

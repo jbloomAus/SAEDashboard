@@ -49,8 +49,8 @@ class NeuronpediaRunnerConfig:
     use_wandb: bool = False
 
     shuffle_tokens: bool = True
-    prefix_tokens: Optional[List[int]] = None
-    suffix_tokens: Optional[List[int]] = None
+    prefix_str: Optional[str] = None
+    suffix_str: Optional[str] = None
     ignore_positions: Optional[List[int]] = None
     prepend_bos: Optional[bool] = None  # Override SAE default if specified
 
@@ -68,6 +68,8 @@ class NeuronpediaRunnerConfig:
     clt_dtype: str = ""
     # Optional filename for CLT weights (supports .safetensors or .pt). If empty, default search order will be used.
     clt_weights_filename: str = ""
+
+    sae_converter_name: Optional[str] = None
 
 
 @dataclass
@@ -114,6 +116,6 @@ class NeuronpediaVectorRunnerConfig:
     # Additional settings
     use_wandb: bool = False
     shuffle_tokens: bool = True
-    prefix_tokens: Optional[List[int]] = None
-    suffix_tokens: Optional[List[int]] = None
+    prefix_token_strs: Optional[List[str]] = None
+    suffix_token_strs: Optional[List[str]] = None
     ignore_positions: Optional[List[int]] = None
