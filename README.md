@@ -218,3 +218,4 @@ This project is based on the work by Callum McDougall. If you use SAEDashboard i
 ## Contact
 
 For questions or support, please [open an issue](https://github.com/your-username/sae-dashboard/issues) on our GitHub repository.
+
