@@ -1,14 +1,132 @@
 # CHANGELOG
 
+## v0.7.0 (2025-08-31)
+
+### Feature
+
+* feat: Merge pull request #69 from jbloomAus/qwen-transcoder
+
+Transcoder Support + SAELens v6 ([`8f8651e`](https://github.com/jbloomAus/SAEDashboard/commit/8f8651edaf8c20bc8eaff09e05de238a4ce780fb))
+
+### Fix
+
+* fix: relax saelens to not break saelens demo project ([`e38d140`](https://github.com/jbloomAus/SAEDashboard/commit/e38d1408f30f47f9e91646fa8646300750b23fd3))
+
+### Unknown
+
+* Merge branch &#39;main&#39; into qwen-transcoder ([`ae9dede`](https://github.com/jbloomAus/SAEDashboard/commit/ae9dedead671996ebf4f7de84eb4252b2af85fc2))
+
+* Merge pull request #67 from jbloomAus/relax_saelens
+
+fix: relax saelens to not break saelens demo project ([`fa1691a`](https://github.com/jbloomAus/SAEDashboard/commit/fa1691ab224e684618b2e800b8fda8af741eb81b))
+
 ## v0.6.11 (2025-08-05)
 
 ### Fix
 
 * fix: fixes tool.semantic_release subtable (#66) ([`eb36157`](https://github.com/jbloomAus/SAEDashboard/commit/eb361571550a4653f7fbcc5a9cc2c98c329aaf41))
 
+* fix: fixes tool.semantic_release subtable (#66) ([`725d76d`](https://github.com/jbloomAus/SAEDashboard/commit/725d76d9ac00e3b295c6b11f4657f4432c925e9e))
+
 ### Unknown
 
 * upgrades python-semantic-release (#65) ([`fcdae8b`](https://github.com/jbloomAus/SAEDashboard/commit/fcdae8b0e18bbf2c5184977bdf14cc14280fb6bc))
+
+* fix CI ([`d7dffdd`](https://github.com/jbloomAus/SAEDashboard/commit/d7dffdd79b0165cbdfb360f13622385f884a2158))
+
+* upgrades python-semantic-release (#65) ([`721d683`](https://github.com/jbloomAus/SAEDashboard/commit/721d683b437f378f22c3e713cb4e3f16bdc82e1a))
+
+* converter ([`30ff988`](https://github.com/jbloomAus/SAEDashboard/commit/30ff9881f4ea1adc3305675088f5fb808367d5eb))
+
+* bos override ([`bd04133`](https://github.com/jbloomAus/SAEDashboard/commit/bd04133033ce5b422f62fc12099eb6527d6f8070))
+
+* add prefix tokens to cli ([`4560dd7`](https://github.com/jbloomAus/SAEDashboard/commit/4560dd7301a713b3b45d836df3e43bf25ba52c64))
+
+* add prefix tokens to cli ([`50636fb`](https://github.com/jbloomAus/SAEDashboard/commit/50636fb667384fbf1df8d7809cfe3c5ebc44beab))
+
+* top acts group 20 ([`1e3d3d4`](https://github.com/jbloomAus/SAEDashboard/commit/1e3d3d4228b5f526f9a2e1d90cb51ff74d8e60b8))
+
+* temp updates for qwen transcoder ([`5727ac9`](https://github.com/jbloomAus/SAEDashboard/commit/5727ac944feed9eb78f60f6553feb40c7b6622d8))
+
+* some config fixes ([`51d903a`](https://github.com/jbloomAus/SAEDashboard/commit/51d903a98ebc2402f6d4863f1efc1062420ea3eb))
+
+* olved double normalization ([`5293073`](https://github.com/jbloomAus/SAEDashboard/commit/5293073adef90efc0804c61d9dbe3ab55430f62b))
+
+* updated readme ([`6ea06f2`](https://github.com/jbloomAus/SAEDashboard/commit/6ea06f2371e80191d8a29cca0c5e134943db02d0))
+
+* formatting changes ([`ad7422e`](https://github.com/jbloomAus/SAEDashboard/commit/ad7422e11a5525d8584991e278a3342ebf4ff892))
+
+* Update CLT test script parameters ([`9961859`](https://github.com/jbloomAus/SAEDashboard/commit/996185947217ccd13d6763462d764cbd2977a28e))
+
+* Merge pull request #64 from jbloomAus/clt-support
+
+CLT Support ([`57971a9`](https://github.com/jbloomAus/SAEDashboard/commit/57971a9e85b62cc2a9e7bf04ee8d8c26fac9cecc))
+
+* Add Cross-Layer Transcoder (CLT) support to SAEDashboard
+
+- Add CLTLayerWrapper to provide SAE-compatible interface for CLTs
+- Integrate CLT loading into NeuronpediaRunner with --use-clt flag
+- Add CLT-specific configuration parameters (clt_layer_idx, clt_weights_filename)
+- Support JumpReLU activation with learned thresholds
+- Add normalization statistics loading from norm_stats.json
+- Handle CLT-specific hook naming conventions (tl_input_template)
+- Add comprehensive unit tests for CLT functionality
+- Fix existing unit tests to use StandardSAE/StandardSAEConfig
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude &lt;noreply@anthropic.com&gt; ([`fab4c6c`](https://github.com/jbloomAus/SAEDashboard/commit/fab4c6cc7a026bbf9beed229734a34323f22c158))
+
+* Add CLT (Cross-Layer Transcoder) support
+
+- Add CLTLayerWrapper to wrap CLT models for SAE-compatible interface
+- Add CLT loading logic in neuronpedia_runner with local file support
+- Add conditional logic to skip fold_W_dec_norm() for CLT wrappers
+- Add conditional logic to skip hook_z_reshaping_mode for CLT wrappers
+- Add support for additional hook types (hook_mlp_out, hook_attn_out, etc.)
+- Add CLI arguments for CLT configuration (--use-clt, --clt-layer-idx, etc.)
+- Ensure set_use_hook_mlp_in is called for CLT models ([`0c58760`](https://github.com/jbloomAus/SAEDashboard/commit/0c587608d2da05aa5ed3656afc0ca6b001fbf79b))
+
+* script for CLT dashboard generation ([`31e7154`](https://github.com/jbloomAus/SAEDashboard/commit/31e7154363af98af2d6ec269ee9a78f9723048bb))
+
+* formatting ([`210fdc4`](https://github.com/jbloomAus/SAEDashboard/commit/210fdc4bd3d8e2dc957c2925719a7a7f7bca1de3))
+
+* simplified init function ([`883deb4`](https://github.com/jbloomAus/SAEDashboard/commit/883deb46d75df68af96c2366f59a41dd4a6db964))
+
+* formatted tests ([`676b0f1`](https://github.com/jbloomAus/SAEDashboard/commit/676b0f17db4ad919c951414e29c1eb224efa8cef))
+
+* added tests and formatting ([`70cbad3`](https://github.com/jbloomAus/SAEDashboard/commit/70cbad3074d2c0a86929921d78d20954e1caf6d8))
+
+* Fix compatibility with new SAELens API structure
+
+- Fix hook_layer extraction from hook_name when not in config
+- Remove deprecated unpacking of SAE.from_pretrained() return values
+- Handle prepend_bos in both config and metadata locations
+- Add support for extracting layer number from hook_name pattern
+
+Co-Authored-By: Claude &lt;noreply@anthropic.com&gt; ([`9018991`](https://github.com/jbloomAus/SAEDashboard/commit/9018991a40b62b7f4ece4f91aa8f07b9f2119d9f))
+
+* Fix indentation and hook_name access for transcoders
+
+- Fix indentation errors in neuronpedia_runner.py
+- Fix hook_name access - it&#39;s always in metadata for both SAEs and transcoders
+- Add test scripts for transcoder functionality
+- Successfully tested transcoder dashboard generation
+
+Co-Authored-By: Claude &lt;noreply@anthropic.com&gt; ([`31368e4`](https://github.com/jbloomAus/SAEDashboard/commit/31368e4387757063df87e3b04bd512e13a8cc7d5))
+
+* Update .gitignore to exclude test directories and submodules ([`5bf67c5`](https://github.com/jbloomAus/SAEDashboard/commit/5bf67c56e242f496b849957675dd610863485aeb))
+
+* Add transcoder support to SAEDashboard
+
+- Update imports from sae_lens to use new API structure
+- Add support for loading Transcoder and SkipTranscoder
+- Handle differences between SAE and Transcoder configs
+- Add support for normalized hooks in transformer_lens_wrapper
+- Fix architecture handling in FeatureMaskingContext
+- Update ActivationsStore.from_sae() to include dataset parameter
+
+Co-Authored-By: Claude &lt;noreply@anthropic.com&gt; ([`02f78a0`](https://github.com/jbloomAus/SAEDashboard/commit/02f78a0b2a6d08729e60caf06649fca4dfc38ec7))
 
 ## v0.6.10 (2025-07-16)
 
