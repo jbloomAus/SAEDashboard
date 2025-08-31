@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v0.7.1 (2025-08-31)
+
+### Fix
+
+* fix: force build ([`f432ba2`](https://github.com/jbloomAus/SAEDashboard/commit/f432ba2d14edd4c11ac71e947fbb1e97790e753e))
+
 ## v0.7.0 (2025-08-31)
 
 ### Feature
