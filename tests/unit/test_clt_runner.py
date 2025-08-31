@@ -1,12 +1,10 @@
 """Tests for CLT (Cross-Layer Transcoder) support in Neuronpedia runner."""
 
 import json
-import os
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import pytest
 import torch
 
 from sae_dashboard.neuronpedia.neuronpedia_runner_config import NeuronpediaRunnerConfig
@@ -61,7 +59,7 @@ class TestCLTWrapperIntegration:
 
     def test_clt_wrapper_initialization(self):
         """Test CLTLayerWrapper can be imported and basic initialization."""
-        from sae_dashboard.clt_layer_wrapper import CLTLayerWrapper, CLTWrapperConfig
+        from sae_dashboard.clt_layer_wrapper import CLTLayerWrapper
 
         # Mock CLT model
         mock_clt = MagicMock()

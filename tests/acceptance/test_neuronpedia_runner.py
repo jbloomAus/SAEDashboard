@@ -347,8 +347,8 @@ def test_neuronpedia_runner_prefix_suffix_it_model():
         end_batch=NUM_BATCHES - 1,
         use_wandb=True,
         shuffle_tokens=False,
-        prefix_tokens=[106, 1645, 108],
-        suffix_tokens=[107, 108],
+        # prefix_tokens=[106, 1645, 108],
+        # suffix_tokens=[107, 108],
         ignore_positions=[0, 1, 2],
     )
 

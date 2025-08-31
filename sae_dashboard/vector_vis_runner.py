@@ -58,7 +58,7 @@ class VectorDataGeneratorFactory:
                 else []
             ),
         )
-        wrapped_model = TransformerLensWrapper(model, activation_config)
+        wrapped_model = TransformerLensWrapper(model, activation_config)  # type: ignore
         return VectorDataGenerator(
             cfg=cfg, model=wrapped_model, encoder=encoder, tokens=tokens
         )
@@ -331,7 +331,7 @@ class VectorVisRunner:
 
 
 def get_decoder_weights_distribution(
-    encoder: SAE,
+    encoder: SAE,  # type: ignore
     model: HookedTransformer,
     feature_idx: Union[int, List[int]],
 ) -> List[DecoderWeightsDistribution]:

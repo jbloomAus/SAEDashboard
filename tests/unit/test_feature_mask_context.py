@@ -5,7 +5,7 @@ from sae_dashboard.feature_data_generator import FeatureMaskingContext
 
 
 @torch.no_grad()
-def test_feature_mask_context(autoencoder: SAE):
+def test_feature_mask_context(autoencoder: SAE):  # type: ignore
     feature_indices = list(range(10))
 
     sae_in_mock = torch.randn(10, 64, autoencoder.cfg.d_in)

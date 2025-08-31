@@ -116,6 +116,6 @@ class NeuronpediaVectorRunnerConfig:
     # Additional settings
     use_wandb: bool = False
     shuffle_tokens: bool = True
-    prefix_token_strs: Optional[List[str]] = None
-    suffix_token_strs: Optional[List[str]] = None
+    prefix_str: Optional[str] = None
+    suffix_str: Optional[str] = None
     ignore_positions: Optional[List[int]] = None

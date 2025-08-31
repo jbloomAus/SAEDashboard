@@ -9,6 +9,7 @@ from pathlib import Path
 # from types import SimpleNamespace # Unused import
 from typing import (  # Added Optional, Union and List
     TYPE_CHECKING,
+    Any,
     List,
     Optional,
     Union,
@@ -115,10 +116,10 @@ class CLTWrapperConfig:
     normalize_activations: bool = False
     dataset_trust_remote_code: bool = False
     seqpos_slice: Optional[slice] = None
-    model_from_pretrained_kwargs: dict = field(default_factory=dict)
+    model_from_pretrained_kwargs: dict[str, Any] = field(default_factory=dict)
     metadata: Optional[CLTMetadata] = None
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert config to dictionary for compatibility with SAE interface."""
         return asdict(self)
 
@@ -331,28 +332,28 @@ class CLTLayerWrapper:
         # Original W_enc from CLT encoder module is [d_sae_layer, d_model]
         # We transpose to match sae-lens W_enc convention: [d_model, d_sae_layer]
         self.W_enc = (
-            self._gather_encoder_weight(clt.encoder_module.encoders[layer_idx].weight)
+            self._gather_encoder_weight(clt.encoder_module.encoders[layer_idx].weight)  # type: ignore
             .t()
             .contiguous()
         )
         # For W_dec, use the decoder from the same layer to itself
         decoder_key = f"{layer_idx}->{layer_idx}"
-        if decoder_key not in clt.decoder_module.decoders:
+        if decoder_key not in clt.decoder_module.decoders:  # type: ignore
             raise KeyError(f"Decoder key {decoder_key} not found in CLT decoders.")
         # Original W_dec from CLT decoder module is [d_model, d_sae_layer]
         # We transpose to match sae-lens W_dec convention: [d_sae_layer, d_model]
         self.W_dec = (
-            self._gather_decoder_weight(clt.decoder_module.decoders[decoder_key].weight)
+            self._gather_decoder_weight(clt.decoder_module.decoders[decoder_key].weight)  # type: ignore
             .t()
             .contiguous()
         )
 
         self.b_enc = self._gather_encoder_bias(
-            clt.encoder_module.encoders[layer_idx].bias_param
+            clt.encoder_module.encoders[layer_idx].bias_param  # type: ignore
         )
         # For b_dec, use the bias from the same-layer decoder
         self.b_dec = self._gather_decoder_bias(
-            clt.decoder_module.decoders[decoder_key].bias_param
+            clt.decoder_module.decoders[decoder_key].bias_param  # type: ignore
         )
 
         # Cache for folded weights if needed
@@ -438,9 +439,9 @@ class CLTLayerWrapper:
 
         if x.ndim > 2:
             # Reshape back to original batch/sequence dimensions, with the last dim being N_FEATURES_IN_BATCH
-            encoded_acts = encoded_acts.reshape(*original_shape[:-1], -1)
+            encoded_acts = encoded_acts.reshape(*original_shape[:-1], -1)  # type: ignore
 
-        return encoded_acts
+        return encoded_acts  # type: ignore
 
     def turn_off_forward_pass_hook_z_reshaping(self):
         """Stub method to satisfy SAE interface. CLTWrapper does not use this."""

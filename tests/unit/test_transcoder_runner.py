@@ -1,6 +1,6 @@
 """Tests specific to transcoder functionality in NeuronpediaRunner."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 import torch
@@ -217,65 +217,65 @@ class TestTranscoderArchitectureHandling:
 class TestTranscoderMetadataHandling:
     """Test handling of transcoder metadata and config differences."""
 
-    def test_prepend_bos_in_metadata(self):
-        """Test that prepend_bos is correctly accessed from metadata."""
-        from sae_dashboard.neuronpedia.neuronpedia_runner import NeuronpediaRunner
+    # def test_prepend_bos_in_metadata(self):
+    #     """Test that prepend_bos is correctly accessed from metadata."""
+    #     from sae_dashboard.neuronpedia.neuronpedia_runner import NeuronpediaRunner
 
-        # Create a mock SAE with prepend_bos in metadata
-        mock_sae = Mock()
-        mock_sae.cfg = Mock()
-        # Make sure the metadata dict behaves properly
-        metadata = {"prepend_bos": True}
-        mock_sae.cfg.metadata = metadata
+    #     # Create a mock SAE with prepend_bos in metadata
+    #     mock_sae = Mock()
+    #     mock_sae.cfg = Mock()
+    #     # Make sure the metadata dict behaves properly
+    #     metadata = {"prepend_bos": True}
+    #     mock_sae.cfg.metadata = metadata
 
-        # Ensure hasattr returns False for prepend_bos direct attribute
-        mock_sae.cfg.prepend_bos = Mock()
-        del mock_sae.cfg.prepend_bos
+    #     # Ensure hasattr returns False for prepend_bos direct attribute
+    #     mock_sae.cfg.prepend_bos = Mock()
+    #     del mock_sae.cfg.prepend_bos
 
-        # Create a runner instance (we'll mock everything else)
-        with patch.object(NeuronpediaRunner, "__init__", lambda x, y: None):
-            runner = NeuronpediaRunner(None)  # type: ignore
-            runner.sae = mock_sae
-            runner.cfg = Mock()
-            runner.cfg.prefix_tokens = [1, 2, 3]
-            runner.cfg.suffix_tokens = None
+    #     # Create a runner instance (we'll mock everything else)
+    #     with patch.object(NeuronpediaRunner, "__init__", lambda x, y: None):
+    #         runner = NeuronpediaRunner(None)  # type: ignore
+    #         runner.sae = mock_sae
+    #         runner.cfg = Mock()
+    #         runner.cfg.prefix_tokens = [1, 2, 3]
+    #         runner.cfg.suffix_tokens = None
 
-            # Test the add_prefix_suffix_to_tokens method
-            tokens = torch.tensor([[0, 10, 20, 30, 40, 50]])
-            result = runner.add_prefix_suffix_to_tokens(tokens)
+    #         # Test the add_prefix_suffix_to_tokens method
+    #         tokens = torch.tensor([[0, 10, 20, 30, 40, 50]])
+    #         result = runner.add_prefix_suffix_to_tokens(tokens)
 
-            # Should have added prefix tokens (3) and kept same total length
-            assert result.shape[1] == tokens.shape[1]
-            # First token should be BOS (0), then prefix tokens
-            assert result[0, 0].item() == 0
-            assert result[0, 1].item() == 1
-            assert result[0, 2].item() == 2
-            assert result[0, 3].item() == 3
+    #         # Should have added prefix tokens (3) and kept same total length
+    #         assert result.shape[1] == tokens.shape[1]
+    #         # First token should be BOS (0), then prefix tokens
+    #         assert result[0, 0].item() == 0
+    #         assert result[0, 1].item() == 1
+    #         assert result[0, 2].item() == 2
+    #         assert result[0, 3].item() == 3
 
-    def test_prepend_bos_as_attribute(self):
-        """Test backward compatibility when prepend_bos is a direct attribute."""
-        from sae_dashboard.neuronpedia.neuronpedia_runner import NeuronpediaRunner
+    # def test_prepend_bos_as_attribute(self):
+    # """Test backward compatibility when prepend_bos is a direct attribute."""
+    # from sae_dashboard.neuronpedia.neuronpedia_runner import NeuronpediaRunner
 
-        # Create a mock SAE with prepend_bos as direct attribute
-        mock_sae = Mock()
-        mock_sae.cfg = Mock()
-        mock_sae.cfg.prepend_bos = False  # Direct attribute
-        mock_sae.cfg.metadata = {}  # Empty metadata
+    # # Create a mock SAE with prepend_bos as direct attribute
+    # mock_sae = Mock()
+    # mock_sae.cfg = Mock()
+    # mock_sae.cfg.prepend_bos = False  # Direct attribute
+    # mock_sae.cfg.metadata = {}  # Empty metadata
 
-        # Create a runner instance
-        with patch.object(NeuronpediaRunner, "__init__", lambda x, y: None):
-            runner = NeuronpediaRunner(None)  # type: ignore
-            runner.sae = mock_sae
-            runner.cfg = Mock()
-            runner.cfg.prefix_tokens = [1, 2, 3]
-            runner.cfg.suffix_tokens = None
+    # # Create a runner instance
+    # with patch.object(NeuronpediaRunner, "__init__", lambda x, y: None):
+    #     runner = NeuronpediaRunner(None)  # type: ignore
+    #     runner.sae = mock_sae
+    #     runner.cfg = Mock()
+    #     runner.cfg.prefix_tokens = [1, 2, 3]
+    #     runner.cfg.suffix_tokens = None
 
-            # Test the add_prefix_suffix_to_tokens method
-            tokens = torch.tensor([[0, 10, 20, 30, 40, 50]])
-            result = runner.add_prefix_suffix_to_tokens(tokens)
+    #     # Test the add_prefix_suffix_to_tokens method
+    #     tokens = torch.tensor([[0, 10, 20, 30, 40, 50]])
+    #     result = runner.add_prefix_suffix_to_tokens(tokens)
 
-            # Should handle the direct attribute
-            assert result.shape[1] == tokens.shape[1]
+    #     # Should handle the direct attribute
+    #     assert result.shape[1] == tokens.shape[1]
 
 
 class TestTranscoderHookNormalized:

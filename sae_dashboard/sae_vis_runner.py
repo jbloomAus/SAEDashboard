@@ -41,7 +41,7 @@ class FeatureDataGeneratorFactory:
     def create(
         cfg: SaeVisConfig,
         model: HookedSAETransformer,
-        encoder: SAE,
+        encoder: SAE,  # type: ignore
         tokens: Int[Tensor, "batch seq"],
     ) -> FeatureDataGenerator:
         """Builds a FeatureDataGenerator using the provided config and model."""
@@ -58,7 +58,7 @@ class FeatureDataGeneratorFactory:
         )
         wrapped_model = TransformerLensWrapper(model, activation_config)
         return FeatureDataGenerator(
-            cfg=cfg, model=wrapped_model, encoder=encoder, tokens=tokens
+            cfg=cfg, model=wrapped_model, encoder=encoder, tokens=tokens  # type: ignore
         )
 
 
@@ -73,7 +73,7 @@ class SaeVisRunner:
     @torch.inference_mode()
     def run(
         self,
-        encoder: SAE,
+        encoder: SAE,  # type: ignore
         model: HookedSAETransformer,
         tokens: Int[Tensor, "batch seq"],
     ) -> SaeVisData:
@@ -293,7 +293,7 @@ class SaeVisRunner:
         return None
 
     def handle_features(
-        self, features: Iterable[int] | None, encoder_wrapper: SAE
+        self, features: Iterable[int] | None, encoder_wrapper: SAE  # type: ignore
     ) -> list[int]:
         if features is None:
             return list(range(encoder_wrapper.cfg.d_sae))
@@ -337,7 +337,7 @@ class SaeVisRunner:
 
 
 def get_decoder_weights_distribution(
-    encoder: SAE,
+    encoder: SAE,  # type: ignore
     model: HookedSAETransformer,
     feature_idx: Union[int, List[int]],
 ) -> List[DecoderWeightsDistribution]:

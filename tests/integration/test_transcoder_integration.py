@@ -19,7 +19,7 @@ from sae_dashboard.neuronpedia.neuronpedia_runner import (
 class TestTranscoderIntegration:
     """Integration tests that actually load and run transcoders."""
 
-    def test_transcoder_dashboard_generation(self, tmp_path):
+    def test_transcoder_dashboard_generation(self, tmp_path):  # type: ignore
         """Test end-to-end transcoder dashboard generation."""
         # Configure for minimal test
         config = NeuronpediaRunnerConfig(
@@ -68,7 +68,7 @@ class TestTranscoderIntegration:
             assert data["model_id"] == "gemma-2-2b"
             assert data["layer"] == 0
 
-    def test_transcoder_vs_sae_differences(self, tmp_path):
+    def test_transcoder_vs_sae_differences(self, tmp_path):  # type: ignore
         """Test that transcoders are handled differently from standard SAEs."""
         # Test with transcoder
         transcoder_config = NeuronpediaRunnerConfig(
@@ -113,12 +113,12 @@ class TestTranscoderIntegration:
         transcoder_arch = transcoder_runner.sae.cfg.architecture
         if callable(transcoder_arch):
             transcoder_arch = transcoder_arch()
-        assert "transcoder" in transcoder_arch.lower()
+        assert "transcoder" in transcoder_arch.lower()  # type: ignore
 
         sae_arch = sae_runner.sae.cfg.architecture
         if callable(sae_arch):
             sae_arch = sae_arch()
-        assert "transcoder" not in sae_arch.lower()
+        assert "transcoder" not in sae_arch.lower()  # type: ignore
 
 
 @pytest.mark.skipif(
@@ -141,7 +141,7 @@ class TestTranscoderEdgeCases:
             )
             _ = NeuronpediaRunner(config)
 
-    def test_transcoder_with_custom_dtype(self, tmp_path):
+    def test_transcoder_with_custom_dtype(self, tmp_path):  # type: ignore
         """Test transcoder loading with custom dtype."""
         config = NeuronpediaRunnerConfig(
             sae_set="gemma-scope-2b-pt-transcoders",
