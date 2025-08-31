@@ -1,22 +1,19 @@
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import einops
 import numpy as np
 import torch
 from jaxtyping import Float, Int
-from sae_lens import SAE
+from sae_lens import SAE, HookedSAETransformer
 from sae_lens.config import DTYPE_MAP as DTYPES
-from sae_lens.sae import TopK
+from sae_lens.saes.topk_sae import TopK
 from torch import Tensor, nn
 from tqdm.auto import tqdm
 
 from sae_dashboard.dfa_calculator import DFACalculator
 from sae_dashboard.sae_vis_data import SaeVisConfig
-from sae_dashboard.transformer_lens_wrapper import (
-    TransformerLensWrapper,
-    to_resid_direction,
-)
+from sae_dashboard.transformer_lens_wrapper import to_resid_direction
 from sae_dashboard.utils_fns import RollingCorrCoef
 
 Arr = np.ndarray
@@ -27,15 +24,15 @@ class FeatureDataGenerator:
         self,
         cfg: SaeVisConfig,
         tokens: Int[Tensor, "batch seq"],
-        model: TransformerLensWrapper,
-        encoder: SAE,
+        model: HookedSAETransformer,
+        encoder: SAE[Any],
     ):
         self.cfg = cfg
         self.model = model
         self.encoder = encoder
         self.token_minibatches = self.batch_tokens(tokens)
         self.dfa_calculator = (
-            DFACalculator(model.model, encoder) if cfg.use_dfa else None
+            DFACalculator(model.model, encoder) if cfg.use_dfa else None  # type: ignore
         )
 
         if cfg.use_dfa:
@@ -75,7 +72,7 @@ class FeatureDataGenerator:
         # Get encoder & decoder directions
         feature_out_dir = self.encoder.W_dec[feature_indices]  # [feats d_autoencoder]
         feature_resid_dir = to_resid_direction(
-            feature_out_dir, self.model
+            feature_out_dir, self.model  # type: ignore
         )  # [feats d_model]
 
         # ! Compute & concatenate together all feature activations & post-activation function values
@@ -83,7 +80,7 @@ class FeatureDataGenerator:
             minibatch.to(self.cfg.device)
             model_activation_dict = self.get_model_acts(i, minibatch)
             primary_acts = model_activation_dict[
-                self.model.activation_config.primary_hook_point
+                self.model.activation_config.primary_hook_point  # type: ignore
             ].to(
                 self.encoder.device
             )  # make sure acts are on the correct device
@@ -118,7 +115,7 @@ class FeatureDataGenerator:
                 max_value_indices = torch.argmax(feature_acts, dim=1)
                 batch_dfa_results = self.dfa_calculator.calculate(
                     model_activation_dict,
-                    self.model.hook_layer,
+                    self.model.hook_layer,  # type: ignore
                     feature_indices,
                     max_value_indices,
                 )
@@ -172,12 +169,12 @@ class FeatureDataGenerator:
                 activation_dict = load_tensor_dict_torch(cache_path, self.cfg.device)
             else:
                 activation_dict = self.model.forward(
-                    minibatch_tokens.to("cpu"), return_logits=False
+                    minibatch_tokens.to("cpu"), return_logits=False  # type: ignore
                 )
                 save_tensor_dict_torch(activation_dict, cache_path)
         else:
             activation_dict = self.model.forward(
-                minibatch_tokens.to("cpu"), return_logits=False
+                minibatch_tokens.to("cpu"), return_logits=False  # type: ignore
             )
 
         return activation_dict
@@ -228,7 +225,7 @@ def load_tensor_dict_torch(filename: Path, device: str) -> Dict[str, torch.Tenso
 
 
 class FeatureMaskingContext:
-    def __init__(self, sae: SAE, feature_idxs: List[int]):
+    def __init__(self, sae: SAE[Any], feature_idxs: List[int]):
         self.sae = sae
         self.feature_idxs = feature_idxs
         self.original_weight = {}
@@ -249,19 +246,29 @@ class FeatureMaskingContext:
         # set the weight
         setattr(self.sae, "W_enc", nn.Parameter(masked_weight))
 
-        if self.sae.cfg.architecture == "standard":
+        # Handle architecture as either attribute or method
+        architecture = self.sae.cfg.architecture
+        if callable(architecture):
+            architecture = architecture()
+
+        if architecture in [
+            "standard",
+            "standard_transcoder",
+            "transcoder",
+            "skip_transcoder",
+        ]:
             ## b_enc
             self.original_weight["b_enc"] = getattr(self.sae, "b_enc").data.clone()
             # mask the weight
-            masked_weight = self.sae.b_enc[self.feature_idxs]
+            masked_weight = self.sae.b_enc[self.feature_idxs]  # type: ignore
             # set the weight
             setattr(self.sae, "b_enc", nn.Parameter(masked_weight))
 
-        elif self.sae.cfg.architecture == "jumprelu":
+        elif architecture in ["jumprelu", "jumprelu_transcoder"]:
             ## b_enc
             self.original_weight["b_enc"] = getattr(self.sae, "b_enc").data.clone()
             # mask the weight
-            masked_weight = self.sae.b_enc[self.feature_idxs]
+            masked_weight = self.sae.b_enc[self.feature_idxs]  # type: ignore
             # set the weight
             setattr(self.sae, "b_enc", nn.Parameter(masked_weight))
 
@@ -270,29 +277,29 @@ class FeatureMaskingContext:
                 self.sae, "threshold"
             ).data.clone()
             # mask the weight
-            masked_weight = self.sae.threshold[self.feature_idxs]
+            masked_weight = self.sae.threshold[self.feature_idxs]  # type: ignore
             # set the weight
             setattr(self.sae, "threshold", nn.Parameter(masked_weight))
 
-        elif self.sae.cfg.architecture == "gated":
+        elif architecture in ["gated", "gated_transcoder"]:
             ## b_gate
             self.original_weight["b_gate"] = getattr(self.sae, "b_gate").data.clone()
             # mask the weight
-            masked_weight = self.sae.b_gate[self.feature_idxs]
+            masked_weight = self.sae.b_gate[self.feature_idxs]  # type: ignore
             # set the weight
             setattr(self.sae, "b_gate", nn.Parameter(masked_weight))
 
             ## r_mag
             self.original_weight["r_mag"] = getattr(self.sae, "r_mag").data.clone()
             # mask the weight
-            masked_weight = self.sae.r_mag[self.feature_idxs]
+            masked_weight = self.sae.r_mag[self.feature_idxs]  # type: ignore
             # set the weight
             setattr(self.sae, "r_mag", nn.Parameter(masked_weight))
 
             ## b_mag
             self.original_weight["b_mag"] = getattr(self.sae, "b_mag").data.clone()
             # mask the weight
-            masked_weight = self.sae.b_mag[self.feature_idxs]
+            masked_weight = self.sae.b_mag[self.feature_idxs]  # type: ignore
             # set the weight
             setattr(self.sae, "b_mag", nn.Parameter(masked_weight))
         else:

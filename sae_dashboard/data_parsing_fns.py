@@ -103,7 +103,9 @@ def add_feature_neuron_correlations(
     feature_tables_data["correlated_neurons_cossim"] = neuron_cossim
 
 
-def get_logits_table_data(logit_vector: Float[Tensor, "d_vocab"], n_rows: int):
+def get_logits_table_data(
+    logit_vector: Float[Tensor, "d_vocab"], n_rows: int  # noqa: F821
+):
     # Get logits table data
     top_logits = TopK(logit_vector.float(), k=n_rows, largest=True)
     bottom_logits = TopK(logit_vector.float(), k=n_rows, largest=False)
@@ -374,7 +376,7 @@ def get_prompt_data(
     )
     assert isinstance(tokens, torch.Tensor)
 
-    model_wrapped = TransformerLensWrapper(model, ActivationConfig(cfg.hook_point, []))
+    model_wrapped = TransformerLensWrapper(model, ActivationConfig(cfg.hook_point, []))  # type: ignore
 
     feature_act_dir = encoder.W_enc[:, feature_idx]  # [d_in feats]
     feature_out_dir = encoder.W_dec[feature_idx]  # [feats d_in]

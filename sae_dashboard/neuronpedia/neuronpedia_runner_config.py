@@ -31,7 +31,7 @@ class NeuronpediaRunnerConfig:
 
     # quantiles
     n_quantiles: int = 5
-    top_acts_group_size: int = 30
+    top_acts_group_size: int = 20
     quantile_group_size: int = 5
 
     # additional calculations
@@ -49,11 +49,27 @@ class NeuronpediaRunnerConfig:
     use_wandb: bool = False
 
     shuffle_tokens: bool = True
-    prefix_tokens: Optional[List[int]] = None
-    suffix_tokens: Optional[List[int]] = None
+    prefix_str: Optional[str] = None
+    suffix_str: Optional[str] = None
     ignore_positions: Optional[List[int]] = None
+    prepend_bos: Optional[bool] = None  # Override SAE default if specified
 
     hf_model_path: Optional[str] = None
+
+    # If true, we load a Transcoder (inherits from SAE) instead of a standard SAE.
+    use_transcoder: bool = False
+
+    # If true, we load a SkipTranscoder (inherits from Transcoder) instead.
+    use_skip_transcoder: bool = False
+
+    # CLT (Cross-Layer Transcoder) specific parameters
+    use_clt: bool = False
+    clt_layer_idx: Optional[int] = None
+    clt_dtype: str = ""
+    # Optional filename for CLT weights (supports .safetensors or .pt). If empty, default search order will be used.
+    clt_weights_filename: str = ""
+
+    sae_converter_name: Optional[str] = None
 
 
 @dataclass
@@ -100,6 +116,6 @@ class NeuronpediaVectorRunnerConfig:
     # Additional settings
     use_wandb: bool = False
     shuffle_tokens: bool = True
-    prefix_tokens: Optional[List[int]] = None
-    suffix_tokens: Optional[List[int]] = None
+    prefix_str: Optional[str] = None
+    suffix_str: Optional[str] = None
     ignore_positions: Optional[List[int]] = None

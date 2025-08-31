@@ -28,7 +28,7 @@ def valid_activation_config(real_model: HookedTransformer) -> ActivationConfig:
 def test_initialization(
     real_model: HookedTransformer, valid_activation_config: ActivationConfig
 ) -> None:
-    wrapper = TransformerLensWrapper(real_model, valid_activation_config)
+    wrapper = TransformerLensWrapper(real_model, valid_activation_config)  # type: ignore
     assert wrapper.model == real_model
     assert wrapper.activation_config == valid_activation_config
     assert wrapper.hook_layer == 5
@@ -37,7 +37,7 @@ def test_initialization(
 def test_validate_hook_points(
     real_model: HookedTransformer, valid_activation_config: ActivationConfig
 ) -> None:
-    wrapper = TransformerLensWrapper(real_model, valid_activation_config)
+    wrapper = TransformerLensWrapper(real_model, valid_activation_config)  # type: ignore
     wrapper.validate_hook_points()  # This should not raise an exception
 
 
@@ -47,13 +47,13 @@ def test_validate_hook_points_invalid(real_model: HookedTransformer) -> None:
         auxiliary_hook_points=["blocks.0.hook_resid_pre"],
     )
     with pytest.raises(AssertionError):
-        TransformerLensWrapper(real_model, invalid_config)
+        TransformerLensWrapper(real_model, invalid_config)  # type: ignore
 
 
 def test_get_layer(
     real_model: HookedTransformer, valid_activation_config: ActivationConfig
 ) -> None:
-    wrapper = TransformerLensWrapper(real_model, valid_activation_config)
+    wrapper = TransformerLensWrapper(real_model, valid_activation_config)  # type: ignore
     assert wrapper.get_layer("blocks.2.hook_mlp_out") == 2
     with pytest.raises(AssertionError):
         wrapper.get_layer("invalid_hook_point")
@@ -65,7 +65,7 @@ def test_forward(
     valid_activation_config: ActivationConfig,
     return_logits: bool,
 ) -> None:
-    wrapper = TransformerLensWrapper(real_model, valid_activation_config)
+    wrapper = TransformerLensWrapper(real_model, valid_activation_config)  # type: ignore
     tokens = torch.randint(0, real_model.cfg.d_vocab, (2, 10))
 
     activation_dict = wrapper.forward(tokens, return_logits=return_logits)
@@ -126,7 +126,7 @@ def test_forward(
 def test_hook_fn_store_act(
     real_model: HookedTransformer, valid_activation_config: ActivationConfig
 ) -> None:
-    wrapper = TransformerLensWrapper(real_model, valid_activation_config)
+    wrapper = TransformerLensWrapper(real_model, valid_activation_config)  # type: ignore
     activation = torch.randn(2, 10, real_model.cfg.d_model)
     hook = type("MockHook", (), {"ctx": {}})()
 
@@ -137,7 +137,7 @@ def test_hook_fn_store_act(
 def test_property_access(
     real_model: HookedTransformer, valid_activation_config: ActivationConfig
 ) -> None:
-    wrapper = TransformerLensWrapper(real_model, valid_activation_config)
+    wrapper = TransformerLensWrapper(real_model, valid_activation_config)  # type: ignore
 
     assert torch.all(wrapper.W_U == real_model.W_U)
     assert torch.all(wrapper.W_out == real_model.W_out)

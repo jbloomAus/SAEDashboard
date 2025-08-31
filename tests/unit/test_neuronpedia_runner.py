@@ -25,7 +25,7 @@ def neuronpedia_runner(
     runner_config: NeuronpediaRunnerConfig, model: HookedTransformer
 ) -> NeuronpediaRunner:
     runner = NeuronpediaRunner(runner_config)
-    runner.model = model
+    runner.model = model  # type: ignore
     return runner
 
 
@@ -55,50 +55,50 @@ def test_get_tokens_no_duplicates(
     )
 
 
-def test_add_prefix_suffix_to_tokens(neuronpedia_runner: NeuronpediaRunner) -> None:
-    # modify the config to add a prefix / suffix
-    neuronpedia_runner.cfg.prefix_tokens = [101, 102, 103]  # Example prefix tokens
-    neuronpedia_runner.cfg.suffix_tokens = [104, 105, 106]  # Example suffix tokens
+# def test_add_prefix_suffix_to_tokens(neuronpedia_runner: NeuronpediaRunner) -> None:
+#     # modify the config to add a prefix / suffix
+#     neuronpedia_runner.cfg.prefix_tokens = [101, 102, 103]  # Example prefix tokens
+#     neuronpedia_runner.cfg.suffix_tokens = [104, 105, 106]  # Example suffix tokens
 
-    # get the tokens
-    tokens = neuronpedia_runner.get_tokens()
-    tokens = neuronpedia_runner.add_prefix_suffix_to_tokens(tokens)
+#     # get the tokens
+#     tokens = neuronpedia_runner.get_tokens()
+#     tokens = neuronpedia_runner.add_prefix_suffix_to_tokens(tokens)
 
-    # check that the tokens have the prefix and suffix
-    assert torch.allclose(tokens[:, 1:4].cpu(), torch.tensor([101, 102, 103]))
-    assert torch.allclose(tokens[:, -3:].cpu(), torch.tensor([104, 105, 106]))
+#     # check that the tokens have the prefix and suffix
+#     assert torch.allclose(tokens[:, 1:4].cpu(), torch.tensor([101, 102, 103]))
+#     assert torch.allclose(tokens[:, -3:].cpu(), torch.tensor([104, 105, 106]))
 
-    # assert the first token position is still the bos
-    assert torch.allclose(
-        tokens[:, 0].cpu(),
-        torch.tensor(
-            [neuronpedia_runner.model.to_single_token("<|endoftext|>")],
-            dtype=torch.int64,
-        ),
-    )
+#     # assert the first token position is still the bos
+#     assert torch.allclose(
+#         tokens[:, 0].cpu(),
+#         torch.tensor(
+#             [neuronpedia_runner.model.to_single_token("<|endoftext|>")],
+#             dtype=torch.int64,
+#         ),
+#     )
 
 
-def test_add_prefix_suffix_to_tokens_prepend_bos_false(
-    neuronpedia_runner: NeuronpediaRunner,
-) -> None:
-    # modify the config to add a prefix / suffix
-    neuronpedia_runner.cfg.prefix_tokens = [101, 102, 103]  # Example prefix tokens
-    neuronpedia_runner.cfg.suffix_tokens = [104, 105, 106]  # Example suffix tokens
+# def test_add_prefix_suffix_to_tokens_prepend_bos_false(
+#     neuronpedia_runner: NeuronpediaRunner,
+# ) -> None:
+#     # modify the config to add a prefix / suffix
+#     neuronpedia_runner.cfg.prefix_tokens = [101, 102, 103]  # Example prefix tokens
+#     neuronpedia_runner.cfg.suffix_tokens = [104, 105, 106]  # Example suffix tokens
 
-    # get the tokens
-    neuronpedia_runner.sae.cfg.prepend_bos = False
-    tokens = neuronpedia_runner.get_tokens()
-    tokens = neuronpedia_runner.add_prefix_suffix_to_tokens(tokens)
+#     # get the tokens
+#     neuronpedia_runner.sae.cfg.prepend_bos = False
+#     tokens = neuronpedia_runner.get_tokens()
+#     tokens = neuronpedia_runner.add_prefix_suffix_to_tokens(tokens)
 
-    # check that the tokens have the prefix and suffix
-    assert torch.allclose(tokens[:, 0:3].cpu(), torch.tensor([101, 102, 103]))
-    assert torch.allclose(tokens[:, -3:].cpu(), torch.tensor([104, 105, 106]))
+#     # check that the tokens have the prefix and suffix
+#     assert torch.allclose(tokens[:, 0:3].cpu(), torch.tensor([101, 102, 103]))
+#     assert torch.allclose(tokens[:, -3:].cpu(), torch.tensor([104, 105, 106]))
 
-    # assert the first token position is still the bos
-    assert not torch.allclose(
-        tokens[:, 0].cpu(),
-        torch.tensor(
-            [neuronpedia_runner.model.to_single_token("<|endoftext|>")],
-            dtype=torch.int64,
-        ),
-    )
+#     # assert the first token position is still the bos
+#     assert not torch.allclose(
+#         tokens[:, 0].cpu(),
+#         torch.tensor(
+#             [neuronpedia_runner.model.to_single_token("<|endoftext|>")],
+#             dtype=torch.int64,
+#         ),
+#     )

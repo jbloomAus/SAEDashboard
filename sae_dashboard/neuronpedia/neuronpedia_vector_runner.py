@@ -11,7 +11,7 @@ import torch
 import wandb
 import wandb.sdk
 from matplotlib import colors
-from sae_lens.training.activations_store import ActivationsStore
+from sae_lens import ActivationsStore
 from tqdm import tqdm
 from transformer_lens import HookedTransformer
 
@@ -156,7 +156,7 @@ class NeuronpediaVectorRunner:
             dataset=self.cfg.huggingface_dataset_path,
             streaming=True,
             hook_name=self.vector_set.hook_point,
-            hook_layer=self.vector_set.hook_layer,
+            hook_layer=self.vector_set.hook_layer,  # type: ignore
             hook_head_index=self.vector_set.hook_head_index,
             context_size=self.cfg.n_tokens_in_prompt,
             d_in=self.vector_set.cfg.d_in,
@@ -298,34 +298,40 @@ class NeuronpediaVectorRunner:
 
     def add_prefix_suffix_to_tokens(self, tokens: torch.Tensor) -> torch.Tensor:
         original_length = tokens.shape[1]
-        bos_tokens = tokens[:, 0]  # might not be if sae.cfg.prepend_bos is False
-        prefix_length = len(self.cfg.prefix_tokens) if self.cfg.prefix_tokens else 0
-        suffix_length = len(self.cfg.suffix_tokens) if self.cfg.suffix_tokens else 0
 
         # return tokens if no prefix or suffix
-        if self.cfg.prefix_tokens is None and self.cfg.suffix_tokens is None:
+        if self.cfg.prefix_str is None and self.cfg.suffix_str is None:
             return tokens
 
+        # generate tokens for the prefix and suffix
+        prefix_tokens = (
+            self.model.tokenizer.encode(self.cfg.prefix_str)  # type: ignore
+            if self.cfg.prefix_str is not None
+            else []
+        )
+        suffix_tokens = (
+            self.model.tokenizer.encode(self.cfg.suffix_str)  # type: ignore
+            if self.cfg.suffix_str is not None
+            else []
+        )
+
         # Calculate how many tokens to keep from the original
-        keep_length = original_length - prefix_length - suffix_length
+        keep_length = original_length - len(prefix_tokens) - len(suffix_tokens)
 
         if keep_length <= 0:
             raise ValueError("Prefix and suffix are too long for the given tokens.")
 
         # Trim original tokens
-        tokens = tokens[:, : keep_length - self.vector_set.cfg.prepend_bos]
+        tokens = tokens[:, :keep_length]
 
-        if self.cfg.prefix_tokens:
-            prefix = torch.tensor(self.cfg.prefix_tokens).to(tokens.device)
+        if self.cfg.prefix_str:
+            prefix = torch.tensor(prefix_tokens).to(tokens.device)
             prefix_repeated = prefix.unsqueeze(0).repeat(tokens.shape[0], 1)
             # if sae.cfg.prepend_bos, then add that before the suffix
-            if self.vector_set.cfg.prepend_bos:
-                bos = bos_tokens.unsqueeze(1)
-                prefix_repeated = torch.cat([bos, prefix_repeated], dim=1)
             tokens = torch.cat([prefix_repeated, tokens], dim=1)
 
-        if self.cfg.suffix_tokens:
-            suffix = torch.tensor(self.cfg.suffix_tokens).to(tokens.device)
+        if self.cfg.suffix_str:
+            suffix = torch.tensor(suffix_tokens).to(tokens.device)
             suffix_repeated = suffix.unsqueeze(0).repeat(tokens.shape[0], 1)
             tokens = torch.cat([tokens, suffix_repeated], dim=1)
 
@@ -634,10 +640,10 @@ def main():
         help="Don't shuffle tokens",
     )
     parser.add_argument(
-        "--prefix-tokens", type=int, nargs="+", help="Tokens to prefix to each sequence"
-    )
-    parser.add_argument(
-        "--suffix-tokens", type=int, nargs="+", help="Tokens to append to each sequence"
+        "--prefix-str",
+        type=str,
+        default=None,
+        help="Optional string to prepend to each prompt. Example: --prefix-str '<|im_start|>user\n'",
     )
     parser.add_argument(
         "--ignore-positions",
@@ -672,8 +678,7 @@ def main():
         huggingface_dataset_path=args.dataset_path,
         use_wandb=args.use_wandb,
         shuffle_tokens=args.shuffle_tokens,
-        prefix_tokens=args.prefix_tokens,
-        suffix_tokens=args.suffix_tokens,
+        prefix_str=args.prefix_str,
         ignore_positions=args.ignore_positions,
     )
 

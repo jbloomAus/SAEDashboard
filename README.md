@@ -85,6 +85,71 @@ runner.run()
 
 For more options and detailed configuration, refer to the `NeuronpediaRunnerConfig` class in the code.
 
+## Cross-Layer Transcoder (CLT) Support
+
+SAEDashboard now supports visualization of Cross-Layer Transcoders (CLTs), which are a variant of SAEs that process activations across transformer layers. To use CLT visualization:
+
+### Required Files
+
+When using a CLT model, you'll need these files in your CLT model directory:
+
+1. **Model weights**: A `.safetensors` or `.pt` file containing the CLT weights
+2. **Configuration**: A `cfg.json` file with the CLT configuration, including:
+   - `num_features`: Number of features in the CLT
+   - `num_layers`: Number of transformer layers
+   - `d_model`: Model dimension
+   - `activation_fn`: Activation function (e.g., "jumprelu", "relu")
+   - `normalization_method`: How inputs are normalized (e.g., "mean_std", "none")
+   - `tl_input_template`: TransformerLens hook template (e.g., "blocks.{}.ln2.hook_normalized"). Note that this will usually differ from the hook name in the model's cfg.json, which is based on NNsight/transformers. You will need to find the corresponding TransformerLens hook name.
+3. **Normalization statistics** (if `normalization_method` is "mean_std"): A `norm_stats.json` file containing the mean and standard deviation for each layer's inputs, generated from the dataset when activations were generated (or afterwards). The file should have this structure:
+   ```json
+   {
+     "0": {
+       "inputs": {
+         "mean": [0.1, -0.2, ...],  // Array of d_model values
+         "std": [1.0, 0.9, ...]      // Array of d_model values
+       }
+     },
+     "1": {
+       "inputs": {
+         "mean": [...],
+         "std": [...]
+       }
+     },
+     // ... entries for each layer
+   }
+   ```
+
+### Example Usage
+
+```python
+from sae_dashboard.neuronpedia.neuronpedia_runner_config import NeuronpediaRunnerConfig
+from sae_dashboard.neuronpedia.neuronpedia_runner import NeuronpediaRunner
+
+config = NeuronpediaRunnerConfig(
+    sae_set="your_clt_set",
+    sae_path="/path/to/clt/model/directory",  # Directory containing the files above
+    model_id="gpt2",  # Base model the CLT was trained on
+    outputs_dir="clt_outputs",
+    huggingface_dataset_path="your/dataset",
+    use_clt=True,  # Enable CLT mode
+    clt_layer_idx=5,  # Which layer to visualize (0-indexed)
+    clt_weights_filename="model.safetensors",  # Optional: specify exact weights file
+    n_prompts_total=1000,
+    n_features_at_a_time=64
+)
+
+runner = NeuronpediaRunner(config)
+runner.run()
+```
+
+### Notes on CLT Support
+
+- CLTs must be loaded from local files (HuggingFace Hub loading not yet supported)
+- The `--use-clt` flag is mutually exclusive with `--use-transcoder` and `--use-skip-transcoder`
+- JumpReLU activation functions with learned thresholds are supported
+- The visualization will show features for the specified layer only
+
 ## Configuration Options
 
 SAEDashboard offers a wide range of configuration options for both SaeVisRunner and NeuronpediaRunner. Key options include:

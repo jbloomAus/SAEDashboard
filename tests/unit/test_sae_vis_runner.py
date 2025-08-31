@@ -68,23 +68,23 @@ def cfg(request: pytest.FixtureRequest, cache_path: Path) -> SaeVisConfig:
 def sae_vis_data(
     cfg: SaeVisConfig,
     model: HookedTransformer,
-    autoencoder: SAE,
+    autoencoder: SAE,  # type: ignore
     tokens: Int[Tensor, "batch seq"],
 ) -> SaeVisData:
     autoencoder.cfg.device = TEST_DEVICE
     autoencoder.to(TEST_DEVICE)
-    data = SaeVisRunner(cfg).run(encoder=autoencoder, model=model, tokens=tokens)
+    data = SaeVisRunner(cfg).run(encoder=autoencoder, model=model, tokens=tokens)  # type: ignore
     return data
 
 
 def test_SaeVisData_create_results_look_reasonable(
     tokens: Int[Tensor, "batch seq"],
     model: HookedTransformer,
-    autoencoder: SAE,
+    autoencoder: SAE,  # type: ignore
     cfg: SaeVisConfig,
 ):
     sae_vis_data = SaeVisRunner(cfg).run(
-        encoder=autoencoder, model=model, tokens=tokens
+        encoder=autoencoder, model=model, tokens=tokens  # type: ignore
     )
     assert sae_vis_data.encoder == autoencoder
     assert sae_vis_data.model == model

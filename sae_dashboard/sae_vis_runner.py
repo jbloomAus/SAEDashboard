@@ -10,11 +10,10 @@ import torch
 from jaxtyping import Int
 from rich import print as rprint
 from rich.table import Table
-from sae_lens import SAE
+from sae_lens import SAE, HookedSAETransformer
 from sae_lens.config import DTYPE_MAP as DTYPES
 from torch import Tensor
 from tqdm.auto import tqdm
-from transformer_lens import HookedTransformer
 
 from sae_dashboard.components import (
     ActsHistogramData,
@@ -41,8 +40,8 @@ class FeatureDataGeneratorFactory:
     @staticmethod
     def create(
         cfg: SaeVisConfig,
-        model: HookedTransformer,
-        encoder: SAE,
+        model: HookedSAETransformer,
+        encoder: SAE,  # type: ignore
         tokens: Int[Tensor, "batch seq"],
     ) -> FeatureDataGenerator:
         """Builds a FeatureDataGenerator using the provided config and model."""
@@ -59,7 +58,7 @@ class FeatureDataGeneratorFactory:
         )
         wrapped_model = TransformerLensWrapper(model, activation_config)
         return FeatureDataGenerator(
-            cfg=cfg, model=wrapped_model, encoder=encoder, tokens=tokens
+            cfg=cfg, model=wrapped_model, encoder=encoder, tokens=tokens  # type: ignore
         )
 
 
@@ -73,17 +72,27 @@ class SaeVisRunner:
 
     @torch.inference_mode()
     def run(
-        self, encoder: SAE, model: HookedTransformer, tokens: Int[Tensor, "batch seq"]
+        self,
+        encoder: SAE,  # type: ignore
+        model: HookedSAETransformer,
+        tokens: Int[Tensor, "batch seq"],
     ) -> SaeVisData:
         # Apply random seed
         self.set_seeds()
 
         # add extra method to SAE which is not yet provided by SAE Lens.
         # encoder = self.mock_feature_acts_subset_for_now(encoder)
-        encoder.fold_W_dec_norm()
+
+        # Skip fold_W_dec_norm for CLT wrappers as they don't support this method
+        if "CLTLayerWrapper" in str(type(encoder)):
+            print("SaeVisRunner: Skipping fold_W_dec_norm() for CLT wrapper.")
+        else:
+            encoder.fold_W_dec_norm()
 
         # turn off reshaping mode since that's not useful if we're caching activations on disk
-        if encoder.hook_z_reshaping_mode:
+        if "CLTLayerWrapper" in str(type(encoder)):
+            print("SaeVisRunner: Skipping hook_z_reshaping_mode check for CLT wrapper.")
+        elif encoder.hook_z_reshaping_mode:
             encoder.turn_off_forward_pass_hook_z_reshaping()
 
         # set precision on encoders and model
@@ -284,7 +293,7 @@ class SaeVisRunner:
         return None
 
     def handle_features(
-        self, features: Iterable[int] | None, encoder_wrapper: SAE
+        self, features: Iterable[int] | None, encoder_wrapper: SAE  # type: ignore
     ) -> list[int]:
         if features is None:
             return list(range(encoder_wrapper.cfg.d_sae))
@@ -328,8 +337,8 @@ class SaeVisRunner:
 
 
 def get_decoder_weights_distribution(
-    encoder: SAE,
-    model: HookedTransformer,
+    encoder: SAE,  # type: ignore
+    model: HookedSAETransformer,
     feature_idx: Union[int, List[int]],
 ) -> List[DecoderWeightsDistribution]:
     if not isinstance(feature_idx, list):

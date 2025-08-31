@@ -1,5 +1,6 @@
 import argparse
 import gc
+import importlib
 import json
 import os
 from datetime import datetime
@@ -8,15 +9,13 @@ from typing import Dict, Set, Tuple
 
 import numpy as np
 import torch
-import wandb
-import wandb.sdk
 from matplotlib import colors
-from sae_lens.sae import SAE
-from sae_lens.training.activations_store import ActivationsStore
+from sae_lens import SAE, ActivationsStore, HookedSAETransformer
 from tqdm import tqdm
-from transformer_lens import HookedTransformer
 from transformers import AutoModelForCausalLM
 
+import wandb
+import wandb.sdk
 from sae_dashboard.components_config import (
     ActsHistogramConfig,
     Column,
@@ -61,6 +60,12 @@ HTML_ANOMALIES = {
 }
 
 
+def get_sae_loader(loader_name: str):
+    module = importlib.import_module("sae_lens.loading.pretrained_sae_loaders")
+    loader_function = getattr(module, loader_name)
+    return loader_function
+
+
 class NeuronpediaRunner:
     def __init__(
         self,
@@ -68,7 +73,23 @@ class NeuronpediaRunner:
     ):
         self.cfg = cfg
 
-        # Get device defaults. But if we have overrides, then use those.
+        # Initialize core components
+        self.device_count = self._setup_devices()
+        self._load_sae_or_transcoder()
+        if cfg.prepend_bos is not None:
+            # if metadata doesnt exist, create it
+            if not hasattr(self.sae.cfg, "metadata"):
+                self.sae.cfg["metadata"] = {}  # type: ignore
+            self.sae.cfg.metadata["prepend_bos"] = cfg.prepend_bos  # type: ignore
+        self._configure_dtypes()
+        self._extract_model_info()
+        self._initialize_model()
+        self._setup_activation_store()
+        self._setup_output_directory()
+        self.vocab_dict = self.get_vocab_dict()
+
+    def _setup_devices(self) -> int:
+        """Set up device configuration based on available hardware."""
         device_count = 1
         # Set correct device, use multi-GPU if we have it
         if torch.backends.mps.is_available():
@@ -96,31 +117,235 @@ class NeuronpediaRunner:
             self.cfg.model_n_devices = self.cfg.model_n_devices or 1
             self.cfg.activation_store_device = self.cfg.activation_store_device or "cpu"
 
-        # Initialize SAE, defaulting to SAE dtype unless we override
-        if self.cfg.from_local_sae:
-            self.sae = SAE.load_from_disk(  # type: ignore
-                path=self.cfg.sae_path,
-                device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
-                dtype=self.cfg.sae_dtype if self.cfg.sae_dtype != "" else None,
+        return device_count
+
+    def _load_sae_or_transcoder(self):
+        """Load SAE, Transcoder, SkipTranscoder, or CLT based on configuration."""
+        # Validate that only one loader type is specified
+        flags = [
+            self.cfg.use_transcoder,
+            self.cfg.use_skip_transcoder,
+            self.cfg.use_clt,
+        ]
+        if sum(flags) > 1:
+            raise ValueError(
+                "Only one of --use-transcoder, --use-skip-transcoder, or --use-clt can be set."
             )
-        else:
-            self.sae, _, _ = SAE.from_pretrained(
-                release=self.cfg.sae_set,
-                sae_id=self.cfg.sae_path,
-                device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
+        if self.cfg.use_clt and self.cfg.clt_layer_idx is None:
+            raise ValueError("--clt-layer-idx must be specified when using --use-clt.")
+
+        if self.cfg.use_skip_transcoder:
+            # Dynamically import to avoid dependency issues when Transcoder isn't used
+            try:
+                from sae_lens import SkipTranscoder  # type: ignore
+            except ImportError as e:
+                raise ImportError(
+                    "SkipTranscoder class not found in sae_lens. Install a version of sae_lens that provides it or disable --use-skip-transcoder."
+                ) from e
+            LoaderClass = SkipTranscoder
+            loader_kwargs = {}
+            # TODO: Check if SkipTranscoder supports local loading via path= kwarg
+            # if self.cfg.from_local_sae:
+            #     loader_kwargs["path"] = self.cfg.sae_path
+            # else:
+            loader_kwargs["release"] = self.cfg.sae_set
+            loader_kwargs["sae_id"] = self.cfg.sae_path
+
+            self.sae = LoaderClass.from_pretrained(  # type: ignore
+                device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE, **loader_kwargs
             )
-            if self.cfg.sae_dtype != "":
-                if self.cfg.sae_dtype == "float16":
-                    self.sae.to(dtype=torch.float16)
-                elif self.cfg.sae_dtype == "float32":
-                    self.sae.to(dtype=torch.float32)
-                elif self.cfg.sae_dtype == "bfloat16":
-                    self.sae.to(dtype=torch.bfloat16)
-                else:
+            # SkipTranscoder doesn't directly support dtype override in from_pretrained, apply after
+            if self.cfg.sae_dtype:
+                self._apply_sae_dtype_override()
+
+        elif self.cfg.use_transcoder:
+            # Dynamically import to avoid dependency issues when Transcoder isn't used
+            try:
+                from sae_lens import Transcoder  # type: ignore
+            except ImportError as e:
+                raise ImportError(
+                    "Transcoder class not found in sae_lens. Install a version of sae_lens that provides Transcoder or disable --use-transcoder."
+                ) from e
+            LoaderClass = Transcoder
+
+            if self.cfg.from_local_sae:
+                # Transcoder might not have load_from_pretrained, use from_pretrained
+                self.sae = LoaderClass.from_pretrained(  # type: ignore
+                    path=self.cfg.sae_path,  # type: ignore
+                    device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
+                    # dtype=self.cfg.sae_dtype if self.cfg.sae_dtype != "" else None, # Dtype applied after
+                )
+            else:
+                self.sae = LoaderClass.from_pretrained(  # type: ignore
+                    release=self.cfg.sae_set,
+                    sae_id=self.cfg.sae_path,
+                    device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
+                    converter=(
+                        get_sae_loader(self.cfg.sae_converter_name)
+                        if self.cfg.sae_converter_name
+                        else None
+                    ),
+                )
+            # Apply dtype override after loading for Transcoder as well
+            if self.cfg.sae_dtype:
+                self._apply_sae_dtype_override()
+        elif self.cfg.use_clt:
+            # Dynamically import CLT components only when needed
+            try:
+                from clt.config.clt_config import CLTConfig  # type: ignore
+                from clt.models.clt import CrossLayerTranscoder  # type: ignore
+            except ImportError as e:
+                raise ImportError(
+                    "CLT components (CrossLayerTranscoder, CLTConfig) not found. "
+                    "Ensure the 'clt' package is installed and available."
+                ) from e
+
+            if self.cfg.from_local_sae:
+                # Load CLT config from local path
+                try:
+                    clt_config_path = Path(self.cfg.sae_path) / "cfg.json"
+                    if not clt_config_path.is_file():
+                        raise FileNotFoundError(
+                            f"CLT config file not found at {clt_config_path}"
+                        )
+                    clt_cfg = CLTConfig.from_json(clt_config_path)  # type: ignore
+                except Exception as e:
                     raise ValueError(
-                        f"Unsupported dtype: {self.cfg.sae_dtype}, we support float16, float32, bfloat16"
+                        f"Failed to load CLT config from {clt_config_path}: {e}"  # type: ignore
+                    ) from e
+
+                # Create CLT instance
+                self.clt = CrossLayerTranscoder(
+                    config=clt_cfg,
+                    process_group=None,
+                    device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,  # type: ignore
+                )
+
+                # Load weights
+                self._load_clt_weights()
+
+                # Apply dtype override if specified
+                if self.cfg.clt_dtype:
+                    try:
+                        dtype_torch = getattr(torch, self.cfg.clt_dtype)
+                        self.clt.to(dtype=dtype_torch)
+                        print(f"Overriding CLT dtype to {self.cfg.clt_dtype}")
+                    except AttributeError:
+                        raise ValueError(f"Invalid clt_dtype: {self.cfg.clt_dtype}")
+                elif hasattr(self.clt.config, "dtype") and self.clt.config.dtype:  # type: ignore
+                    self.cfg.clt_dtype = str(self.clt.config.dtype).replace(  # type: ignore
+                        "torch.", ""
+                    )
+                    print(f"Using CLT configured dtype: {self.cfg.clt_dtype}")
+                else:
+                    self.cfg.clt_dtype = "float32"
+                    print(
+                        f"CLT dtype not specified, defaulting to {self.cfg.clt_dtype}"
                     )
 
+                # Create wrapper for the specific layer
+                from sae_dashboard.clt_layer_wrapper import CLTLayerWrapper
+
+                assert self.cfg.clt_layer_idx is not None  # Already validated above
+                self.sae = CLTLayerWrapper(
+                    self.clt,
+                    self.cfg.clt_layer_idx,
+                    clt_model_dir_path=self.cfg.sae_path,
+                )
+                print(f"Created CLTLayerWrapper for layer {self.cfg.clt_layer_idx}")
+            else:
+                raise NotImplementedError(
+                    "Loading CLT from non-local path (e.g., HF release) is not yet implemented."
+                )
+        else:
+            LoaderClass = SAE
+            if self.cfg.from_local_sae:
+                self.sae = SAE.load_from_pretrained(  # type: ignore
+                    path=self.cfg.sae_path,
+                    device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
+                    dtype=self.cfg.sae_dtype if self.cfg.sae_dtype != "" else None,
+                )
+            else:
+                self.sae = SAE.from_pretrained(
+                    release=self.cfg.sae_set,
+                    sae_id=self.cfg.sae_path,
+                    device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
+                )
+                if self.cfg.sae_dtype != "":
+                    self._apply_sae_dtype_override()
+
+    def _load_clt_weights(self):
+        """Load CLT weights from file."""
+        from pathlib import Path
+        from typing import List, Optional
+
+        # Determine which file to load
+        explicit_filename = (
+            self.cfg.clt_weights_filename if self.cfg.clt_weights_filename else ""
+        )
+
+        candidate_paths: List[Path] = []
+        if explicit_filename:
+            candidate_paths.append(Path(self.cfg.sae_path) / explicit_filename)
+
+        # If no explicit filename or the file doesn't exist, search common patterns
+        if not candidate_paths or not candidate_paths[0].is_file():
+            # Find any *.safetensors file in directory
+            candidate_paths.extend(
+                sorted(Path(self.cfg.sae_path).glob("*.safetensors"))
+            )
+            # Add common filenames
+            candidate_paths.append(Path(self.cfg.sae_path) / "model.safetensors")
+            candidate_paths.append(Path(self.cfg.sae_path) / "model.pt")
+            candidate_paths.append(Path(self.cfg.sae_path) / "model.bin")
+
+        # Pick the first existing path
+        weights_path: Optional[Path] = None
+        for cand in candidate_paths:
+            if cand.is_file():
+                weights_path = cand
+                break
+
+        if weights_path is None:
+            raise FileNotFoundError(
+                f"No CLT weights file found in {self.cfg.sae_path}. "
+                f"Expected one of: {', '.join(str(p) for p in candidate_paths)}"
+            )
+
+        print(f"Loading CLT state dict from: {weights_path}")
+
+        # Choose loader based on file extension
+        if weights_path.suffix == ".safetensors":
+            try:
+                from safetensors.torch import load_file as safe_load_file
+            except ImportError as e:
+                raise ImportError(
+                    "safetensors library is required to load .safetensors files. "
+                    "Install via `pip install safetensors`."
+                ) from e
+            state_dict = safe_load_file(weights_path)
+        else:
+            state_dict = torch.load(weights_path, map_location=self.cfg.sae_device)
+
+        # Load the state dict
+        self.clt.load_state_dict(state_dict)
+        print("CLT state dict loaded successfully.")
+
+    def _apply_sae_dtype_override(self):
+        """Apply dtype override to SAE."""
+        if self.cfg.sae_dtype == "float16":
+            self.sae.to(dtype=torch.float16)  # type: ignore
+        elif self.cfg.sae_dtype == "float32":
+            self.sae.to(dtype=torch.float32)  # type: ignore
+        elif self.cfg.sae_dtype == "bfloat16":
+            self.sae.to(dtype=torch.bfloat16)  # type: ignore
+        else:
+            raise ValueError(
+                f"Unsupported dtype: {self.cfg.sae_dtype}, we support float16, float32, bfloat16"
+            )
+
+    def _configure_dtypes(self):
+        """Configure data types for SAE and model."""
         # If we didn't override dtype, then use the SAE's dtype
         if self.cfg.sae_dtype == "":
             print(f"Using SAE configured dtype: {self.sae.cfg.dtype}")
@@ -136,9 +361,25 @@ class NeuronpediaRunner:
         self.sae.cfg.device = self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE
 
         if self.cfg.huggingface_dataset_path == "":
-            self.cfg.huggingface_dataset_path = self.sae.cfg.dataset_path
+            self.cfg.huggingface_dataset_path = self.sae.cfg.dataset_path  # type: ignore
 
-        print(f"Device Count: {device_count}")
+        self._print_configuration()
+
+        self.sae.cfg.dataset_path = self.cfg.huggingface_dataset_path  # type: ignore
+        self.sae.cfg.context_size = self.cfg.n_tokens_in_prompt  # type: ignore
+
+        # Skip fold_W_dec_norm for CLT wrappers as they don't support this method
+        if "CLTLayerWrapper" in str(type(self.sae)):
+            print("NeuronpediaRunner: Skipping fold_W_dec_norm() for CLT wrapper.")
+        else:
+            self.sae.fold_W_dec_norm()
+
+        print(f"SAE DType: {self.cfg.sae_dtype}")
+        print(f"Model DType: {self.cfg.model_dtype}")
+
+    def _print_configuration(self):
+        """Print configuration details."""
+        print(f"Device Count: {self.device_count}")
         print(f"SAE Device: {self.cfg.sae_device}")
         print(f"Model Device: {self.cfg.model_device}")
         print(f"Model Num Devices: {self.cfg.model_n_devices}")
@@ -152,33 +393,56 @@ class NeuronpediaRunner:
         print(f"Total number of contexts (prompts): {self.cfg.n_prompts_total}")
 
         # get the sae's cfg and check if it has from pretrained kwargs
-        # with open(f"{self.cfg.sae_path}/cfg.json", "r") as f:
         sae_cfg_json = self.sae.cfg.to_dict()
-        sae_from_pretrained_kwargs = sae_cfg_json.get(
+        self.sae_from_pretrained_kwargs = sae_cfg_json.get(
             "model_from_pretrained_kwargs", {}
         )
         print("SAE Config on disk:")
         print(json.dumps(sae_cfg_json, indent=2))
-        if sae_from_pretrained_kwargs != {}:
-            print("SAE has from_pretrained_kwargs", sae_from_pretrained_kwargs)
+        if self.sae_from_pretrained_kwargs != {}:
+            print("SAE has from_pretrained_kwargs", self.sae_from_pretrained_kwargs)
         else:
             print(
                 "SAE does not have from_pretrained_kwargs. Standard TransformerLens Loading"
             )
 
-        self.sae.cfg.dataset_path = self.cfg.huggingface_dataset_path
-        self.sae.cfg.context_size = self.cfg.n_tokens_in_prompt
+    def _extract_model_info(self):
+        """Extract model ID and layer information from SAE configuration."""
+        # For transcoders, model_name might be in metadata
+        if hasattr(self.sae.cfg, "model_name"):
+            self.model_id = self.sae.cfg.model_name  # type: ignore
+        elif (
+            hasattr(self.sae.cfg, "metadata") and "model_name" in self.sae.cfg.metadata  # type: ignore
+        ):
+            self.model_id = self.sae.cfg.metadata["model_name"]  # type: ignore
+        else:
+            raise ValueError("Could not find model_name in SAE config")
 
-        self.sae.fold_W_dec_norm()
-
-        print(f"SAE DType: {self.cfg.sae_dtype}")
-        print(f"Model DType: {self.cfg.model_dtype}")
-
-        # Initialize Model
-        self.model_id = self.sae.cfg.model_name
         self.cfg.model_id = self.model_id
-        self.layer = self.sae.cfg.hook_layer
+
+        # For transcoders, hook_layer might be hook_layer_out
+        if hasattr(self.sae.cfg, "hook_layer"):
+            self.layer = self.sae.cfg.hook_layer  # type: ignore
+        elif hasattr(self.sae.cfg, "hook_layer_out"):
+            self.layer = self.sae.cfg.hook_layer_out  # type: ignore
+        else:
+            # Try to extract layer from hook_name (e.g., "blocks.5.hook_resid_pre" -> 5)
+            # We need to get hook_name first
+            hook_name = self.sae.cfg.metadata.get("hook_name", "")  # type: ignore
+            import re
+
+            match = re.search(r"blocks\.(\d+)\.", hook_name)
+            if match:
+                self.layer = int(match.group(1))
+            else:
+                raise ValueError(
+                    "Could not find hook_layer in SAE config or extract from hook_name"
+                )
+
         self.cfg.layer = self.layer
+
+    def _initialize_model(self):
+        """Initialize the transformer model."""
         # If custom HF model path is provided, load it first
         hf_model = None
         if self.cfg.hf_model_path:
@@ -187,41 +451,58 @@ class NeuronpediaRunner:
                 self.cfg.hf_model_path,
             )
 
-        self.model = HookedTransformer.from_pretrained(
-            model_name=self.model_id,
+        self.model = HookedSAETransformer.from_pretrained(
+            model_name=self.model_id,  # type: ignore
             device=self.cfg.model_device,
             n_devices=self.cfg.model_n_devices or 1,
             hf_model=hf_model,  # Pass the custom model if provided
-            **sae_from_pretrained_kwargs,
+            **self.sae_from_pretrained_kwargs,
             dtype=self.cfg.model_dtype,
         )
 
-        # Initialize Activations Store
+        # Ensure MLP-in hooks are computed if needed (important for most Transcoders)
+        # Get hook_name - it's always in metadata for both SAEs and Transcoders
+        if hasattr(self.sae.cfg.metadata, "hook_name"):
+            self.hook_name = self.sae.cfg.metadata.hook_name  # type: ignore
+        else:
+            self.hook_name = self.sae.cfg.metadata["hook_name"]  # type: ignore
+
+        if (
+            self.cfg.use_transcoder
+            or self.cfg.use_skip_transcoder
+            or self.cfg.use_clt
+            or "hook_mlp_in" in self.hook_name  # type: ignore
+        ) and hasattr(self.model, "set_use_hook_mlp_in"):
+            # TransformerLens models 1.12+ support this flag
+            self.model.set_use_hook_mlp_in(True)
+
+    def _setup_activation_store(self):
+        """Set up the activation store for data generation."""
+        # set the context size to the number of tokens in the prompt
+        self.sae.cfg.metadata.context_size = self.cfg.n_tokens_in_prompt  # type: ignore
         self.activations_store = ActivationsStore.from_sae(
             model=self.model,
-            sae=self.sae,
+            sae=self.sae,  # type: ignore
+            dataset=self.cfg.huggingface_dataset_path,
             streaming=True,
+            context_size=self.cfg.n_tokens_in_prompt,
             store_batch_size_prompts=8,  # these don't matter
             n_batches_in_buffer=16,  # these don't matter
+            disable_concat_sequences=True,
             device=self.cfg.activation_store_device or "cpu",
         )
         self.cached_activations_dir = Path(
-            f"./cached_activations/{self.model_id}_{self.cfg.sae_set}_{self.sae.cfg.hook_name}_{self.sae.cfg.d_sae}width_{self.cfg.n_prompts_total}prompts"
+            f"./cached_activations/{self.model_id}_{self.cfg.sae_set}_{self.hook_name}_{self.sae.cfg.d_sae}width_{self.cfg.n_prompts_total}prompts"
         )
 
-        # override the number of context tokens if we specified one
-        # this is useful because sometimes the default context tokens is too large for us to quickly generate
-        if self.cfg.n_tokens_in_prompt is not None:
-            self.activations_store.context_size = self.cfg.n_tokens_in_prompt
-
+    def _setup_output_directory(self):
+        """Set up the output directory for results."""
         # if we have additional info, add it to the outputs subdir
         self.np_sae_id_suffix = self.cfg.np_sae_id_suffix
 
-        if not os.path.exists(cfg.outputs_dir):
-            os.makedirs(cfg.outputs_dir)
+        if not os.path.exists(self.cfg.outputs_dir):
+            os.makedirs(self.cfg.outputs_dir)
         self.cfg.outputs_dir = self.create_output_directory()
-
-        self.vocab_dict = self.get_vocab_dict()
 
     def create_output_directory(self) -> str:
         """
@@ -230,7 +511,9 @@ class NeuronpediaRunner:
         Returns:
             Path: The path to the created output directory.
         """
-        outputs_subdir = f"{self.model_id}_{self.cfg.sae_set}_{self.sae.cfg.hook_name}_{self.sae.cfg.d_sae}"
+        outputs_subdir = (
+            f"{self.model_id}_{self.cfg.sae_set}_{self.hook_name}_{self.sae.cfg.d_sae}"
+        )
         if self.np_sae_id_suffix is not None:
             outputs_subdir += f"_{self.np_sae_id_suffix}"
         outputs_dir = Path(self.cfg.outputs_dir).joinpath(outputs_subdir)
@@ -278,62 +561,58 @@ class NeuronpediaRunner:
     def add_prefix_suffix_to_tokens(self, tokens: torch.Tensor) -> torch.Tensor:
         original_length = tokens.shape[1]
         bos_tokens = tokens[:, 0]  # might not be if sae.cfg.prepend_bos is False
-        prefix_length = len(self.cfg.prefix_tokens) if self.cfg.prefix_tokens else 0
-        suffix_length = len(self.cfg.suffix_tokens) if self.cfg.suffix_tokens else 0
 
         # return tokens if no prefix or suffix
-        if self.cfg.prefix_tokens is None and self.cfg.suffix_tokens is None:
+        if self.cfg.prefix_str is None and self.cfg.suffix_str is None:
             return tokens
 
+        # generate tokens for the prefix and suffix
+        prefix_tokens = (
+            self.model.tokenizer.encode(self.cfg.prefix_str)  # type: ignore
+            if self.cfg.prefix_str is not None
+            else []
+        )
+        suffix_tokens = (
+            self.model.tokenizer.encode(self.cfg.suffix_str)  # type: ignore
+            if self.cfg.suffix_str is not None
+            else []
+        )
+
         # Calculate how many tokens to keep from the original
-        keep_length = original_length - prefix_length - suffix_length
+        keep_length = original_length - len(prefix_tokens) - len(suffix_tokens)
 
         if keep_length <= 0:
             raise ValueError("Prefix and suffix are too long for the given tokens.")
 
         # Trim original tokens
-        tokens = tokens[:, : keep_length - self.sae.cfg.prepend_bos]
+        if (
+            hasattr(self.sae.cfg.metadata, "prepend_bos")
+            and self.sae.cfg.metadata.prepend_bos  # type: ignore
+        ):
+            tokens = tokens[:, : keep_length - self.sae.cfg.metadata.prepend_bos]  # type: ignore
+        else:
+            tokens = tokens[:, :keep_length]
 
-        if self.cfg.prefix_tokens:
-            prefix = torch.tensor(self.cfg.prefix_tokens).to(tokens.device)
+        if self.cfg.prefix_str:
+            prefix = torch.tensor(prefix_tokens).to(tokens.device)
             prefix_repeated = prefix.unsqueeze(0).repeat(tokens.shape[0], 1)
             # if sae.cfg.prepend_bos, then add that before the suffix
-            if self.sae.cfg.prepend_bos:
+            if (
+                hasattr(self.sae.cfg.metadata, "prepend_bos")
+                and self.sae.cfg.metadata.prepend_bos  # type: ignore
+            ):
                 bos = bos_tokens.unsqueeze(1)
                 prefix_repeated = torch.cat([bos, prefix_repeated], dim=1)
             tokens = torch.cat([prefix_repeated, tokens], dim=1)
 
-        if self.cfg.suffix_tokens:
-            suffix = torch.tensor(self.cfg.suffix_tokens).to(tokens.device)
+        if self.cfg.suffix_str:
+            suffix = torch.tensor(suffix_tokens).to(tokens.device)
             suffix_repeated = suffix.unsqueeze(0).repeat(tokens.shape[0], 1)
             tokens = torch.cat([tokens, suffix_repeated], dim=1)
 
         # assert length hasn't changed
         assert tokens.shape[1] == original_length
         return tokens
-
-    def get_alive_features(self) -> list[int]:
-        # skip sparsity
-        target_feature_indexes = list(range(self.sae.cfg.d_sae))
-        print("Warning: Sparsity option is not implemented, running all features.")
-        # TODO: post-refactor the load_sparsity no longer exists
-        # if self.cfg.sparsity_threshold == 1:
-        #     print("Skipping sparsity because sparsity_threshold was set to 1")
-        #     target_feature_indexes = list(range(self.sae.cfg.d_sae))
-        # else:
-        #     # if we have feature sparsity, then use it to only generate outputs for non-dead features
-        #     self.target_feature_indexes: list[int] = []
-        #     # sparsity = load_sparsity(self.cfg.sae_path)
-        #     # convert sparsity to logged sparsity if it's not
-        #     # TODO: standardize the sparsity file format
-        #     # if len(sparsity) > 0 and sparsity[0] >= 0:
-        #     #     sparsity = torch.log10(sparsity + 1e-10)
-        #     # target_feature_indexes = (
-        #     #     (sparsity > self.cfg.sparsity_threshold)
-        #     #     .nonzero(as_tuple=True)[0]
-        #     #     .tolist()
-        #     # )
-        return target_feature_indexes
 
     def get_feature_batches(self):
         # divide into batches
@@ -414,7 +693,7 @@ class NeuronpediaRunner:
         if self.cfg.use_wandb:
             wandb.init(
                 project="sae-dashboard-generation",
-                name=f"{self.model_id}_{set_name}_{self.sae.cfg.hook_name}_{current_time}",
+                name=f"{self.model_id}_{set_name}_{self.hook_name}_{current_time}",
                 save_code=True,
                 mode="online",
                 config=wandb_cfg,
@@ -423,7 +702,7 @@ class NeuronpediaRunner:
         self.n_features = self.sae.cfg.d_sae
         assert self.n_features is not None
 
-        self.target_feature_indexes = self.get_alive_features()
+        self.target_feature_indexes = list(range(self.n_features))
 
         feature_idx = self.get_feature_batches()
         if self.cfg.start_batch >= len(feature_idx):
@@ -481,7 +760,7 @@ class NeuronpediaRunner:
                 )
 
                 feature_vis_config_gpt = SaeVisConfig(
-                    hook_point=self.sae.cfg.hook_name,
+                    hook_point=self.hook_name,  # type: ignore
                     features=features_to_process,
                     minibatch_size_features=self.cfg.n_features_at_a_time,
                     minibatch_size_tokens=self.cfg.n_prompts_in_forward_pass,
@@ -502,32 +781,11 @@ class NeuronpediaRunner:
                 )
 
                 feature_data = SaeVisRunner(feature_vis_config_gpt).run(
-                    encoder=self.sae,
+                    encoder=self.sae,  # type: ignore
                     model=self.model,
                     tokens=tokens,
                 )
 
-                # if feature_batch_count == 0:
-                #     html_save_path = (
-                #         f"{self.cfg.outputs_dir}/batch-{feature_batch_count}.html"
-                #     )
-                #     save_feature_centric_vis(
-                #         sae_vis_data=feature_data,
-                #         filename=html_save_path,
-                #         # use only the first 10 features for the dashboard
-                #         include_only=features_to_process[
-                #             : max(10, len(features_to_process))
-                #         ],
-                #     )
-
-                #     if self.cfg.use_wandb:
-                #         wandb.log(
-                #             data={
-                #                 "batch": feature_batch_count,
-                #                 "dashboard": wandb.Html(open(html_save_path)),
-                #             },
-                #             step=feature_batch_count,
-                #         )
                 self.cfg.model_id = self.model_id
                 self.cfg.layer = self.layer
                 json_object = NeuronpediaConverter.convert_to_np_json(
@@ -614,6 +872,65 @@ def main():
         default=None,
         help="Optional: Path to custom HuggingFace model to use instead of default weights",
     )
+    parser.add_argument(
+        "--prefix-str",
+        type=str,
+        default=None,
+        help="Optional string to prepend to each prompt. Example: --prefix-str '<|im_start|>user\n'",
+    )
+    parser.add_argument(
+        "--no-prepend-bos",
+        action="store_false",
+        dest="prepend_bos",
+        default=None,
+        help="Don't prepend BOS token to sequences (overrides SAE default)",
+    )
+    parser.add_argument(
+        "--prepend-bos",
+        action="store_true",
+        dest="prepend_bos",
+        default=None,
+        help="Prepend BOS token to sequences (overrides SAE default)",
+    )
+    parser.add_argument(
+        "--use-transcoder",
+        action="store_true",
+        help="If set, load a Transcoder instead of a standard SAE",
+    )
+    parser.add_argument(
+        "--use-skip-transcoder",
+        action="store_true",
+        help="If set, load a SkipTranscoder instead of a Transcoder/SAE",
+    )
+    parser.add_argument(
+        "--use-clt",
+        action="store_true",
+        help="If set, load a CrossLayerTranscoder instead of a standard SAE/Transcoder",
+    )
+    parser.add_argument(
+        "--clt-layer-idx",
+        type=int,
+        default=None,
+        help="Layer index to use for CLT encoder (required if --use-clt)",
+    )
+    parser.add_argument(
+        "--clt-dtype",
+        type=str,
+        default="",
+        help="Optional override for CLT data type (e.g., 'float16')",
+    )
+    parser.add_argument(
+        "--clt-weights-filename",
+        type=str,
+        default="",
+        help="Filename of the CLT weights file (supports .safetensors / .pt). If omitted, script will search for a suitable file automatically.",
+    )
+    parser.add_argument(
+        "--sae-converter-name",
+        type=str,
+        default=None,
+        help="Name of the SAE converter to use, for SAE.from_pretrained's converter argument",
+    )
 
     args = parser.parse_args()
 
@@ -628,6 +945,8 @@ def main():
         model_dtype=args.model_dtype,
         outputs_dir=args.output_dir,
         sparsity_threshold=args.sparsity_threshold,
+        prefix_str=args.prefix_str,
+        prepend_bos=args.prepend_bos,
         n_prompts_total=args.n_prompts,
         n_tokens_in_prompt=args.n_tokens_in_prompt,
         n_prompts_in_forward_pass=args.n_prompts_in_forward_pass,
@@ -636,6 +955,13 @@ def main():
         end_batch=args.end_batch,
         use_wandb=args.use_wandb,
         hf_model_path=args.hf_model_path,
+        use_transcoder=args.use_transcoder,
+        use_skip_transcoder=args.use_skip_transcoder,
+        use_clt=args.use_clt,
+        clt_layer_idx=args.clt_layer_idx,
+        clt_dtype=args.clt_dtype,
+        clt_weights_filename=args.clt_weights_filename,
+        sae_converter_name=args.sae_converter_name,
     )
 
     runner = NeuronpediaRunner(cfg)

@@ -12,17 +12,17 @@ from sae_dashboard.utils_fns import FeatureStatistics, get_tokens
 
 
 @pytest.fixture
-def setup_test_environment() -> (
-    Callable[[], Tuple[HookedTransformer, SAE, torch.Tensor]]
+def setup_test_environment() -> (  # type: ignore
+    Callable[[], Tuple[HookedTransformer, SAE, torch.Tensor]]  # type: ignore
 ):
-    def _setup() -> Tuple[HookedTransformer, SAE, torch.Tensor]:
+    def _setup() -> Tuple[HookedTransformer, SAE, torch.Tensor]:  # type: ignore
         # Set up a small-scale test environment
         device = "cpu"  # Use CUDA for testing
         model = HookedTransformer.from_pretrained("gpt2-small", device=device)
         sae, _, _ = SAE.from_pretrained(
             release="gpt2-small-hook-z-kk", sae_id="blocks.5.hook_z", device=device
         )
-        sae.fold_W_dec_norm()
+        sae.fold_W_dec_norm()  # type: ignore
 
         # Create a small token dataset
         activations_store = ActivationsStore.from_sae(
@@ -32,19 +32,19 @@ def setup_test_environment() -> (
             store_batch_size_prompts=16,
             n_batches_in_buffer=8,
             device=device,
-        )
+        )  # type: ignore
 
         token_dataset = get_tokens(activations_store, 256)
         insert = model.to_tokens("Stalinists shriek in the ears of the police that")
         token_dataset[0, :13] = insert[0]
 
-        return model, sae, token_dataset
+        return model, sae, token_dataset  # type: ignore
 
     return _setup
 
 
 def test_sae_vis_runner_integration(
-    setup_test_environment: Callable[[], Tuple[HookedTransformer, SAE, torch.Tensor]],
+    setup_test_environment: Callable[[], Tuple[HookedTransformer, SAE, torch.Tensor]],  # type: ignore
 ):
     model, sae, token_dataset = setup_test_environment()
 
@@ -65,7 +65,7 @@ def test_sae_vis_runner_integration(
     # Run SaeVisRunner
     data = SaeVisRunner(feature_vis_config).run(
         encoder=sae,
-        model=model,
+        model=model,  # type: ignore
         tokens=token_dataset,
     )
     # Verify the structure and content of the resulting SaeVisData object
