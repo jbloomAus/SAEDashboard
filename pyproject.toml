@@ -20,7 +20,7 @@ matplotlib = "^3.8.4"
 safetensors = "^0.4.3"
 typer = "^0.12.3"
 sae-lens = "^6.8.0"
-clt = {git = "https://github.com/curt-tigges/crosslayer-coding.git", branch = "main"}
+decode-clt = "^0.0.1"
 
 [tool.poetry.group.dev.dependencies]
 isort = "^5.13.2"
