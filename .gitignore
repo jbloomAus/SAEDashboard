@@ -198,3 +198,5 @@ clt_test*/
 test_output/
 test_outputs/
 clt-technical-description.md
+
+ignore_data/
