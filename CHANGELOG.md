@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v0.7.2 (2025-09-01)
+
+### Fix
+
+* fix: use clt pypi library ([`a3197b8`](https://github.com/jbloomAus/SAEDashboard/commit/a3197b8870d43107bba0356af11c64ddc054392d))
+
 ## v0.7.1 (2025-08-31)
 
 ### Fix
