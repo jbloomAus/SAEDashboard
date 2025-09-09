@@ -295,6 +295,10 @@ HTML_ALL_REVERSED = {
     **HTML_ANOMALIES_REVERSED,
 }
 
+# torch.quantile crashes if you pass a tensor with more than 16 million elements
+# see: https://github.com/pytorch/pytorch/issues/64947
+MAX_QUANTILE = 2**24 - 1
+
 
 def process_str_tok(str_tok: str, html: bool = True) -> str:
     """
@@ -617,7 +621,7 @@ class FeatureStatistics:
             )
 
             batch_quantile_data = torch.quantile(
-                batch.to(torch.float32),
+                batch[:, :MAX_QUANTILE].to(torch.float32),
                 quantiles_tensor.to(torch.float32),
                 dim=-1,
             )
