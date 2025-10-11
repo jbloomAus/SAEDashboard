@@ -9,6 +9,8 @@ from typing import Dict, Set, Tuple
 
 import numpy as np
 import torch
+import wandb
+import wandb.sdk
 from matplotlib import colors
 from sae_lens import SAE, ActivationsStore, HookedSAETransformer
 from tqdm import tqdm

@@ -112,6 +112,7 @@ class VectorVisRunner:
 
             (
                 all_feat_acts,
+                all_tokens,
                 _,  # all resid post. no longer used.
                 feature_resid_dir,
                 feature_out_dir,
@@ -175,18 +176,20 @@ class VectorVisRunner:
                 feat_acts = all_feat_acts[..., i]
 
                 # Create a mask for tokens to ignore based on both ID and position
-                ignore_tokens_mask = torch.ones_like(tokens, dtype=torch.bool)
+                ignore_tokens_mask = torch.ones_like(all_tokens, dtype=torch.bool)
                 if self.cfg.ignore_tokens:
                     ignore_tokens_mask &= ~torch.isin(
-                        tokens,
+                        all_tokens,
                         torch.tensor(
                             list(self.cfg.ignore_tokens),
-                            dtype=tokens.dtype,
-                            device=tokens.device,
+                            dtype=all_tokens.dtype,
+                            device=all_tokens.device,
                         ),
                     )
                 if self.cfg.ignore_positions:
-                    ignore_positions_mask = torch.ones_like(tokens, dtype=torch.bool)
+                    ignore_positions_mask = torch.ones_like(
+                        all_tokens, dtype=torch.bool
+                    )
                     ignore_positions_mask[:, self.cfg.ignore_positions] = False
                     ignore_tokens_mask &= ignore_positions_mask
 
