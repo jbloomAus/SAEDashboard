@@ -187,7 +187,9 @@ class VectorVisRunner:
                         ),
                     )
                 if self.cfg.ignore_positions:
-                    ignore_positions_mask = torch.ones_like(all_tokens, dtype=torch.bool)
+                    ignore_positions_mask = torch.ones_like(
+                        all_tokens, dtype=torch.bool
+                    )
                     ignore_positions_mask[:, self.cfg.ignore_positions] = False
                     ignore_tokens_mask &= ignore_positions_mask
 
