@@ -62,6 +62,7 @@ class FeatureDataGenerator:
     ):  # type: ignore
         # Create lists to store the feature activations & final values of the residual stream
         all_feat_acts = []
+        all_tokens = []
         all_dfa_results = {feature_idx: {} for feature_idx in feature_indices}
         total_prompts = 0
 
@@ -109,6 +110,7 @@ class FeatureDataGenerator:
 
             # Add these to the lists (we'll eventually concat)
             all_feat_acts.append(feature_acts)
+            all_tokens.append(minibatch)
 
             # Calculate DFA
             if self.cfg.use_dfa and self.dfa_calculator:
@@ -141,9 +143,11 @@ class FeatureDataGenerator:
                 progress[0].update(1)
 
         all_feat_acts = torch.cat(all_feat_acts, dim=0)
+        all_tokens = torch.cat(all_tokens, dim=0)
 
         return (
             all_feat_acts,
+            all_tokens,
             torch.tensor([]),  # all_resid_post, no longer used
             feature_resid_dir,
             feature_out_dir,

@@ -63,6 +63,7 @@ class VectorDataGenerator:
     ):  # type: ignore
         # Create lists to store the vector activations
         all_feat_acts = []
+        all_tokens = []
         all_dfa_results = {feature_idx: {} for feature_idx in feature_indices}
         # total_prompts = 0
 
@@ -98,6 +99,7 @@ class VectorDataGenerator:
             )
 
             all_feat_acts.append(feature_acts)
+            all_tokens.append(minibatch)
 
             # Calculate DFA if enabled
             # if self.cfg.use_dfa and self.dfa_calculator:
@@ -124,9 +126,11 @@ class VectorDataGenerator:
                 progress[0].update(1)
 
         all_feat_acts = torch.cat(all_feat_acts, dim=0)
+        all_tokens = torch.cat(all_tokens, dim=0)
 
         return (
             all_feat_acts,
+            all_tokens,
             torch.tensor([]),  # No residual post-activation values for vectors
             feature_vectors,  # The vectors themselves serve as the "residual direction"
             feature_vectors,  # The vectors themselves serve as the "output direction"
