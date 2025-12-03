@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional, Union
 import numpy as np
 import torch
 from transformer_lens import HookedTransformer
+from transformers import PreTrainedModel
 
 from sae_dashboard.feature_data import FeatureData
 from sae_dashboard.neuronpedia.neuronpedia_dashboard import (
@@ -17,6 +18,9 @@ from sae_dashboard.neuronpedia.neuronpedia_runner_config import (
 )
 from sae_dashboard.sae_vis_data import SaeVisData
 from sae_dashboard.vector_vis_data import VectorVisData
+
+# Type alias for model types
+ModelType = Union[HookedTransformer, PreTrainedModel]
 
 
 class NpEncoder(json.JSONEncoder):
@@ -39,8 +43,8 @@ class FeatureProcessor:
 
     @staticmethod
     def round_list(to_round: List[float]) -> List[float]:
-        """Round a list of floats to 3 decimal places."""
-        return list(np.round(to_round, 3))
+        """Round a list of floats to 5 decimal places."""
+        return list(np.round(to_round, 5))
 
     @staticmethod
     def ensure_list(input_value: Any) -> List[Any]:
@@ -49,11 +53,21 @@ class FeatureProcessor:
 
     @staticmethod
     def to_str_tokens_safe(
-        model: HookedTransformer, vocab_dict: Dict[int, str], tokens: Any
+        model: ModelType, vocab_dict: Dict[int, str], tokens: Any
     ) -> Any:
         """Convert tokens to string tokens safely."""
         OUT_OF_RANGE_TOKEN = "<|outofrange|>"
-        vocab_max_index = model.cfg.d_vocab - 1
+
+        # Get vocab size from the appropriate source
+        if hasattr(model, "cfg") and hasattr(model.cfg, "d_vocab"):
+            # TransformerLens model
+            vocab_max_index = model.cfg.d_vocab - 1
+        elif hasattr(model, "config") and hasattr(model.config, "vocab_size"):
+            # HuggingFace model
+            vocab_max_index = model.config.vocab_size - 1
+        else:
+            # Fallback to vocab_dict size
+            vocab_max_index = len(vocab_dict) - 1
 
         if isinstance(tokens, int):
             return (
@@ -78,7 +92,7 @@ class NeuronpediaConverter:
 
     @staticmethod
     def convert_to_np_json(
-        model: HookedTransformer,
+        model: ModelType,
         vis_data: Union[SaeVisData, VectorVisData],
         np_cfg: Union[NeuronpediaRunnerConfig, NeuronpediaVectorRunnerConfig],
         vocab_dict: Dict[int, str],
@@ -112,7 +126,7 @@ class NeuronpediaConverter:
 
     @staticmethod
     def _process_features(
-        model: HookedTransformer,
+        model: ModelType,
         data_dict: Dict[int, FeatureData],  # Update to use data_dict directly
         np_cfg: Union[NeuronpediaRunnerConfig, NeuronpediaVectorRunnerConfig],
         vocab_dict: Dict[int, str],
@@ -186,7 +200,7 @@ class NeuronpediaConverter:
     def _process_feature_logits(
         feature_output: NeuronpediaDashboardFeature,
         feature_data: FeatureData,
-        model: HookedTransformer,
+        model: ModelType,
         vocab_dict: Dict[int, str],
     ) -> None:
         """Process feature logits data and update the feature output."""
@@ -256,7 +270,7 @@ class NeuronpediaConverter:
     def _process_feature_activations(
         feature_output: NeuronpediaDashboardFeature,
         feature_data: FeatureData,
-        model: HookedTransformer,
+        model: ModelType,
         vocab_dict: Dict[int, str],
     ) -> None:
         """Process feature activations data and update the feature output."""
@@ -316,7 +330,7 @@ class NeuronpediaConverter:
         bin_max: float,
         bin_contains: float,
         feature_data: FeatureData,
-        model: HookedTransformer,
+        model: ModelType,
         vocab_dict: Dict[int, str],
         feature_index: int,
         activation_thresholds: Optional[dict[int, float | int]] = None,

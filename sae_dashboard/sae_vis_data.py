@@ -43,6 +43,11 @@ class SaeVisConfig:
     ignore_tokens: set[int] = field(default_factory=set)
     ignore_positions: list[int] = field(default_factory=list)
 
+    # Model loading
+    use_huggingface: bool = (
+        False  # If True, use HuggingFace Transformers directly instead of TransformerLens
+    )
+
     # Vis
     feature_centric_layout: SaeVisLayoutConfig = field(
         default_factory=SaeVisLayoutConfig.default_feature_centric_layout
