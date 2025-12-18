@@ -267,10 +267,15 @@ class NeuronpediaRunner:
                     dtype=self.cfg.sae_dtype if self.cfg.sae_dtype != "" else None,
                 )
             else:
-                self.sae = SAE.from_pretrained(
+                self.sae = LoaderClass.from_pretrained(  # type: ignore
                     release=self.cfg.sae_set,
                     sae_id=self.cfg.sae_path,
                     device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
+                    converter=(
+                        get_sae_loader(self.cfg.sae_converter_name)
+                        if self.cfg.sae_converter_name
+                        else None
+                    ),
                 )
                 if self.cfg.sae_dtype != "":
                     self._apply_sae_dtype_override()
@@ -512,13 +517,21 @@ class NeuronpediaRunner:
                     self.cfg.hf_model_path,
                 )
 
-            self.model = HookedSAETransformer.from_pretrained(
+            # Determine dtype
+            dtype_map = {
+                "float32": torch.float32,
+                "float16": torch.float16,
+                "bfloat16": torch.bfloat16,
+            }
+            torch_dtype = dtype_map.get(self.cfg.model_dtype, torch.float32)
+
+            self.model = HookedSAETransformer.from_pretrained_no_processing(
                 model_name=self.model_id,  # type: ignore
                 device=self.cfg.model_device,
                 n_devices=self.cfg.model_n_devices or 1,
                 hf_model=hf_model,  # Pass the custom model if provided
                 **self.sae_from_pretrained_kwargs,
-                dtype=self.cfg.model_dtype,
+                dtype=torch_dtype,
             )
 
             # Store tokenizer reference for TransformerLens models
