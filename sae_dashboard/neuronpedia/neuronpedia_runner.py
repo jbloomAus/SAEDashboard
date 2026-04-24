@@ -506,6 +506,103 @@ class NeuronpediaRunner:
             # TransformerLens models 1.12+ support this flag
             self.model.set_use_hook_mlp_in(True)
 
+        if self.cfg.free_unused_model_layers:
+            self._free_unused_model_layers()
+
+    def _free_unused_model_layers(self):
+        """Replace transformer blocks above the SAE's hook layer with
+        ``nn.Identity()`` to free VRAM.
+
+        The forward pass used for dashboard generation already stops at
+        ``hook_layer + 1`` (see ``TransformerLensWrapper.forward``), so later
+        blocks are never executed. The embedding, ``ln_final``, and
+        ``unembed``/``W_U`` modules are left untouched; ``W_U`` is still
+        needed for feature-to-logit direction calculations in ``SaeVisRunner``.
+
+        Because every TransformerLens-supported architecture exposes its
+        decoder blocks as ``model.blocks`` (an ``nn.ModuleList``), this works
+        uniformly across families (Llama, Qwen, Gemma, Mistral, Phi, etc.)
+        without any per-architecture branching.
+        """
+        import gc
+
+        import torch.nn as nn
+
+        blocks = getattr(self.model, "blocks", None)
+        if blocks is None or self.layer is None:
+            print(
+                "free_unused_model_layers: model has no `blocks` attribute or "
+                "hook layer is unknown; skipping."
+            )
+            return
+
+        # Guard: hook points that force `to_resid_direction` to read the
+        # stacked `model.W_out` / `model.W_O` properties (see
+        # ``transformer_lens_wrapper.to_resid_direction``). Those properties
+        # do ``torch.stack([block.mlp.W_out for block in self.blocks])`` /
+        # ``torch.stack([block.attn.W_O ...])``, which raises ``AttributeError``
+        # on any ``nn.Identity()``-replaced block. Trimming is therefore unsafe
+        # for MLP-neuron (``hook_pre`` / ``hook_post``) and per-head attention
+        # (``hook_z``) SAEs until we snapshot the needed per-layer slices up
+        # front. TODO(vram-snapshot): pre-extract
+        # ``blocks[hook_layer].mlp.W_out`` and ``blocks[hook_layer].attn.W_O``
+        # before trimming and have the wrapper prefer those cached tensors, so
+        # this guard can be lifted for all hook types.
+        hook_name = getattr(self, "hook_name", "") or ""
+        unsafe_markers = ("hook_pre", "hook_post", "hook_z")
+        matched_marker = next((m for m in unsafe_markers if m in hook_name), None)
+        if matched_marker is not None:
+            print(
+                f"free_unused_model_layers: skipping trim — hook point "
+                f"'{hook_name}' contains '{matched_marker}', which would cause "
+                f"`to_resid_direction` to read `model.W_out`/`model.W_O` "
+                f"(stacked over all blocks) and fail on Identity-replaced "
+                f"layers."
+            )
+            return
+
+        n_total = len(blocks)
+        first_unused = self.layer + 1
+        if first_unused >= n_total:
+            print(
+                f"free_unused_model_layers: SAE hook layer is {self.layer} of "
+                f"{n_total}; nothing above the hook layer to free."
+            )
+            return
+
+        freed = 0
+        for i in range(first_unused, n_total):
+            if not isinstance(blocks[i], nn.Identity):
+                # Drop the parameter tensors first so they can be reclaimed
+                # even if something still holds a reference to the block (see
+                # the `mod_dict`/`hook_dict` note below).
+                for p in list(blocks[i].parameters()):
+                    p.data = torch.empty(0, device=p.device, dtype=p.dtype)
+                for b in list(blocks[i].buffers()):
+                    b.data = torch.empty(0, device=b.device, dtype=b.dtype)
+                blocks[i] = nn.Identity()
+                freed += 1
+
+        # CRITICAL: TransformerLens' ``HookedRootModule.setup()`` builds
+        # ``self.mod_dict`` and ``self.hook_dict`` from ``named_modules()`` at
+        # construction time, and these dicts hold *strong* references to every
+        # block and sub-module (attn, mlp, HookPoints, ...). Simply swapping
+        # ``blocks[i]`` in ``_modules`` doesn't update those dicts, so the old
+        # blocks (and their Parameters) stay alive and no VRAM is reclaimed.
+        # Re-running ``setup()`` rebuilds the dicts against the current module
+        # tree, dropping those stale references.
+        if hasattr(self.model, "setup"):
+            self.model.setup()
+
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+        print(
+            f"free_unused_model_layers: freed {freed} transformer block(s) "
+            f"above hook layer {self.layer} (model had {n_total} total)."
+        )
+
     def _setup_activation_store(self):
         """Set up the activation store for data generation."""
         # set the context size to the number of tokens in the prompt
@@ -983,6 +1080,17 @@ def main():
             "activation sinks. A typical value is 10. Defaults to no filtering."
         ),
     )
+    parser.add_argument(
+        "--free-unused-model-layers",
+        action="store_true",
+        help=(
+            "If set, replace transformer blocks above the SAE's hook layer "
+            "with nn.Identity() after loading to free VRAM. The forward pass "
+            "already stops at the hook layer, so those blocks are unused. "
+            "W_U / ln_final are preserved for logit-direction calculations. "
+            "Works uniformly for any TransformerLens-supported architecture."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -1015,6 +1123,7 @@ def main():
         clt_weights_filename=args.clt_weights_filename,
         sae_converter_name=args.sae_converter_name,
         ignore_high_activation_norm_multiple=args.ignore_high_activation_norm_multiple,
+        free_unused_model_layers=args.free_unused_model_layers,
     )
 
     runner = NeuronpediaRunner(cfg)

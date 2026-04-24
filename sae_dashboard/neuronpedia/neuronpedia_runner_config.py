@@ -62,6 +62,16 @@ class NeuronpediaRunnerConfig:
     # correlation statistics. A typical value is 10. None disables filtering.
     ignore_high_activation_norm_multiple: Optional[float] = None
 
+    # If True, replace transformer blocks above the SAE's hook layer with
+    # ``nn.Identity()`` after loading the model. This frees VRAM since those
+    # blocks are never executed (the forward pass already uses
+    # ``stop_at_layer=hook_layer + 1`` in the TransformerLens wrapper). The
+    # embedding, ``ln_final``, and ``unembed`` (``W_U``) layers are preserved
+    # for logit-direction calculations. Defaults to False to preserve the
+    # previous behaviour; enable to reduce memory usage when generating
+    # dashboards for SAEs on early/middle layers of large models.
+    free_unused_model_layers: bool = False
+
     hf_model_path: Optional[str] = None
 
     # If true, we load a Transcoder (inherits from SAE) instead of a standard SAE.
