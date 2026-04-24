@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v0.8.0 (2026-04-24)
+
+### Feature
+
+* feat: option to filter out outlier activations, fix: support SAELens converter for non-transcoders ([`cc0122f`](https://github.com/jbloomAus/SAEDashboard/commit/cc0122f163877270da767922d321cb66adb28939))
+
 ## v0.7.3 (2025-10-11)
 
 ### Fix
