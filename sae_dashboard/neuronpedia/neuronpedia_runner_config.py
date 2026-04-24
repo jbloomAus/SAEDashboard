@@ -54,6 +54,14 @@ class NeuronpediaRunnerConfig:
     ignore_positions: Optional[List[int]] = None
     prepend_bos: Optional[bool] = None  # Override SAE default if specified
 
+    # If set, filter out activations at token positions whose hidden-state norm
+    # exceeds `median_norm * ignore_high_activation_norm_multiple` (computed
+    # per forward-pass minibatch). Useful for models like Qwen which exhibit
+    # random, unpredictable high-norm activation "sinks" hundreds of tokens
+    # into the sequence that otherwise dominate max activating examples and
+    # correlation statistics. A typical value is 10. None disables filtering.
+    ignore_high_activation_norm_multiple: Optional[float] = None
+
     hf_model_path: Optional[str] = None
 
     # If true, we load a Transcoder (inherits from SAE) instead of a standard SAE.
@@ -69,6 +77,14 @@ class NeuronpediaRunnerConfig:
     # Optional filename for CLT weights (supports .safetensors or .pt). If empty, default search order will be used.
     clt_weights_filename: str = ""
 
+    # Optional sae_lens loader/converter name used when loading SAEs from
+    # HuggingFace (passed to SAE.from_pretrained's `converter` arg). Accepts a
+    # short registry name from sae_lens' NAMED_PRETRAINED_SAE_LOADERS
+    # (e.g. "dictionary_learning_1", "gemma_2", "sparsify",
+    # "connor_rob_hook_z") or the full function name exported by
+    # sae_lens.loading.pretrained_sae_loaders (e.g.
+    # "dictionary_learning_sae_huggingface_loader_1"). If None, sae_lens infers
+    # the loader from the release.
     sae_converter_name: Optional[str] = None
 
 

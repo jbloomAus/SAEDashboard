@@ -100,6 +100,31 @@ class FeatureDataGenerator:
                         DTYPES[self.cfg.dtype]
                     )
 
+            # Optionally filter out token positions whose hidden-state norm is
+            # an extreme outlier relative to the median norm in this minibatch.
+            # Mirrors dictionary_learning's `remove_high_norm` handling for
+            # models (e.g. Qwen) with random high-norm activation sinks.
+            # Ref: https://github.com/saprmarks/dictionary_learning/blob/main/dictionary_learning/pytorch_buffer.py#L220
+            if self.cfg.ignore_high_activation_norm_multiple is not None:
+                norms_bs = primary_acts.norm(dim=-1)  # [batch, seq]
+                median_norm = norms_bs.median()
+                high_norm_mask = (
+                    norms_bs
+                    > median_norm * self.cfg.ignore_high_activation_norm_multiple
+                )
+                if high_norm_mask.any():
+                    # Zero out feature activations at high-norm positions so
+                    # they are excluded from max activating examples,
+                    # histograms, and sequence-level stats.
+                    feature_acts = feature_acts.masked_fill(
+                        high_norm_mask.unsqueeze(-1).to(feature_acts.device), 0
+                    )
+                    # Also zero out model activations at these positions so
+                    # they don't skew the rolling correlation statistics.
+                    primary_acts = primary_acts.masked_fill(
+                        high_norm_mask.unsqueeze(-1).to(primary_acts.device), 0
+                    )
+
             self.update_rolling_coefficients(
                 model_acts=primary_acts,
                 feature_acts=feature_acts,

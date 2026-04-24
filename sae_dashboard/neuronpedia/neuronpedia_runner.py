@@ -61,9 +61,34 @@ HTML_ANOMALIES = {
 
 
 def get_sae_loader(loader_name: str):
+    """Resolve a sae_lens HuggingFace SAE loader by name.
+
+    Accepts either:
+      - A short registry name from sae_lens' ``NAMED_PRETRAINED_SAE_LOADERS``,
+        e.g. ``"dictionary_learning_1"``, ``"gemma_2"``, ``"sparsify"``.
+      - A full loader function name exported by
+        ``sae_lens.loading.pretrained_sae_loaders``, e.g.
+        ``"dictionary_learning_sae_huggingface_loader_1"``.
+    """
     module = importlib.import_module("sae_lens.loading.pretrained_sae_loaders")
-    loader_function = getattr(module, loader_name)
-    return loader_function
+
+    # Prefer the short registry name if available.
+    named_loaders = getattr(module, "NAMED_PRETRAINED_SAE_LOADERS", None)
+    if named_loaders is not None and loader_name in named_loaders:
+        return named_loaders[loader_name]
+
+    # Fall back to looking up a function by its full module-level name for
+    # backwards compatibility with earlier usage.
+    if hasattr(module, loader_name):
+        return getattr(module, loader_name)
+
+    available_short = sorted(named_loaders.keys()) if named_loaders else []
+    raise ValueError(
+        f"Unknown SAE loader '{loader_name}'. "
+        f"Expected either a short registry name (e.g. one of {available_short}) "
+        f"or the full name of a loader function exported by "
+        f"sae_lens.loading.pretrained_sae_loaders."
+    )
 
 
 class NeuronpediaRunner:
@@ -270,6 +295,11 @@ class NeuronpediaRunner:
                     release=self.cfg.sae_set,
                     sae_id=self.cfg.sae_path,
                     device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
+                    converter=(
+                        get_sae_loader(self.cfg.sae_converter_name)
+                        if self.cfg.sae_converter_name
+                        else None
+                    ),
                 )
                 if self.cfg.sae_dtype != "":
                     self._apply_sae_dtype_override()
@@ -777,6 +807,7 @@ class NeuronpediaRunner:
                         self.model.tokenizer.eos_token_id,  # type: ignore
                     },  # type: ignore
                     ignore_positions=self.cfg.ignore_positions or [],
+                    ignore_high_activation_norm_multiple=self.cfg.ignore_high_activation_norm_multiple,
                     use_dfa=self.cfg.use_dfa,
                 )
 
@@ -926,10 +957,31 @@ def main():
         help="Filename of the CLT weights file (supports .safetensors / .pt). If omitted, script will search for a suitable file automatically.",
     )
     parser.add_argument(
+        "--sae-loader",
         "--sae-converter-name",
+        dest="sae_converter_name",
         type=str,
         default=None,
-        help="Name of the SAE converter to use, for SAE.from_pretrained's converter argument",
+        help=(
+            "Name of the sae_lens loader/converter to use when loading an SAE "
+            "from HuggingFace (passed to SAE.from_pretrained's `converter` arg). "
+            "Accepts short registry names from sae_lens' "
+            "NAMED_PRETRAINED_SAE_LOADERS (e.g. 'dictionary_learning_1', "
+            "'gemma_2', 'sparsify', 'connor_rob_hook_z') as well as the full "
+            "function name (e.g. 'dictionary_learning_sae_huggingface_loader_1'). "
+            "If omitted, sae_lens infers the loader from the release."
+        ),
+    )
+    parser.add_argument(
+        "--ignore-high-activation-norm-multiple",
+        type=float,
+        default=None,
+        help=(
+            "If set, filter out activations at token positions whose hidden-state "
+            "norm exceeds `median_norm * MULTIPLE` (computed per forward-pass "
+            "minibatch). Useful for models like Qwen that have random high-norm "
+            "activation sinks. A typical value is 10. Defaults to no filtering."
+        ),
     )
 
     args = parser.parse_args()
@@ -962,6 +1014,7 @@ def main():
         clt_dtype=args.clt_dtype,
         clt_weights_filename=args.clt_weights_filename,
         sae_converter_name=args.sae_converter_name,
+        ignore_high_activation_norm_multiple=args.ignore_high_activation_norm_multiple,
     )
 
     runner = NeuronpediaRunner(cfg)
