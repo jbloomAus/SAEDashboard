@@ -38,9 +38,9 @@ class FeatureProcessor:
     """
 
     @staticmethod
-    def round_list(to_round: List[float]) -> List[float]:
-        """Round a list of floats to 3 decimal places."""
-        return list(np.round(to_round, 3))
+    def round_list(to_round: List[float], precision: int = 3) -> List[float]:
+        """Round a list of floats to specified decimal places."""
+        return list(np.round(to_round, precision))
 
     @staticmethod
     def ensure_list(input_value: Any) -> List[Any]:
@@ -124,15 +124,17 @@ class NeuronpediaConverter:
             feature_output = NeuronpediaDashboardFeature()
             feature_output.feature_index = feature_index
 
-            NeuronpediaConverter._process_feature_tables(feature_output, feature_data)
+            NeuronpediaConverter._process_feature_tables(
+                feature_output, feature_data, np_cfg.rounding_precision
+            )
             NeuronpediaConverter._process_feature_logits(
-                feature_output, feature_data, model, vocab_dict
+                feature_output, feature_data, model, vocab_dict, np_cfg.rounding_precision
             )
             NeuronpediaConverter._process_feature_histograms(
-                feature_output, feature_data
+                feature_output, feature_data, np_cfg.rounding_precision
             )
             NeuronpediaConverter._process_feature_activations(
-                feature_output, feature_data, model, vocab_dict
+                feature_output, feature_data, model, vocab_dict, np_cfg.rounding_precision
             )
             NeuronpediaConverter._process_feature_decoder_weight_dist(
                 feature_output, feature_data
@@ -150,7 +152,9 @@ class NeuronpediaConverter:
 
     @staticmethod
     def _process_feature_tables(
-        feature_output: NeuronpediaDashboardFeature, feature_data: FeatureData
+        feature_output: NeuronpediaDashboardFeature,
+        feature_data: FeatureData,
+        precision: int,
     ) -> None:
         """Process feature tables data and update the feature output."""
         if feature_data.feature_tables_data:
@@ -158,28 +162,28 @@ class NeuronpediaConverter:
                 feature_data.feature_tables_data.neuron_alignment_indices
             )
             feature_output.neuron_alignment_values = FeatureProcessor.round_list(
-                feature_data.feature_tables_data.neuron_alignment_values
+                feature_data.feature_tables_data.neuron_alignment_values, precision
             )
             feature_output.neuron_alignment_l1 = FeatureProcessor.round_list(
-                feature_data.feature_tables_data.neuron_alignment_l1
+                feature_data.feature_tables_data.neuron_alignment_l1, precision
             )
             feature_output.correlated_neurons_indices = (
                 feature_data.feature_tables_data.correlated_neurons_indices
             )
             feature_output.correlated_neurons_l1 = FeatureProcessor.round_list(
-                feature_data.feature_tables_data.correlated_neurons_cossim
+                feature_data.feature_tables_data.correlated_neurons_cossim, precision
             )
             feature_output.correlated_neurons_pearson = FeatureProcessor.round_list(
-                feature_data.feature_tables_data.correlated_neurons_pearson
+                feature_data.feature_tables_data.correlated_neurons_pearson, precision
             )
             feature_output.correlated_features_indices = (
                 feature_data.feature_tables_data.correlated_features_indices
             )
             feature_output.correlated_features_l1 = FeatureProcessor.round_list(
-                feature_data.feature_tables_data.correlated_features_cossim
+                feature_data.feature_tables_data.correlated_features_cossim, precision
             )
             feature_output.correlated_features_pearson = FeatureProcessor.round_list(
-                feature_data.feature_tables_data.correlated_features_pearson
+                feature_data.feature_tables_data.correlated_features_pearson, precision
             )
 
     @staticmethod
@@ -188,13 +192,14 @@ class NeuronpediaConverter:
         feature_data: FeatureData,
         model: HookedTransformer,
         vocab_dict: Dict[int, str],
+        precision: int,
     ) -> None:
         """Process feature logits data and update the feature output."""
         top_logits = FeatureProcessor.round_list(
-            feature_data.logits_table_data.top_logits
+            feature_data.logits_table_data.top_logits, precision
         )
         bottom_logits = FeatureProcessor.round_list(
-            feature_data.logits_table_data.bottom_logits
+            feature_data.logits_table_data.bottom_logits, precision
         )
 
         feature_output.neg_str = FeatureProcessor.ensure_list(
@@ -212,7 +217,9 @@ class NeuronpediaConverter:
 
     @staticmethod
     def _process_feature_histograms(
-        feature_output: NeuronpediaDashboardFeature, feature_data: FeatureData
+        feature_output: NeuronpediaDashboardFeature,
+        feature_data: FeatureData,
+        precision: int,
     ) -> None:
         """Process feature histogram data and update the feature output."""
         if feature_data.acts_histogram_data.title:
@@ -227,18 +234,18 @@ class NeuronpediaConverter:
 
         freq_hist_data = feature_data.acts_histogram_data
         feature_output.freq_hist_data_bar_values = FeatureProcessor.round_list(
-            freq_hist_data.bar_values
+            freq_hist_data.bar_values, precision
         )
         feature_output.freq_hist_data_bar_heights = FeatureProcessor.round_list(
-            freq_hist_data.bar_heights
+            freq_hist_data.bar_heights, precision
         )
 
         logits_hist_data = feature_data.logits_histogram_data
         feature_output.logits_hist_data_bar_heights = FeatureProcessor.round_list(
-            logits_hist_data.bar_heights
+            logits_hist_data.bar_heights, precision
         )
         feature_output.logits_hist_data_bar_values = FeatureProcessor.round_list(
-            logits_hist_data.bar_values
+            logits_hist_data.bar_values, precision
         )
 
     @staticmethod
@@ -258,6 +265,7 @@ class NeuronpediaConverter:
         feature_data: FeatureData,
         model: HookedTransformer,
         vocab_dict: Dict[int, str],
+        precision: int,
     ) -> None:
         """Process feature activations data and update the feature output."""
         activations = []
@@ -282,6 +290,7 @@ class NeuronpediaConverter:
                         model,
                         vocab_dict,
                         feature_output.feature_index,
+                        precision=precision,
                     )
                     activations.append(activation)
 
@@ -320,6 +329,7 @@ class NeuronpediaConverter:
         vocab_dict: Dict[int, str],
         feature_index: int,
         activation_thresholds: Optional[dict[int, float | int]] = None,
+        precision: int = 3,
     ) -> NeuronpediaDashboardActivation:
         """Create a NeuronpediaDashboardActivation object from sequence data."""
         activation = NeuronpediaDashboardActivation()
@@ -330,12 +340,12 @@ class NeuronpediaConverter:
         if feature_data.dfa_data is not None:
             if sequence.original_index in feature_data.dfa_data:
                 dfa_data = feature_data.dfa_data[sequence.original_index]
-                # Round DFA values to three decimal points
+                # Round DFA values to specified decimal points
                 activation.dfa_values = [
-                    round(v, 3) for v in dfa_data["dfaValues"][1:]
+                    round(v, precision) for v in dfa_data["dfaValues"][1:]
                 ]  # Skip BOS token
                 activation.dfa_maxValue = round(
-                    max(activation.dfa_values), 3
+                    max(activation.dfa_values), precision
                 )  # Recalculate max to skip BOS token
                 activation.dfa_targetIndex = (
                     dfa_data["dfaTargetIndex"] - 1
@@ -352,7 +362,7 @@ class NeuronpediaConverter:
             FeatureProcessor.to_str_tokens_safe(model, vocab_dict, token_id)
             for token_id in sequence.token_ids
         ]
-        activation.values = FeatureProcessor.round_list(sequence.feat_acts)
+        activation.values = FeatureProcessor.round_list(sequence.feat_acts, precision)
         if activation_thresholds is not None:
             threshold = activation_thresholds[feature_index]
             activation.values = [

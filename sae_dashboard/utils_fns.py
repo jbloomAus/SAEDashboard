@@ -567,6 +567,7 @@ class FeatureStatistics:
             tuple[list[float], int]
         ] = ASYMMETRIC_RANGES_AND_PRECISIONS,
         batch_size: Optional[int] = None,
+        rounding_precision: int = 6,
     ) -> "FeatureStatistics":
         """Calculates various statistics for a tensor of activations.
 
@@ -596,7 +597,7 @@ class FeatureStatistics:
                 skew=[],
                 kurtosis=[],
                 quantile_data=[],
-                quantiles=[round(q, 6) for q in quantiles + [1.0]],
+                quantiles=[round(q, rounding_precision) for q in quantiles + [1.0]],
                 ranges_and_precisions=ranges_and_precisions,
             )
 
@@ -624,8 +625,8 @@ class FeatureStatistics:
 
             quantile_data.extend(batch_quantile_data.T.tolist())
 
-        quantiles = [round(q, 6) for q in quantiles + [1.0]]
-        quantile_data = [[round(q, 6) for q in qd] for qd in quantile_data]
+        quantiles = [round(q, rounding_precision) for q in quantiles + [1.0]]
+        quantile_data = [[round(q, rounding_precision) for q in qd] for qd in quantile_data]
 
         # Strip out the quantile data prefixes which are all zeros
         for i, qd in enumerate(quantile_data):
@@ -1122,6 +1123,7 @@ class HistogramData:
         n_bins: int,
         tickmode: Literal["ints", "5 ticks"],
         title: str | None,
+        rounding_precision: int = 5,
     ) -> T:
         """
         Args:
@@ -1145,7 +1147,7 @@ class HistogramData:
         bin_edges = torch.linspace(min_value, max_value, n_bins + 1)
         # Calculate the heights of each bin
         bar_heights = torch.histc(data, bins=n_bins).int().tolist()
-        bar_values = [round(x, 5) for x in (bin_edges[:-1] + bin_size / 2).tolist()]
+        bar_values = [round(x, rounding_precision) for x in (bin_edges[:-1] + bin_size / 2).tolist()]
 
         # Choose tickvalues
         # TODO - improve this, it's currently a bit hacky (currently I only use the 5 ticks mode)
@@ -1169,7 +1171,7 @@ class HistogramData:
                 [0],  # zero (always is a tick)
                 [tickrange * i for i in range(1, 1 + num_positive_ticks)],
             )
-            tick_vals = [round(t, 1) for t in tick_vals]
+            tick_vals = [round(t, rounding_precision) for t in tick_vals]
 
         return cls(  # type: ignore
             bar_heights=bar_heights,  # type: ignore

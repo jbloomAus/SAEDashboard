@@ -159,6 +159,7 @@ def parse_prompt_data(
     W_U: Float[Tensor, "d_model d_vocab"],
     feature_idx: list[int] | None = None,
     num_top_features: int = 10,
+    rounding_precision: int = 3,
 ) -> dict[str, tuple[list[int], list[str]]]:
     """
     Gets data needed to create the sequences in the prompt-centric vis (displaying dashboards for the most relevant
@@ -263,7 +264,7 @@ def parse_prompt_data(
         # Store the sequence data
         sae_vis_data.feature_data_dict[feat].prompt_data = SequenceData(
             token_ids=tokens.squeeze(0).tolist(),
-            feat_acts=[round(f, 4) for f in feat_acts[:, i].tolist()],
+            feat_acts=[round(f, rounding_precision) for f in feat_acts[:, i].tolist()],
             loss_contribution=[0.0] + loss_contribution.tolist(),
             token_logits=raw_logits[i, tokens.squeeze(0)].tolist(),
             top_token_ids=top_contribution_to_logits.indices.tolist(),

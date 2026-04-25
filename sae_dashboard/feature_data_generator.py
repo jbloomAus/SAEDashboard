@@ -7,7 +7,6 @@ import torch
 from jaxtyping import Float, Int
 from sae_lens import SAE, HookedSAETransformer
 from sae_lens.config import DTYPE_MAP as DTYPES
-from sae_lens.saes.topk_sae import TopK
 from torch import Tensor, nn
 from tqdm.auto import tqdm
 
@@ -86,7 +85,7 @@ class FeatureDataGenerator:
             )  # make sure acts are on the correct device
 
             # For TopK, compute all activations first, then select features
-            if isinstance(self.encoder.activation_fn, TopK):
+            if self.encoder.cfg.architecture() in ["topk", "batchtopk", "temporal"]:
                 # Get all features' activations
                 all_features_acts = self.encoder.encode(primary_acts)
                 # Then select only the features we're interested in

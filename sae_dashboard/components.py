@@ -242,6 +242,7 @@ class LogitsTableData:
         id_suffix: str,
         column: int | tuple[int, int],
         component_specific_kwargs: dict[str, Any] = {},
+        rounding_precision: int = 2,
     ) -> HTML:
         """
         Converts data -> HTML object, for the logits table (i.e. the top and bottom affected tokens by this feature).
@@ -281,14 +282,14 @@ class LogitsTableData:
             data["negLogits"].append(
                 {
                     "symbol": unprocess_str_tok(neg_str[i]),
-                    "value": round(bottom_logits[i], 2),
+                    "value": round(bottom_logits[i], rounding_precision),
                     "color": f"rgba(255,{int(255*(1-neg_bg_values[i]))},{int(255*(1-neg_bg_values[i]))},0.5)",
                 }
             )
             data["posLogits"].append(
                 {
                     "symbol": unprocess_str_tok(pos_str[i]),
-                    "value": round(top_logits[i], 2),
+                    "value": round(top_logits[i], rounding_precision),
                     "color": f"rgba({int(255*(1-pos_bg_values[i]))},{int(255*(1-pos_bg_values[i]))},255,0.5)",
                 }
             )

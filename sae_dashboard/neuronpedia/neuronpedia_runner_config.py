@@ -48,6 +48,8 @@ class NeuronpediaRunnerConfig:
     model_n_devices: int | None = None
     use_wandb: bool = False
 
+    rounding_precision: int = 3  # Number of decimal places for rounding
+
     shuffle_tokens: bool = True
     prefix_str: Optional[str] = None
     suffix_str: Optional[str] = None
@@ -141,6 +143,7 @@ class NeuronpediaVectorRunnerConfig:
 
     # Additional settings
     use_wandb: bool = False
+    rounding_precision: int = 3  # Number of decimal places for rounding
     shuffle_tokens: bool = True
     prefix_str: Optional[str] = None
     suffix_str: Optional[str] = None

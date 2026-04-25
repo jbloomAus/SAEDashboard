@@ -20,7 +20,7 @@ rich = "^13.7.1"
 matplotlib = "^3.8.4"
 safetensors = "^0.4.3"
 typer = "^0.12.3"
-sae-lens = "^6.8.0"
+sae-lens = {git = "https://github.com/canrager/SAELens.git"}
 decode-clt = "^0.0.1"
 hf-transfer = "^0.1.9"
 

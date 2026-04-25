@@ -84,7 +84,7 @@ class SaeVisRunner:
         # encoder = self.mock_feature_acts_subset_for_now(encoder)
 
         # Skip fold_W_dec_norm for CLT wrappers as they don't support this method
-        if "CLTLayerWrapper" in str(type(encoder)):
+        if "CLTLayerWrapper" in str(type(encoder)) or encoder.cfg.architecture() in ["temporal"]:
             print("SaeVisRunner: Skipping fold_W_dec_norm() for CLT wrapper.")
         else:
             encoder.fold_W_dec_norm()

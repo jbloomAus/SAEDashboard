@@ -315,6 +315,7 @@ class SequenceDataGenerator:
         loss_contribution: Float[Tensor, "n_bold 1"] | None = None,
         top_contribution_to_logits: TopK | None = None,
         bottom_contribution_to_logits: TopK | None = None,
+        rounding_precision: int = 3,
     ):
         sequence_groups_data = []
         group_sizes_cumsum = np.cumsum(
@@ -359,7 +360,7 @@ class SequenceDataGenerator:
                     SequenceData(
                         original_index=int(indices_bold[i, 0].item()),
                         token_ids=token_ids[i].tolist(),
-                        feat_acts=[round(f, 4) for f in feat_acts_coloring[i].tolist()],
+                        feat_acts=[round(f, rounding_precision) for f in feat_acts_coloring[i].tolist()],
                         token_logits=feat_logits[token_ids[i]].tolist(),
                         qualifying_token_index=int(indices_bold[i, 1].item()),
                     )
