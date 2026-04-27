@@ -42,6 +42,11 @@ class SaeVisConfig:
     dtype: str = "float32"
     ignore_tokens: set[int] = field(default_factory=set)
     ignore_positions: list[int] = field(default_factory=list)
+    # If set, filter out activations at token positions whose hidden-state norm
+    # exceeds `median_norm * ignore_high_activation_norm_multiple` (per
+    # forward-pass minibatch). Useful for models like Qwen which exhibit random
+    # high-norm activation sinks deep in the sequence. None disables filtering.
+    ignore_high_activation_norm_multiple: float | None = None
 
     # Model loading
     use_huggingface: bool = (
