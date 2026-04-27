@@ -572,6 +572,12 @@ class NeuronpediaRunner:
                 # TransformerLens models 1.12+ support this flag
                 self.model.set_use_hook_mlp_in(True)
 
+        # Trim unused decoder blocks above the SAE's hook layer to free VRAM.
+        # Runs on both the TransformerLens and HuggingFace paths; the helper
+        # detects the layer container appropriately for each.
+        if self.cfg.free_unused_model_layers:
+            self._free_unused_model_layers()
+
     def _add_to_tokens_method(self):
         """
         Add a to_tokens method to the HuggingFace model for compatibility with sae_lens.
@@ -659,33 +665,80 @@ class NeuronpediaRunner:
         # Also add tokenizer reference to model for compatibility
         self.model.tokenizer = tokenizer
 
-        if self.cfg.free_unused_model_layers:
-            self._free_unused_model_layers()
+    def _get_layer_container(self):
+        """Return the ``nn.ModuleList`` holding transformer decoder blocks.
+
+        - TransformerLens: every supported architecture exposes its decoder
+          blocks as ``model.blocks`` (an ``nn.ModuleList``).
+        - HuggingFace: the path varies by architecture (e.g. ``model.layers``
+          for Llama/Mistral/Gemma/Qwen2/Qwen3, ``transformer.h`` for GPT-2,
+          ``gpt_neox.layers`` for Pythia, ``language_model.layers`` for
+          PaliGemma/Gemma 3 multimodal). We reuse ``hook_utils`` to find
+          layer 0's full path, then strip the trailing index to get the
+          parent container.
+
+        Returns ``None`` if no ``ModuleList`` of decoder blocks can be found.
+        """
+        import torch.nn as nn
+
+        if not self.cfg.use_huggingface:
+            blocks = getattr(self.model, "blocks", None)
+            return blocks if isinstance(blocks, nn.ModuleList) else None
+
+        from sae_dashboard.hook_utils import (
+            get_layer_module_path,
+            get_submodule_by_path,
+        )
+
+        try:
+            layer0_path = get_layer_module_path(self.model, 0)
+        except ValueError:
+            return None
+
+        parent_path, _, _ = layer0_path.rpartition(".")
+        if not parent_path:
+            return None
+
+        try:
+            container = get_submodule_by_path(self.model, parent_path)
+        except (AttributeError, IndexError, KeyError):
+            return None
+
+        return container if isinstance(container, nn.ModuleList) else None
 
     def _free_unused_model_layers(self):
         """Replace transformer blocks above the SAE's hook layer with
         ``nn.Identity()`` to free VRAM.
 
         The forward pass used for dashboard generation already stops at
-        ``hook_layer + 1`` (see ``TransformerLensWrapper.forward``), so later
-        blocks are never executed. The embedding, ``ln_final``, and
-        ``unembed``/``W_U`` modules are left untouched; ``W_U`` is still
-        needed for feature-to-logit direction calculations in ``SaeVisRunner``.
+        ``hook_layer + 1`` for both TransformerLens (see
+        ``TransformerLensWrapper.forward``) and HuggingFace (see
+        ``HuggingFaceModelWrapper._register_stop_hook``), so later blocks
+        are never executed. The embedding, final norm, and
+        ``unembed``/``lm_head``/``W_U`` modules are left untouched;
+        ``W_U`` is still needed for feature-to-logit direction calculations
+        in ``SaeVisRunner``.
 
-        Because every TransformerLens-supported architecture exposes its
-        decoder blocks as ``model.blocks`` (an ``nn.ModuleList``), this works
-        uniformly across families (Llama, Qwen, Gemma, Mistral, Phi, etc.)
-        without any per-architecture branching.
+        Works for both TransformerLens models (where blocks live at
+        ``model.blocks``) and HuggingFace ``AutoModelForCausalLM`` models
+        (where the container path varies by architecture). The container
+        is detected via ``_get_layer_container``.
         """
         import gc
 
         import torch.nn as nn
 
-        blocks = getattr(self.model, "blocks", None)
-        if blocks is None or self.layer is None:
+        if self.layer is None:
             print(
-                "free_unused_model_layers: model has no `blocks` attribute or "
-                "hook layer is unknown; skipping."
+                "free_unused_model_layers: hook layer is unknown; skipping."
+            )
+            return
+
+        blocks = self._get_layer_container()
+        if blocks is None:
+            print(
+                "free_unused_model_layers: could not locate the transformer "
+                "block container on this model; skipping."
             )
             return
 
@@ -736,7 +789,7 @@ class NeuronpediaRunner:
                 blocks[i] = nn.Identity()
                 freed += 1
 
-        # CRITICAL: TransformerLens' ``HookedRootModule.setup()`` builds
+        # CRITICAL (TransformerLens only): ``HookedRootModule.setup()`` builds
         # ``self.mod_dict`` and ``self.hook_dict`` from ``named_modules()`` at
         # construction time, and these dicts hold *strong* references to every
         # block and sub-module (attn, mlp, HookPoints, ...). Simply swapping
@@ -744,7 +797,11 @@ class NeuronpediaRunner:
         # blocks (and their Parameters) stay alive and no VRAM is reclaimed.
         # Re-running ``setup()`` rebuilds the dicts against the current module
         # tree, dropping those stale references.
-        if hasattr(self.model, "setup"):
+        #
+        # HuggingFace models do not maintain a parallel module dict — replacing
+        # ``layers[i]`` in the ``ModuleList`` already updates the underlying
+        # ``_modules`` storage, so no equivalent step is needed.
+        if not self.cfg.use_huggingface and hasattr(self.model, "setup"):
             self.model.setup()
 
         gc.collect()
