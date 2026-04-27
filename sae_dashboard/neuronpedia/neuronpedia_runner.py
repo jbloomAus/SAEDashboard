@@ -832,7 +832,7 @@ class NeuronpediaRunner:
 
         # Get vocab size from the appropriate source
         if self.cfg.use_huggingface:
-            vocab_size = self.model.config.vocab_size
+            vocab_size = getattr(self.model.config, "vocab_size", len(vocab_dict))
         else:
             vocab_size = self.model.cfg.d_vocab
 

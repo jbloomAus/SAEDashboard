@@ -111,8 +111,15 @@ class HuggingFaceModelWrapper(nn.Module):
 
     def _get_unembed_matrix(self) -> Tensor:
         """Get the unembedding (lm_head) weight matrix."""
+        # Try direct lm_head access
         if hasattr(self.model, "lm_head"):
             return self.model.lm_head.weight.data.T  # (d_model, vocab_size)
+        # Try language_model.lm_head for multimodal models (e.g., Gemma 3)
+        elif hasattr(self.model, "language_model") and hasattr(
+            self.model.language_model, "lm_head"
+        ):
+            return self.model.language_model.lm_head.weight.data.T
+        # Try get_output_embeddings
         elif hasattr(self.model, "get_output_embeddings"):
             output_embeddings = self.model.get_output_embeddings()
             if output_embeddings is not None:

@@ -267,6 +267,7 @@ def detect_model_architecture(model) -> str:
         "mistral": "llama",  # Mistral uses Llama-style architecture
         "gemma": "gemma",
         "gemma2": "gemma",
+        "paligemma": "gemma3",  # Gemma 3 multimodal (PaliGemma architecture)
         "gpt2": "gpt2",
         "gpt_neo": "gpt2",
         "gpt_neox": "gpt_neox",
@@ -298,6 +299,7 @@ def get_layer_module_path(model, layer_index: int) -> str:
     # Try common patterns
     patterns = [
         f"model.layers.{layer_index}",  # Llama, Mistral, Gemma, Qwen2
+        f"model.language_model.layers.{layer_index}",  # Gemma 3 (PaliGemma) multimodal
         f"transformer.h.{layer_index}",  # GPT-2
         f"gpt_neox.layers.{layer_index}",  # GPT-NeoX, Pythia
         f"model.decoder.layers.{layer_index}",  # Some encoder-decoder models

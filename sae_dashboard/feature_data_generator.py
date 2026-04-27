@@ -188,9 +188,14 @@ class FeatureDataGenerator:
         if self.cfg.cache_dir is not None:
             cache_path = self.cfg.cache_dir / f"model_activations_{minibatch_index}.pt"
             if use_cache and cache_path.exists():
-                activation_dict = activation_dict = torch.load(
-                    cache_path, map_location="cpu", mmap=True
-                )  # load_tensor_dict_torch(cache_path, self.cfg.device)
+                # Removed duplicate assignment. mmap=True enables memory-mapped file I/O which allows
+                # lazy loading of tensors without reading the entire file into memory upfront, making
+                # it faster for large cached activation files. weights_only=False allows loading the
+                # full pickled objects which can be faster than the restricted loader when dealing with
+                # complex tensor dictionaries (though less secure for untrusted files).
+                activation_dict = torch.load(
+                    cache_path, map_location="cpu", weights_only=False, mmap=True
+                )
             else:
                 activation_dict = self.model.forward(
                     minibatch_tokens.to("cpu"), return_logits=False  # type: ignore
