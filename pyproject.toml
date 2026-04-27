@@ -8,7 +8,7 @@ license = "MIT"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-torch = "^2.0.0"
+torch = "^2.7.1,<2.8.0"
 einops = ">=0.7.0"
 datasets = "^3.0.0"
 dataclasses-json = "^0.6.4"
@@ -20,7 +20,7 @@ rich = "^13.7.1"
 matplotlib = "^3.8.4"
 safetensors = "^0.4.3"
 typer = "^0.12.3"
-sae-lens = "^6.8.0"
+sae-lens = "^6.22.3"
 decode-clt = "^0.0.1"
 hf-transfer = "^0.1.9"
 

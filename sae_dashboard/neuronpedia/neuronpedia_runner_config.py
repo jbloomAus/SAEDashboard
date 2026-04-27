@@ -97,6 +97,9 @@ class NeuronpediaRunnerConfig:
     # the loader from the release.
     sae_converter_name: Optional[str] = None
 
+    # HuggingFace mode - use HuggingFace Transformers directly instead of TransformerLens
+    use_huggingface: bool = False
+
 
 @dataclass
 class NeuronpediaVectorRunnerConfig:

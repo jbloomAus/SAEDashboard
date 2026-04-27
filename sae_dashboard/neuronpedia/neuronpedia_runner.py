@@ -9,13 +9,13 @@ from typing import Dict, Set, Tuple
 
 import numpy as np
 import torch
+import wandb
+import wandb.sdk
 from matplotlib import colors
 from sae_lens import SAE, ActivationsStore, HookedSAETransformer
 from tqdm import tqdm
-from transformers import AutoModelForCausalLM
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
-import wandb
-import wandb.sdk
 from sae_dashboard.components_config import (
     ActsHistogramConfig,
     Column,
@@ -26,6 +26,7 @@ from sae_dashboard.components_config import (
 )
 
 # from sae_dashboard.data_writing_fns import save_feature_centric_vis
+from sae_dashboard.hook_utils import convert_model_name_tl_to_hf
 from sae_dashboard.layout import SaeVisLayoutConfig
 from sae_dashboard.neuronpedia.neuronpedia_converter import NeuronpediaConverter
 from sae_dashboard.neuronpedia.neuronpedia_runner_config import NeuronpediaRunnerConfig
@@ -291,7 +292,7 @@ class NeuronpediaRunner:
                     dtype=self.cfg.sae_dtype if self.cfg.sae_dtype != "" else None,
                 )
             else:
-                self.sae = SAE.from_pretrained(
+                self.sae = LoaderClass.from_pretrained(  # type: ignore
                     release=self.cfg.sae_set,
                     sae_id=self.cfg.sae_path,
                     device=self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE,
@@ -391,16 +392,21 @@ class NeuronpediaRunner:
         self.sae.cfg.device = self.cfg.sae_device or DEFAULT_FALLBACK_DEVICE
 
         if self.cfg.huggingface_dataset_path == "":
-            self.cfg.huggingface_dataset_path = self.sae.cfg.dataset_path  # type: ignore
+            self.cfg.huggingface_dataset_path = self.sae.cfg.metadata.dataset_path  # type: ignore
 
         self._print_configuration()
 
         self.sae.cfg.dataset_path = self.cfg.huggingface_dataset_path  # type: ignore
         self.sae.cfg.context_size = self.cfg.n_tokens_in_prompt  # type: ignore
 
-        # Skip fold_W_dec_norm for CLT wrappers as they don't support this method
-        if "CLTLayerWrapper" in str(type(self.sae)):
-            print("NeuronpediaRunner: Skipping fold_W_dec_norm() for CLT wrapper.")
+        # Handle architecture as either attribute or method
+        architecture = self.sae.cfg.architecture
+        if callable(architecture):
+            architecture = architecture()
+
+        # Skip fold_W_dec_norm for CLT wrappers and TemporalSAE as they don't support this method
+        if "CLTLayerWrapper" in str(type(self.sae)) or architecture in ["temporal"]:
+            print("NeuronpediaRunner: Skipping fold_W_dec_norm().")
         else:
             self.sae.fold_W_dec_norm()
 
@@ -473,38 +479,185 @@ class NeuronpediaRunner:
 
     def _initialize_model(self):
         """Initialize the transformer model."""
-        # If custom HF model path is provided, load it first
-        hf_model = None
-        if self.cfg.hf_model_path:
-            print(f"Loading custom HF model from: {self.cfg.hf_model_path}")
-            hf_model = AutoModelForCausalLM.from_pretrained(
-                self.cfg.hf_model_path,
-            )
-
-        self.model = HookedSAETransformer.from_pretrained(
-            model_name=self.model_id,  # type: ignore
-            device=self.cfg.model_device,
-            n_devices=self.cfg.model_n_devices or 1,
-            hf_model=hf_model,  # Pass the custom model if provided
-            **self.sae_from_pretrained_kwargs,
-            dtype=self.cfg.model_dtype,
-        )
-
-        # Ensure MLP-in hooks are computed if needed (important for most Transcoders)
-        # Get hook_name - it's always in metadata for both SAEs and Transcoders
+        # Get hook_name first - it's always in metadata for both SAEs and Transcoders
         if hasattr(self.sae.cfg.metadata, "hook_name"):
             self.hook_name = self.sae.cfg.metadata.hook_name  # type: ignore
         else:
             self.hook_name = self.sae.cfg.metadata["hook_name"]  # type: ignore
 
-        if (
-            self.cfg.use_transcoder
-            or self.cfg.use_skip_transcoder
-            or self.cfg.use_clt
-            or "hook_mlp_in" in self.hook_name  # type: ignore
-        ) and hasattr(self.model, "set_use_hook_mlp_in"):
-            # TransformerLens models 1.12+ support this flag
-            self.model.set_use_hook_mlp_in(True)
+        if self.cfg.use_huggingface:
+            # Use HuggingFace Transformers directly instead of TransformerLens
+            print(f"Loading HuggingFace model: {self.model_id}")
+
+            # Determine model path - use custom HF path if provided, otherwise convert model_id
+            if self.cfg.hf_model_path:
+                model_path = self.cfg.hf_model_path
+            else:
+                # Convert TransformerLens model name to HuggingFace model name
+                model_path = convert_model_name_tl_to_hf(self.model_id)
+                if model_path != self.model_id:
+                    print(f"Converted model name: {self.model_id} -> {model_path}")
+
+            # Load tokenizer
+            self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+            if self.tokenizer.pad_token is None:
+                self.tokenizer.pad_token = self.tokenizer.eos_token
+            if self.tokenizer.pad_token_id is None:
+                self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
+
+            # Determine dtype
+            dtype_map = {
+                "float32": torch.float32,
+                "float16": torch.float16,
+                "bfloat16": torch.bfloat16,
+            }
+            torch_dtype = dtype_map.get(self.cfg.model_dtype, torch.float32)
+
+            # Load model
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_path,
+                torch_dtype=torch_dtype,
+                device_map=(
+                    self.cfg.model_device if self.cfg.model_device != "cpu" else None
+                ),
+                **self.sae_from_pretrained_kwargs,
+            )
+
+            if self.cfg.model_device == "cpu":
+                self.model = self.model.to("cpu")
+
+            self.model.eval()
+
+            # Add to_tokens method to HuggingFace model for compatibility with sae_lens
+            self._add_to_tokens_method()
+
+            print(f"HuggingFace model loaded on device: {self.cfg.model_device}")
+        else:
+            # Use TransformerLens (original behavior)
+            # If custom HF model path is provided, load it first
+            hf_model = None
+            if self.cfg.hf_model_path:
+                print(f"Loading custom HF model from: {self.cfg.hf_model_path}")
+                hf_model = AutoModelForCausalLM.from_pretrained(
+                    self.cfg.hf_model_path,
+                )
+
+            # Determine dtype
+            dtype_map = {
+                "float32": torch.float32,
+                "float16": torch.float16,
+                "bfloat16": torch.bfloat16,
+            }
+            torch_dtype = dtype_map.get(self.cfg.model_dtype, torch.float32)
+
+            self.model = HookedSAETransformer.from_pretrained_no_processing(
+                model_name=self.model_id,  # type: ignore
+                device=self.cfg.model_device,
+                n_devices=self.cfg.model_n_devices or 1,
+                hf_model=hf_model,  # Pass the custom model if provided
+                **self.sae_from_pretrained_kwargs,
+                dtype=torch_dtype,
+            )
+
+            # Store tokenizer reference for TransformerLens models
+            self.tokenizer = self.model.tokenizer  # type: ignore
+
+            # Ensure MLP-in hooks are computed if needed (important for most Transcoders)
+            if (
+                self.cfg.use_transcoder
+                or self.cfg.use_skip_transcoder
+                or self.cfg.use_clt
+                or "hook_mlp_in" in self.hook_name  # type: ignore
+            ) and hasattr(self.model, "set_use_hook_mlp_in"):
+                # TransformerLens models 1.12+ support this flag
+                self.model.set_use_hook_mlp_in(True)
+
+    def _add_to_tokens_method(self):
+        """
+        Add a to_tokens method to the HuggingFace model for compatibility with sae_lens.
+
+        TransformerLens models have a to_tokens method that sae_lens expects.
+        This adds an equivalent method to HuggingFace models.
+        """
+        tokenizer = self.tokenizer
+        model = self.model
+
+        def to_tokens(
+            text,
+            prepend_bos=True,
+            padding_side="right",
+            move_to_device=True,
+            truncate=True,
+        ):
+            """
+            Convert text to tokens, mimicking TransformerLens behavior.
+
+            TransformerLens explicitly prepends BOS token when prepend_bos=True.
+            HuggingFace tokenizers don't always do this (e.g., GPT-2 doesn't auto-prepend BOS).
+            We need to manually prepend the BOS token to match TransformerLens behavior.
+
+            Args:
+                text: String or list of strings to tokenize
+                prepend_bos: Whether to prepend BOS token
+                padding_side: Which side to pad on
+                move_to_device: Whether to move tokens to model device
+                truncate: Whether to truncate to max length
+            """
+            if isinstance(text, str):
+                text = [text]
+
+            # Set padding side
+            original_padding_side = tokenizer.padding_side
+            tokenizer.padding_side = padding_side
+
+            # Tokenize WITHOUT adding special tokens - we'll handle BOS manually
+            # This matches TransformerLens behavior more closely
+            encoded = tokenizer(
+                text,
+                return_tensors="pt",
+                padding=True,
+                truncation=truncate,
+                add_special_tokens=False,  # Don't auto-add, we handle BOS manually
+            )
+
+            # Restore padding side
+            tokenizer.padding_side = original_padding_side
+
+            tokens = encoded["input_ids"]
+
+            # Manually prepend BOS token if requested (matching TransformerLens behavior)
+            if prepend_bos:
+                # Get BOS token ID - use eos_token_id for GPT-2 style models
+                # that use the same token for BOS and EOS
+                bos_token_id = tokenizer.bos_token_id
+                if bos_token_id is None:
+                    bos_token_id = tokenizer.eos_token_id
+
+                if bos_token_id is not None:
+                    # Create BOS column and prepend
+                    bos_column = torch.full(
+                        (tokens.shape[0], 1),
+                        bos_token_id,
+                        dtype=tokens.dtype,
+                        device=tokens.device,
+                    )
+                    tokens = torch.cat([bos_column, tokens], dim=1)
+
+            if move_to_device:
+                device = next(model.parameters()).device
+                tokens = tokens.to(device)
+
+            return tokens
+
+        # Monkey-patch the method onto the model
+        import types
+
+        self.model.to_tokens = types.MethodType(
+            lambda self, *args, **kwargs: to_tokens(*args, **kwargs), self.model
+        )
+
+        # Also add tokenizer reference to model for compatibility
+        self.model.tokenizer = tokenizer
 
         if self.cfg.free_unused_model_layers:
             self._free_unused_model_layers()
@@ -788,8 +941,8 @@ class NeuronpediaRunner:
         return tokens
 
     def get_vocab_dict(self) -> Dict[int, str]:
-        # get vocab
-        vocab_dict: dict = self.model.tokenizer.vocab  # type: ignore
+        # get vocab - use tokenizer which is set for both HuggingFace and TransformerLens
+        vocab_dict: dict = self.tokenizer.vocab  # type: ignore
         new_vocab_dict = {}
         # Replace substrings in the keys of vocab_dict using HTML_ANOMALIES
         for k, v in vocab_dict.items():  # type: ignore
@@ -798,8 +951,15 @@ class NeuronpediaRunner:
                 modified_key = modified_key.replace(anomaly, HTML_ANOMALIES[anomaly])
             new_vocab_dict[v] = modified_key
         vocab_dict = new_vocab_dict
+
+        # Get vocab size from the appropriate source
+        if self.cfg.use_huggingface:
+            vocab_size = getattr(self.model.config, "vocab_size", len(vocab_dict))
+        else:
+            vocab_size = self.model.cfg.d_vocab
+
         # pad with blank tokens to the actual vocab size
-        for i in range(len(vocab_dict), self.model.cfg.d_vocab):
+        for i in range(len(vocab_dict), vocab_size):
             vocab_dict[i] = OUT_OF_RANGE_TOKEN
         return vocab_dict
 
@@ -899,19 +1059,21 @@ class NeuronpediaRunner:
                     dtype=self.cfg.sae_dtype,
                     cache_dir=self.cached_activations_dir,
                     ignore_tokens={
-                        self.model.tokenizer.pad_token_id,  # type: ignore
-                        self.model.tokenizer.bos_token_id,  # type: ignore
-                        self.model.tokenizer.eos_token_id,  # type: ignore
+                        self.tokenizer.pad_token_id,  # type: ignore
+                        self.tokenizer.bos_token_id,  # type: ignore
+                        self.tokenizer.eos_token_id,  # type: ignore
                     },  # type: ignore
                     ignore_positions=self.cfg.ignore_positions or [],
                     ignore_high_activation_norm_multiple=self.cfg.ignore_high_activation_norm_multiple,
                     use_dfa=self.cfg.use_dfa,
+                    use_huggingface=self.cfg.use_huggingface,
                 )
 
                 feature_data = SaeVisRunner(feature_vis_config_gpt).run(
                     encoder=self.sae,  # type: ignore
                     model=self.model,
                     tokens=tokens,
+                    tokenizer=self.tokenizer if self.cfg.use_huggingface else None,
                 )
 
                 self.cfg.model_id = self.model_id
@@ -1091,6 +1253,12 @@ def main():
             "Works uniformly for any TransformerLens-supported architecture."
         ),
     )
+    parser.add_argument(
+        "--huggingface",
+        action="store_true",
+        help="Use HuggingFace Transformers directly instead of TransformerLens. "
+        "This enables support for models not available in TransformerLens.",
+    )
 
     args = parser.parse_args()
 
@@ -1122,6 +1290,7 @@ def main():
         clt_dtype=args.clt_dtype,
         clt_weights_filename=args.clt_weights_filename,
         sae_converter_name=args.sae_converter_name,
+        use_huggingface=args.huggingface,
         ignore_high_activation_norm_multiple=args.ignore_high_activation_norm_multiple,
         free_unused_model_layers=args.free_unused_model_layers,
     )

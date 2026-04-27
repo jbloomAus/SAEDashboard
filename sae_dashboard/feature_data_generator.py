@@ -1,22 +1,31 @@
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 import einops
 import numpy as np
 import torch
 from jaxtyping import Float, Int
-from sae_lens import SAE, HookedSAETransformer
+from sae_lens import SAE
 from sae_lens.config import DTYPE_MAP as DTYPES
-from sae_lens.saes.topk_sae import TopK
 from torch import Tensor, nn
 from tqdm.auto import tqdm
 
 from sae_dashboard.dfa_calculator import DFACalculator
+from sae_dashboard.huggingface_model_wrapper import (
+    HuggingFaceModelWrapper,
+    to_resid_direction_hf,
+)
 from sae_dashboard.sae_vis_data import SaeVisConfig
-from sae_dashboard.transformer_lens_wrapper import to_resid_direction
+from sae_dashboard.transformer_lens_wrapper import (
+    TransformerLensWrapper,
+    to_resid_direction,
+)
 from sae_dashboard.utils_fns import RollingCorrCoef
 
 Arr = np.ndarray
+
+# Type alias for model wrapper types
+ModelWrapperType = Union[TransformerLensWrapper, HuggingFaceModelWrapper]
 
 
 class FeatureDataGenerator:
@@ -24,21 +33,27 @@ class FeatureDataGenerator:
         self,
         cfg: SaeVisConfig,
         tokens: Int[Tensor, "batch seq"],
-        model: HookedSAETransformer,
+        model: ModelWrapperType,
         encoder: SAE[Any],
     ):
         self.cfg = cfg
         self.model = model
         self.encoder = encoder
         self.token_minibatches = self.batch_tokens(tokens)
-        self.dfa_calculator = (
-            DFACalculator(model.model, encoder) if cfg.use_dfa else None  # type: ignore
-        )
 
+        # DFA is only supported for TransformerLens models
         if cfg.use_dfa:
+            if isinstance(model, HuggingFaceModelWrapper):
+                raise NotImplementedError(
+                    "DFA (Direct Feature Attribution) is not yet supported for HuggingFace models. "
+                    "Please use TransformerLens (use_huggingface=False) for DFA."
+                )
             assert (
                 "hook_z" in encoder.cfg.hook_name
             ), f"DFAs are only supported for hook_z, but got {encoder.cfg.hook_name}"
+            self.dfa_calculator = DFACalculator(model.model, encoder)  # type: ignore
+        else:
+            self.dfa_calculator = None
 
     @torch.inference_mode()
     def batch_tokens(
@@ -71,9 +86,16 @@ class FeatureDataGenerator:
 
         # Get encoder & decoder directions
         feature_out_dir = self.encoder.W_dec[feature_indices]  # [feats d_autoencoder]
-        feature_resid_dir = to_resid_direction(
-            feature_out_dir, self.model  # type: ignore
-        )  # [feats d_model]
+
+        # Use appropriate to_resid_direction function based on model wrapper type
+        if isinstance(self.model, HuggingFaceModelWrapper):
+            feature_resid_dir = to_resid_direction_hf(
+                feature_out_dir, self.model
+            )  # [feats d_model]
+        else:
+            feature_resid_dir = to_resid_direction(
+                feature_out_dir, self.model  # type: ignore
+            )  # [feats d_model]
 
         # ! Compute & concatenate together all feature activations & post-activation function values
         for i, minibatch in enumerate(self.token_minibatches):
@@ -86,7 +108,7 @@ class FeatureDataGenerator:
             )  # make sure acts are on the correct device
 
             # For TopK, compute all activations first, then select features
-            if isinstance(self.encoder.activation_fn, TopK):
+            if self.encoder.cfg.architecture() in ["topk", "batchtopk", "temporal"]:
                 # Get all features' activations
                 all_features_acts = self.encoder.encode(primary_acts)
                 # Then select only the features we're interested in
@@ -191,7 +213,14 @@ class FeatureDataGenerator:
         if self.cfg.cache_dir is not None:
             cache_path = self.cfg.cache_dir / f"model_activations_{minibatch_index}.pt"
             if use_cache and cache_path.exists():
-                activation_dict = load_tensor_dict_torch(cache_path, self.cfg.device)
+                # Removed duplicate assignment. mmap=True enables memory-mapped file I/O which allows
+                # lazy loading of tensors without reading the entire file into memory upfront, making
+                # it faster for large cached activation files. weights_only=False allows loading the
+                # full pickled objects which can be faster than the restricted loader when dealing with
+                # complex tensor dictionaries (though less secure for untrusted files).
+                activation_dict = torch.load(
+                    cache_path, map_location="cpu", weights_only=False, mmap=True
+                )
             else:
                 activation_dict = self.model.forward(
                     minibatch_tokens.to("cpu"), return_logits=False  # type: ignore

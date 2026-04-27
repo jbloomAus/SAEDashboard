@@ -14,6 +14,7 @@ from sae_lens import SAE, HookedSAETransformer
 from sae_lens.config import DTYPE_MAP as DTYPES
 from torch import Tensor
 from tqdm.auto import tqdm
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from sae_dashboard.components import (
     ActsHistogramData,
@@ -27,6 +28,10 @@ from sae_dashboard.data_parsing_fns import (
 )
 from sae_dashboard.feature_data import FeatureData
 from sae_dashboard.feature_data_generator import FeatureDataGenerator
+from sae_dashboard.huggingface_model_wrapper import (
+    HFActivationConfig,
+    HuggingFaceModelWrapper,
+)
 from sae_dashboard.sae_vis_data import SaeVisConfig, SaeVisData
 from sae_dashboard.sequence_data_generator import SequenceDataGenerator
 from sae_dashboard.transformer_lens_wrapper import (
@@ -40,23 +45,60 @@ class FeatureDataGeneratorFactory:
     @staticmethod
     def create(
         cfg: SaeVisConfig,
-        model: HookedSAETransformer,
+        model: Union[HookedSAETransformer, AutoModelForCausalLM],
         encoder: SAE,  # type: ignore
         tokens: Int[Tensor, "batch seq"],
+        tokenizer: AutoTokenizer = None,  # Required for HuggingFace models
     ) -> FeatureDataGenerator:
-        """Builds a FeatureDataGenerator using the provided config and model."""
-        activation_config = ActivationConfig(
-            primary_hook_point=cfg.hook_point,
-            auxiliary_hook_points=(
-                [
-                    re.sub(r"hook_z", "hook_v", cfg.hook_point),
-                    re.sub(r"hook_z", "hook_pattern", cfg.hook_point),
-                ]
-                if cfg.use_dfa
-                else []
-            ),
-        )
-        wrapped_model = TransformerLensWrapper(model, activation_config)
+        """Builds a FeatureDataGenerator using the provided config and model.
+
+        Args:
+            cfg: The SaeVisConfig configuration
+            model: Either a HookedSAETransformer (TransformerLens) or AutoModelForCausalLM (HuggingFace)
+            encoder: The SAE encoder
+            tokens: The input tokens
+            tokenizer: Required when using HuggingFace models (cfg.use_huggingface=True)
+
+        Returns:
+            FeatureDataGenerator instance configured for the model type
+        """
+        if cfg.use_huggingface:
+            # Use HuggingFace model wrapper
+            if tokenizer is None:
+                raise ValueError("tokenizer must be provided when use_huggingface=True")
+
+            # DFA is not yet supported for HuggingFace models
+            if cfg.use_dfa:
+                raise NotImplementedError(
+                    "DFA (Direct Feature Attribution) is not yet supported for HuggingFace models. "
+                    "Please use TransformerLens (use_huggingface=False) for DFA."
+                )
+
+            activation_config = HFActivationConfig(
+                primary_hook_point=cfg.hook_point,
+                auxiliary_hook_points=[],
+            )
+            wrapped_model = HuggingFaceModelWrapper(
+                model=model,  # type: ignore
+                tokenizer=tokenizer,
+                activation_config=activation_config,
+                dtype=DTYPES.get(cfg.dtype, torch.float32),
+            )
+        else:
+            # Use TransformerLens model wrapper
+            activation_config = ActivationConfig(
+                primary_hook_point=cfg.hook_point,
+                auxiliary_hook_points=(
+                    [
+                        re.sub(r"hook_z", "hook_v", cfg.hook_point),
+                        re.sub(r"hook_z", "hook_pattern", cfg.hook_point),
+                    ]
+                    if cfg.use_dfa
+                    else []
+                ),
+            )
+            wrapped_model = TransformerLensWrapper(model, activation_config)  # type: ignore
+
         return FeatureDataGenerator(
             cfg=cfg, model=wrapped_model, encoder=encoder, tokens=tokens  # type: ignore
         )
@@ -74,8 +116,9 @@ class SaeVisRunner:
     def run(
         self,
         encoder: SAE,  # type: ignore
-        model: HookedSAETransformer,
+        model: Union[HookedSAETransformer, AutoModelForCausalLM],
         tokens: Int[Tensor, "batch seq"],
+        tokenizer: AutoTokenizer = None,  # Required for HuggingFace models
     ) -> SaeVisData:
         # Apply random seed
         self.set_seeds()
@@ -84,7 +127,9 @@ class SaeVisRunner:
         # encoder = self.mock_feature_acts_subset_for_now(encoder)
 
         # Skip fold_W_dec_norm for CLT wrappers as they don't support this method
-        if "CLTLayerWrapper" in str(type(encoder)):
+        if "CLTLayerWrapper" in str(type(encoder)) or encoder.cfg.architecture() in [
+            "temporal"
+        ]:
             print("SaeVisRunner: Skipping fold_W_dec_norm() for CLT wrapper.")
         else:
             encoder.fold_W_dec_norm()
@@ -110,13 +155,19 @@ class SaeVisRunner:
         progress = self.get_progress_bar(tokens, feature_batches, features_list)
 
         feature_data_generator = FeatureDataGeneratorFactory.create(
-            self.cfg, model, encoder, tokens
+            self.cfg, model, encoder, tokens, tokenizer=tokenizer
         )
+
+        # Get W_U (unembedding matrix) from the appropriate source
+        if self.cfg.use_huggingface:
+            W_U = self._get_hf_unembed_matrix(model)
+        else:
+            W_U = model.W_U
 
         sequence_data_generator = SequenceDataGenerator(
             cfg=self.cfg,
             tokens=tokens,
-            W_U=model.W_U,
+            W_U=W_U,
         )
 
         all_consolidated_dfa_results = {
@@ -139,8 +190,8 @@ class SaeVisRunner:
 
             # Get the logits of all features (i.e. the directions this feature writes to the logit output)
             logits = einops.einsum(
-                feature_resid_dir.to(device=model.W_U.device, dtype=model.W_U.dtype),
-                model.W_U,
+                feature_resid_dir.to(device=W_U.device, dtype=W_U.dtype),
+                W_U,
                 "feats d_model, d_model d_vocab -> feats d_vocab",
             ).to(self.device)
 
@@ -291,6 +342,16 @@ class SaeVisRunner:
             torch.manual_seed(self.cfg.seed)
             np.random.seed(self.cfg.seed)
         return None
+
+    def _get_hf_unembed_matrix(self, model: AutoModelForCausalLM) -> Tensor:
+        """Get the unembedding (lm_head) weight matrix from a HuggingFace model."""
+        if hasattr(model, "lm_head"):
+            return model.lm_head.weight.data.T  # (d_model, vocab_size)
+        elif hasattr(model, "get_output_embeddings"):
+            output_embeddings = model.get_output_embeddings()
+            if output_embeddings is not None:
+                return output_embeddings.weight.data.T
+        raise ValueError("Could not find unembedding matrix in HuggingFace model")
 
     def handle_features(
         self, features: Iterable[int] | None, encoder_wrapper: SAE  # type: ignore

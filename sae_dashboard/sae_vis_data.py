@@ -48,6 +48,11 @@ class SaeVisConfig:
     # high-norm activation sinks deep in the sequence. None disables filtering.
     ignore_high_activation_norm_multiple: float | None = None
 
+    # Model loading
+    use_huggingface: bool = (
+        False  # If True, use HuggingFace Transformers directly instead of TransformerLens
+    )
+
     # Vis
     feature_centric_layout: SaeVisLayoutConfig = field(
         default_factory=SaeVisLayoutConfig.default_feature_centric_layout
