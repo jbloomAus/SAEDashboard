@@ -486,10 +486,14 @@ class NeuronpediaVectorRunner:
                     dtype=self.cfg.vector_dtype,
                     cache_dir=self.cached_activations_dir,
                     ignore_tokens={
-                        self.model.tokenizer.pad_token_id,  # type: ignore
-                        self.model.tokenizer.bos_token_id,  # type: ignore
-                        self.model.tokenizer.eos_token_id,  # type: ignore
-                    },  # type: ignore
+                        tok_id
+                        for tok_id in (
+                            self.model.tokenizer.pad_token_id,  # type: ignore
+                            self.model.tokenizer.bos_token_id,  # type: ignore
+                            self.model.tokenizer.eos_token_id,  # type: ignore
+                        )
+                        if tok_id is not None
+                    },
                     ignore_positions=self.cfg.ignore_positions or [],
                     ignore_thresholds=self.cfg.activation_thresholds,
                     use_dfa=self.cfg.use_dfa,

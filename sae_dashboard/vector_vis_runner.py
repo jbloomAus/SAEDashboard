@@ -177,14 +177,18 @@ class VectorVisRunner:
                 # Create a mask for tokens to ignore based on both ID and position
                 ignore_tokens_mask = torch.ones_like(tokens, dtype=torch.bool)
                 if self.cfg.ignore_tokens:
-                    ignore_tokens_mask &= ~torch.isin(
-                        tokens,
-                        torch.tensor(
-                            list(self.cfg.ignore_tokens),
-                            dtype=tokens.dtype,
-                            device=tokens.device,
-                        ),
-                    )
+                    valid_ignore_tokens = [
+                        t for t in self.cfg.ignore_tokens if t is not None
+                    ]
+                    if valid_ignore_tokens:
+                        ignore_tokens_mask &= ~torch.isin(
+                            tokens,
+                            torch.tensor(
+                                valid_ignore_tokens,
+                                dtype=tokens.dtype,
+                                device=tokens.device,
+                            ),
+                        )
                 if self.cfg.ignore_positions:
                     ignore_positions_mask = torch.ones_like(tokens, dtype=torch.bool)
                     ignore_positions_mask[:, self.cfg.ignore_positions] = False
