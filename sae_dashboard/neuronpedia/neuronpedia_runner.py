@@ -405,7 +405,10 @@ class NeuronpediaRunner:
             architecture = architecture()
 
         # Skip fold_W_dec_norm for CLT wrappers and TemporalSAE as they don't support this method
-        if "CLTLayerWrapper" in str(type(self.sae)) or architecture in ["temporal"]:
+        if "CLTLayerWrapper" in str(type(self.sae)) or architecture in [
+            "temporal",
+            "topk",
+        ]:
             print("NeuronpediaRunner: Skipping fold_W_dec_norm().")
         else:
             self.sae.fold_W_dec_norm()
@@ -729,9 +732,7 @@ class NeuronpediaRunner:
         import torch.nn as nn
 
         if self.layer is None:
-            print(
-                "free_unused_model_layers: hook layer is unknown; skipping."
-            )
+            print("free_unused_model_layers: hook layer is unknown; skipping.")
             return
 
         blocks = self._get_layer_container()
