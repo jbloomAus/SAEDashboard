@@ -29,6 +29,12 @@ from sae_dashboard.components_config import (
 from sae_dashboard.hook_utils import convert_model_name_tl_to_hf
 from sae_dashboard.layout import SaeVisLayoutConfig
 from sae_dashboard.neuronpedia.neuronpedia_converter import NeuronpediaConverter
+from sae_dashboard.neuronpedia.neuronpedia_export import (
+    NeuronpediaExportConfig,
+    derive_hook_point_from_hook_name,
+    export_neuronpedia_dashboards,
+    resolve_creator_id,
+)
 from sae_dashboard.neuronpedia.neuronpedia_runner_config import NeuronpediaRunnerConfig
 from sae_dashboard.sae_vis_data import SaeVisConfig
 from sae_dashboard.sae_vis_runner import SaeVisRunner
@@ -98,6 +104,12 @@ class NeuronpediaRunner:
         cfg: NeuronpediaRunnerConfig,
     ):
         self.cfg = cfg
+
+        # Fail fast if Neuronpedia export was requested but required metadata
+        # is missing — better to surface this before spending hours generating
+        # batches.
+        if cfg.output_neuronpedia_exports:
+            self._validate_neuronpedia_export_cfg()
 
         # Initialize core components
         self.device_count = self._setup_devices()
@@ -1164,6 +1176,83 @@ class NeuronpediaRunner:
         if self.cfg.use_wandb:
             wandb.sdk.finish()
 
+        if self.cfg.output_neuronpedia_exports:
+            self._run_neuronpedia_export()
+
+    def _validate_neuronpedia_export_cfg(self) -> None:
+        """Ensure all required metadata for the Neuronpedia export is set."""
+        required_fields = {
+            "neuronpedia_creator_name": self.cfg.neuronpedia_creator_name,
+            "neuronpedia_release_id": self.cfg.neuronpedia_release_id,
+            "neuronpedia_release_title": self.cfg.neuronpedia_release_title,
+            "neuronpedia_release_url": self.cfg.neuronpedia_release_url,
+            "neuronpedia_source_set_description": (
+                self.cfg.neuronpedia_source_set_description
+            ),
+        }
+        missing = [name for name, value in required_fields.items() if not value]
+        if missing:
+            raise ValueError(
+                "--output-neuronpedia-exports requires all of: "
+                + ", ".join(
+                    f"--{name.replace('_', '-')}" for name in missing
+                )
+            )
+        if not self.cfg.np_set_name:
+            raise ValueError(
+                "--output-neuronpedia-exports requires --np-set-name "
+                "(used as the Neuronpedia source-set ID)."
+            )
+
+    def _run_neuronpedia_export(self) -> None:
+        """Convert ``batch-*.json`` outputs to the Neuronpedia bulk-import layout."""
+        assert self.cfg.np_set_name is not None  # Already validated.
+        assert self.cfg.neuronpedia_creator_name is not None
+        assert self.cfg.neuronpedia_release_id is not None
+        assert self.cfg.neuronpedia_release_title is not None
+        assert self.cfg.neuronpedia_release_url is not None
+        assert self.cfg.neuronpedia_source_set_description is not None
+        assert self.layer is not None
+        assert self.model_id is not None
+
+        exports_dir = self.cfg.neuronpedia_exports_dir or os.path.join(
+            os.path.dirname(self.cfg.outputs_dir.rstrip(os.sep)) or ".",
+            "neuronpedia_exports",
+        )
+
+        export_cfg = NeuronpediaExportConfig(
+            saedashboard_output_dir=self.cfg.outputs_dir,
+            exports_dir=exports_dir,
+            creator_name=self.cfg.neuronpedia_creator_name,
+            creator_id=resolve_creator_id(self.cfg.neuronpedia_creator_id),
+            release_id=self.cfg.neuronpedia_release_id,
+            release_title=self.cfg.neuronpedia_release_title,
+            url=self.cfg.neuronpedia_release_url,
+            model_name=self.model_id,
+            neuronpedia_source_set_id=self.cfg.np_set_name,
+            neuronpedia_source_set_description=(
+                self.cfg.neuronpedia_source_set_description
+            ),
+            hf_weights_repo_id=(
+                self.cfg.neuronpedia_hf_weights_repo_id or self.cfg.sae_set
+            ),
+            hf_weights_path=(
+                self.cfg.neuronpedia_hf_weights_path or self.cfg.sae_path
+            ),
+            hook_point=derive_hook_point_from_hook_name(str(self.hook_name)),
+            layer_num=self.layer,
+            prompts_huggingface_dataset_path=self.cfg.huggingface_dataset_path,
+            n_prompts_total=self.cfg.n_prompts_total,
+            n_tokens_in_prompt=self.cfg.n_tokens_in_prompt,
+            zero_out_bos_token=self.cfg.neuronpedia_zero_out_bos_token,
+        )
+
+        print(
+            "\n========== Converting batch outputs to Neuronpedia "
+            "bulk-import format =========="
+        )
+        export_neuronpedia_dashboards(export_cfg)
+
 
 def main():
     parser = argparse.ArgumentParser(description="Run Neuronpedia feature generation")
@@ -1322,6 +1411,104 @@ def main():
         "This enables support for models not available in TransformerLens.",
     )
 
+    # ------------------------------------------------------------------
+    # Neuronpedia bulk-import export flags
+    # ------------------------------------------------------------------
+    parser.add_argument(
+        "--output-neuronpedia-exports",
+        action="store_true",
+        help=(
+            "After generating batch-*.json files, also convert them to the "
+            "Neuronpedia bulk-import directory layout (release.jsonl, "
+            "model.jsonl, sourceset.jsonl, source.jsonl, plus gzipped "
+            "per-batch features and activations). Requires "
+            "--neuronpedia-creator-name, --neuronpedia-release-id, "
+            "--neuronpedia-release-title, --neuronpedia-release-url, "
+            "--neuronpedia-source-set-description, and --np-set-name."
+        ),
+    )
+    parser.add_argument(
+        "--neuronpedia-exports-dir",
+        type=str,
+        default=None,
+        help=(
+            "Where to write Neuronpedia bulk-import exports. Defaults to "
+            "'<output-dir>/../neuronpedia_exports'. Files end up under "
+            "{exports-dir}/{model_id}/{layer-source_set}/."
+        ),
+    )
+    parser.add_argument(
+        "--neuronpedia-creator-name",
+        type=str,
+        default=None,
+        help="Display name of the creator (e.g. your team / org name).",
+    )
+    parser.add_argument(
+        "--neuronpedia-creator-id",
+        type=str,
+        default=None,
+        help=(
+            "Neuronpedia creator ID. If omitted, falls back to the "
+            "DEFAULT_CREATOR_ID env var, then to a hardcoded default."
+        ),
+    )
+    parser.add_argument(
+        "--neuronpedia-release-id",
+        type=str,
+        default=None,
+        help=(
+            "Release ID (alphanumeric + dashes). The release is served at "
+            "https://[neuronpedia_domain]/[release_id]."
+        ),
+    )
+    parser.add_argument(
+        "--neuronpedia-release-title",
+        type=str,
+        default=None,
+        help="Human-readable release title (e.g. 'Gemma 4 SAEs').",
+    )
+    parser.add_argument(
+        "--neuronpedia-release-url",
+        type=str,
+        default=None,
+        help="URL for the release (paper / HuggingFace repo / etc).",
+    )
+    parser.add_argument(
+        "--neuronpedia-source-set-description",
+        type=str,
+        default=None,
+        help=(
+            "Human-readable source-set description shown on Neuronpedia "
+            "(e.g. 'Residual Stream - 65k')."
+        ),
+    )
+    parser.add_argument(
+        "--neuronpedia-hf-weights-repo-id",
+        type=str,
+        default=None,
+        help=(
+            "HuggingFace repo ID for the SAE weights. Defaults to --sae-set."
+        ),
+    )
+    parser.add_argument(
+        "--neuronpedia-hf-weights-path",
+        type=str,
+        default=None,
+        help=(
+            "HuggingFace path to the SAE weights folder. Defaults to "
+            "--sae-path."
+        ),
+    )
+    parser.add_argument(
+        "--neuronpedia-zero-out-bos-token",
+        action="store_true",
+        help=(
+            "Zero out activations on '<bos>' / '<|endoftext|>' tokens in the "
+            "exported activations. Useful for models like Gemma 2 that "
+            "weren't trained with a BOS token."
+        ),
+    )
+
     args = parser.parse_args()
 
     cfg = NeuronpediaRunnerConfig(
@@ -1355,6 +1542,17 @@ def main():
         use_huggingface=args.huggingface,
         ignore_high_activation_norm_multiple=args.ignore_high_activation_norm_multiple,
         free_unused_model_layers=args.free_unused_model_layers,
+        output_neuronpedia_exports=args.output_neuronpedia_exports,
+        neuronpedia_exports_dir=args.neuronpedia_exports_dir,
+        neuronpedia_creator_name=args.neuronpedia_creator_name,
+        neuronpedia_creator_id=args.neuronpedia_creator_id,
+        neuronpedia_release_id=args.neuronpedia_release_id,
+        neuronpedia_release_title=args.neuronpedia_release_title,
+        neuronpedia_release_url=args.neuronpedia_release_url,
+        neuronpedia_source_set_description=args.neuronpedia_source_set_description,
+        neuronpedia_hf_weights_repo_id=args.neuronpedia_hf_weights_repo_id,
+        neuronpedia_hf_weights_path=args.neuronpedia_hf_weights_path,
+        neuronpedia_zero_out_bos_token=args.neuronpedia_zero_out_bos_token,
     )
 
     runner = NeuronpediaRunner(cfg)

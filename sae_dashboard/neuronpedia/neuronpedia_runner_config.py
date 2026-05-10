@@ -100,6 +100,39 @@ class NeuronpediaRunnerConfig:
     # HuggingFace mode - use HuggingFace Transformers directly instead of TransformerLens
     use_huggingface: bool = False
 
+    # ------------------------------------------------------------------
+    # Neuronpedia bulk-import export options
+    # ------------------------------------------------------------------
+    # When True, after generating ``batch-*.json`` files, the runner will
+    # additionally convert them to the Neuronpedia bulk-import directory
+    # layout (release.jsonl / model.jsonl / sourceset.jsonl / source.jsonl
+    # plus gzipped per-batch features and activations). See
+    # ``sae_dashboard.neuronpedia.neuronpedia_export`` for details.
+    output_neuronpedia_exports: bool = False
+
+    # Where to write the converted exports. Defaults to
+    # ``{outputs_dir}/../neuronpedia_exports`` when None.
+    neuronpedia_exports_dir: Optional[str] = None
+
+    # Author / release metadata. Required when ``output_neuronpedia_exports``
+    # is True.
+    neuronpedia_creator_name: Optional[str] = None
+    neuronpedia_creator_id: Optional[str] = None  # falls back to env var
+    neuronpedia_release_id: Optional[str] = None
+    neuronpedia_release_title: Optional[str] = None
+    neuronpedia_release_url: Optional[str] = None
+    neuronpedia_source_set_description: Optional[str] = None
+
+    # Override values for the Source row. Defaults to ``sae_set`` /
+    # ``sae_path`` respectively when None.
+    neuronpedia_hf_weights_repo_id: Optional[str] = None
+    neuronpedia_hf_weights_path: Optional[str] = None
+
+    # If True, zero out activations on tokens matching ``<bos>`` /
+    # ``<|endoftext|>`` in the exported activations. Useful for models like
+    # Gemma 2 that weren't trained with a BOS token.
+    neuronpedia_zero_out_bos_token: bool = False
+
 
 @dataclass
 class NeuronpediaVectorRunnerConfig:
