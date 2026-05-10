@@ -471,14 +471,17 @@ class NeuronpediaRunner:
 
         self.cfg.model_id = self.model_id
 
-        # For transcoders, hook_layer might be hook_layer_out
-        if hasattr(self.sae.cfg, "hook_layer"):
+        # If the user explicitly provided --layer-num, that wins over any
+        # auto-detection. This is useful for HuggingFace-style hook_names
+        # (e.g. "model.language_model.layers.17") that don't match the
+        # TransformerLens "blocks.<N>.<hook>" pattern.
+        if self.cfg.layer is not None:
+            self.layer = self.cfg.layer
+        elif hasattr(self.sae.cfg, "hook_layer"):
             self.layer = self.sae.cfg.hook_layer  # type: ignore
         elif hasattr(self.sae.cfg, "hook_layer_out"):
             self.layer = self.sae.cfg.hook_layer_out  # type: ignore
         else:
-            # Try to extract layer from hook_name (e.g., "blocks.5.hook_resid_pre" -> 5)
-            # We need to get hook_name first
             hook_name = self.sae.cfg.metadata.get("hook_name", "")  # type: ignore
             import re
 
@@ -487,7 +490,9 @@ class NeuronpediaRunner:
                 self.layer = int(match.group(1))
             else:
                 raise ValueError(
-                    "Could not find hook_layer in SAE config or extract from hook_name"
+                    "Could not find hook_layer in SAE config or extract from "
+                    f"hook_name {hook_name!r}. Pass --layer-num explicitly to "
+                    "set the layer index."
                 )
 
         self.cfg.layer = self.layer
@@ -1410,6 +1415,18 @@ def main():
         help="Use HuggingFace Transformers directly instead of TransformerLens. "
         "This enables support for models not available in TransformerLens.",
     )
+    parser.add_argument(
+        "--layer-num",
+        type=int,
+        default=None,
+        help=(
+            "Explicit layer index for the SAE's hook. Overrides any value "
+            "auto-detected from the SAE config. Required when the SAE's "
+            "hook_name does not match the TransformerLens "
+            "'blocks.<N>.<hook>' pattern (e.g. HuggingFace-style hook_names "
+            "like 'model.language_model.layers.17')."
+        ),
+    )
 
     # ------------------------------------------------------------------
     # Neuronpedia bulk-import export flags
@@ -1540,6 +1557,7 @@ def main():
         clt_weights_filename=args.clt_weights_filename,
         sae_converter_name=args.sae_converter_name,
         use_huggingface=args.huggingface,
+        layer=args.layer_num,
         ignore_high_activation_norm_multiple=args.ignore_high_activation_norm_multiple,
         free_unused_model_layers=args.free_unused_model_layers,
         output_neuronpedia_exports=args.output_neuronpedia_exports,

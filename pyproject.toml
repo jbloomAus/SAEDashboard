@@ -8,7 +8,11 @@ license = "MIT"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-torch = "^2.7.1,<2.8.0"
+# Pin the CUDA 12.8 wheel from PyTorch's index so we ship Blackwell (sm_100 /
+# sm_120, e.g. RTX 50-series, B100/B200) kernels in addition to the older arches
+# the default PyPI wheel covers (sm_50…sm_90). Works for every NVIDIA GPU from
+# Maxwell through Blackwell with zero extra steps after `poetry install`.
+torch = { version = "^2.7.1,<2.8.0", source = "pytorch-cu128" }
 einops = ">=0.7.0"
 datasets = "^3.0.0"
 dataclasses-json = "^0.6.4"
@@ -38,6 +42,11 @@ flake8 = "^7.0.0"
 pytest-cov = "^5.0.0"
 black = "^24.4.2"
 pytest-memray = "^1.7.0"
+
+[[tool.poetry.source]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+priority = "explicit"
 
 [tool.poetry.scripts]
 neuronpedia-runner = "sae_dashboard.neuronpedia.neuronpedia_runner:main"

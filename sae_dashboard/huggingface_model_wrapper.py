@@ -301,17 +301,26 @@ def to_resid_direction_hf(
         The direction in residual stream space
     """
     hook_point = model.activation_config.primary_hook_point
+    # Use the parsed hook_type (which normalises both TL-style hook names and
+    # HF-style module paths) rather than substring-matching the raw hook_point,
+    # because HF-style paths like ``model.language_model.layers.17`` don't
+    # contain the substrings ``resid`` / ``_out``.
+    hook_type = model.primary_hook_info.hook_type
 
-    # For residual stream hooks, no transformation needed
-    if "resid" in hook_point or "_out" in hook_point or "hook_mlp_in" in hook_point:
+    if (
+        "resid" in hook_type
+        or "_out" in hook_type
+        or "hook_mlp_in" in hook_type
+    ):
         return direction
 
     # For other hook types, we would need to apply transformations
     # This is currently not fully implemented for HuggingFace models
     # as it requires extracting specific weight matrices
     raise NotImplementedError(
-        f"Direction transformation for hook point '{hook_point}' is not yet "
-        f"implemented for HuggingFace models. Use TransformerLens for non-residual hooks."
+        f"Direction transformation for hook point '{hook_point}' "
+        f"(hook_type={hook_type!r}) is not yet implemented for HuggingFace "
+        f"models. Use TransformerLens for non-residual hooks."
     )
 
 

@@ -123,6 +123,60 @@ def parse_transformer_lens_hook(hook_name: str) -> Tuple[int, str]:
     return layer_index, hook_type
 
 
+# Patterns for HuggingFace-style transformer-layer module paths. The capture
+# group is the layer index; an optional trailing suffix (e.g. ``.mlp``,
+# ``.self_attn``) identifies a sublayer within the block.
+_HF_LAYER_PATTERNS = [
+    re.compile(r"^(?P<prefix>.*\.layers)\.(?P<layer>\d+)(?:\.(?P<suffix>.+))?$"),
+    re.compile(r"^(?P<prefix>.*\.h)\.(?P<layer>\d+)(?:\.(?P<suffix>.+))?$"),
+]
+
+
+def parse_huggingface_hook(hook_name: str) -> Optional[Tuple[int, str, str]]:
+    """
+    Parse a HuggingFace-style hook name (a module path within the model).
+
+    Examples:
+        ``model.layers.5`` -> (5, "hook_resid_post", "model.layers.5")
+        ``model.language_model.layers.17`` ->
+            (17, "hook_resid_post", "model.language_model.layers.17")
+        ``transformer.h.5`` -> (5, "hook_resid_post", "transformer.h.5")
+        ``model.layers.5.mlp`` -> (5, "hook_mlp_out", "model.layers.5.mlp")
+        ``model.layers.5.self_attn`` ->
+            (5, "hook_attn_out", "model.layers.5.self_attn")
+
+    Hooking on a transformer block module is equivalent to TransformerLens'
+    ``hook_resid_post`` because the block's output is the residual stream that
+    flows into the next block.
+
+    Args:
+        hook_name: A module path like ``model.layers.5`` or
+            ``model.language_model.layers.17``.
+
+    Returns:
+        Tuple of (layer_index, hook_type, hf_module_path), or None if the
+        hook_name doesn't look like a HuggingFace module path.
+    """
+    for pattern in _HF_LAYER_PATTERNS:
+        match = pattern.match(hook_name)
+        if match is None:
+            continue
+        layer_index = int(match.group("layer"))
+        suffix = match.group("suffix")
+        if suffix is None:
+            hook_type = "hook_resid_post"
+        elif suffix == "mlp":
+            hook_type = "hook_mlp_out"
+        elif suffix in ("self_attn", "attn", "attention"):
+            hook_type = "hook_attn_out"
+        else:
+            # Unknown sublayer suffix; surface it as a hook_type so the wrapper
+            # can decide whether it knows how to handle it.
+            hook_type = f"hook_{suffix.replace('.', '_')}"
+        return layer_index, hook_type, hook_name
+    return None
+
+
 def get_hf_module_path(
     layer_index: int,
     hook_type: str,
@@ -196,32 +250,75 @@ def get_hf_module_path(
 
 def transformer_lens_to_hf_hook(hook_name: str, model_type: str = "auto") -> HookInfo:
     """
-    Convert a TransformerLens hook name to HuggingFace hook information.
+    Build HookInfo from either a TransformerLens or HuggingFace-style hook name.
+
+    Despite the name, this function accepts both:
+      * TransformerLens-style names (e.g. ``blocks.5.hook_resid_post``), which
+        are mapped to the canonical HuggingFace module path via
+        :func:`get_hf_module_path`.
+      * HuggingFace-style module paths (e.g. ``model.layers.5`` or
+        ``model.language_model.layers.17``), which are used as-is. This is
+        important for SAEs trained with metadata in HF format (common for
+        multimodal architectures like Gemma 3 / PaliGemma).
 
     Args:
-        hook_name: TransformerLens hook name like "blocks.5.hook_resid_post"
-        model_type: The model type for architecture-specific mappings
+        hook_name: Either a TransformerLens hook name or an HF module path.
+        model_type: The model type for architecture-specific mappings (only
+            used for the TransformerLens path).
 
     Returns:
-        HookInfo with all necessary information to hook into a HuggingFace model
+        HookInfo with all necessary information to hook into a HuggingFace
+        model. ``transformer_lens_name`` is set to the original ``hook_name``
+        so downstream code can use it as a stable activation-dict key.
 
     Example:
         >>> info = transformer_lens_to_hf_hook("blocks.5.hook_resid_post")
         >>> print(info.hf_module_path)  # "model.layers.5"
         >>> print(info.layer_index)      # 5
+        >>> info = transformer_lens_to_hf_hook("model.language_model.layers.17")
+        >>> print(info.hf_module_path)  # "model.language_model.layers.17"
+        >>> print(info.layer_index)      # 17
+        >>> print(info.hook_type)        # "hook_resid_post"
     """
-    layer_index, hook_type = parse_transformer_lens_hook(hook_name)
-    hf_module_path, capture_output, output_index = get_hf_module_path(
-        layer_index, hook_type, model_type
-    )
+    if hook_name.startswith("blocks."):
+        layer_index, hook_type = parse_transformer_lens_hook(hook_name)
+        hf_module_path, capture_output, output_index = get_hf_module_path(
+            layer_index, hook_type, model_type
+        )
+        return HookInfo(
+            transformer_lens_name=hook_name,
+            layer_index=layer_index,
+            hook_type=hook_type,
+            hf_module_path=hf_module_path,
+            capture_output=capture_output,
+            output_index=output_index,
+        )
 
-    return HookInfo(
-        transformer_lens_name=hook_name,
-        layer_index=layer_index,
-        hook_type=hook_type,
-        hf_module_path=hf_module_path,
-        capture_output=capture_output,
-        output_index=output_index,
+    hf_parsed = parse_huggingface_hook(hook_name)
+    if hf_parsed is not None:
+        layer_index, hook_type, hf_module_path = hf_parsed
+        # For block-level hooks (hook_resid_post) and self_attn, HF transformer
+        # blocks return a tuple whose first element is the hidden states.
+        if hook_type in ("hook_resid_post", "hook_attn_out"):
+            capture_output, output_index = True, 0
+        elif hook_type == "hook_mlp_out":
+            capture_output, output_index = True, None
+        else:
+            capture_output, output_index = True, None
+        return HookInfo(
+            transformer_lens_name=hook_name,
+            layer_index=layer_index,
+            hook_type=hook_type,
+            hf_module_path=hf_module_path,
+            capture_output=capture_output,
+            output_index=output_index,
+        )
+
+    raise ValueError(
+        f"Invalid hook name format: {hook_name!r}. Expected either a "
+        f"TransformerLens hook name (e.g. 'blocks.5.hook_resid_post') or a "
+        f"HuggingFace module path (e.g. 'model.layers.5' or "
+        f"'model.language_model.layers.17')."
     )
 
 
