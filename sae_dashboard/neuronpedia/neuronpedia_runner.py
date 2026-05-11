@@ -1233,7 +1233,7 @@ class NeuronpediaRunner:
             release_id=self.cfg.neuronpedia_release_id,
             release_title=self.cfg.neuronpedia_release_title,
             url=self.cfg.neuronpedia_release_url,
-            model_name=self.model_id,
+            model_name=self.cfg.neuronpedia_model_name or self.model_id,
             neuronpedia_source_set_id=self.cfg.np_set_name,
             neuronpedia_source_set_description=(
                 self.cfg.neuronpedia_source_set_description
@@ -1500,6 +1500,17 @@ def main():
         ),
     )
     parser.add_argument(
+        "--neuronpedia-model-name",
+        type=str,
+        default=None,
+        help=(
+            "Override the model name written to the export. Used as Model.id, "
+            "the export '{model_name}/' subdirectory, and modelId on every "
+            "feature/activation/source/sourceset row. Defaults to the "
+            "TransformerLens model name auto-detected from the SAE config."
+        ),
+    )
+    parser.add_argument(
         "--neuronpedia-hf-weights-repo-id",
         type=str,
         default=None,
@@ -1568,6 +1579,7 @@ def main():
         neuronpedia_release_title=args.neuronpedia_release_title,
         neuronpedia_release_url=args.neuronpedia_release_url,
         neuronpedia_source_set_description=args.neuronpedia_source_set_description,
+        neuronpedia_model_name=args.neuronpedia_model_name,
         neuronpedia_hf_weights_repo_id=args.neuronpedia_hf_weights_repo_id,
         neuronpedia_hf_weights_path=args.neuronpedia_hf_weights_path,
         neuronpedia_zero_out_bos_token=args.neuronpedia_zero_out_bos_token,
