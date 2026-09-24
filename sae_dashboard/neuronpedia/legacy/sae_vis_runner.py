@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 import einops
 import torch
 from jaxtyping import Int
-from sae_lens import SAE, HookedSAETransformer
+from sae_lens import SAE
 from torch import Tensor
 
 from sae_dashboard.components import ActsHistogramData, FeatureTablesData
@@ -22,6 +22,9 @@ from sae_dashboard.neuronpedia.legacy.sequence_data_generator import (
 from sae_dashboard.perf_logging import log_perf_event, timed_stage
 from sae_dashboard.sae_vis_data import SaeVisData
 from sae_dashboard.utils_fns import FeatureStatistics
+
+if TYPE_CHECKING:
+    from sae_lens import HookedSAETransformer
 
 if TYPE_CHECKING:
     from sae_dashboard.sae_vis_runner import SaeVisRunner

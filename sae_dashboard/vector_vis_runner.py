@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import math
 import random
 import re
 from collections import defaultdict
-from typing import Iterable, List, Union
+from typing import TYPE_CHECKING, Iterable, List, Union
 
 import einops
 import numpy as np
@@ -14,7 +16,6 @@ from sae_lens import SAE
 from sae_lens.config import DTYPE_MAP as DTYPES
 from torch import Tensor
 from tqdm.auto import tqdm
-from transformer_lens import HookedTransformer
 
 from sae_dashboard.components import (
     ActsHistogramData,
@@ -36,6 +37,9 @@ from sae_dashboard.transformer_lens_wrapper import (
 from sae_dashboard.utils_fns import FeatureStatistics, build_activation_histogram_titles
 from sae_dashboard.vector_data_generator import VectorDataGenerator
 from sae_dashboard.vector_vis_data import VectorVisConfig, VectorVisData
+
+if TYPE_CHECKING:
+    from transformer_lens import HookedTransformer
 
 
 class VectorDataGeneratorFactory:

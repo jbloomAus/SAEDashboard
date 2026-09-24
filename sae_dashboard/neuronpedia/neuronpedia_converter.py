@@ -1,10 +1,9 @@
 import json
 from types import SimpleNamespace
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union, cast
 
 import numpy as np
 import torch
-from transformer_lens import HookedTransformer
 from transformers import PreTrainedModel
 
 from sae_dashboard.feature_data import FeatureData
@@ -19,6 +18,9 @@ from sae_dashboard.neuronpedia.neuronpedia_runner_config import (
 )
 from sae_dashboard.sae_vis_data import SaeVisData
 from sae_dashboard.vector_vis_data import VectorVisData
+
+if TYPE_CHECKING:
+    from transformer_lens import HookedTransformer
 
 
 def _serialize_special_value(value: Any) -> Any:
@@ -36,7 +38,7 @@ def _serialize_special_value(value: Any) -> Any:
 
 
 # Type alias for model types
-ModelType = Union[HookedTransformer, PreTrainedModel]
+ModelType = Union["HookedTransformer", PreTrainedModel]
 
 
 class NpEncoder(json.JSONEncoder):

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import gc
 import importlib
 import json
@@ -8,7 +10,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Iterable, List, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Iterable, List, Union, cast
 
 import einops
 import numpy as np
@@ -16,7 +18,7 @@ import torch
 from jaxtyping import Int
 from rich import print as rprint
 from rich.table import Table
-from sae_lens import SAE, HookedSAETransformer
+from sae_lens import SAE
 from sae_lens.config import DTYPE_MAP as DTYPES
 from torch import Tensor
 from tqdm.auto import tqdm
@@ -68,6 +70,9 @@ from sae_dashboard.utils_fns import (
     build_activation_histogram_titles,
     build_activation_histogram_titles_from_densities,
 )
+
+if TYPE_CHECKING:
+    from sae_lens import HookedSAETransformer
 
 
 def _resolve_unembed_matrix(model: HookedSAETransformer) -> Tensor:
@@ -172,7 +177,7 @@ class FeatureDataGeneratorFactory:
                 ),
             )
             wrapped_model = TransformerLensWrapper(
-                cast(HookedSAETransformer, model),
+                cast("HookedSAETransformer", model),
                 activation_config,
                 disable_kv_cache=not is_preserved_legacy_path(cfg),
             )
@@ -275,7 +280,9 @@ class SaeVisRunner:
         single feature -- the page index does not rescue that. See
         ``DEFAULT_PARQUET_ROW_GROUP_SIZE`` for the measurements.
         """
-        kwargs: dict[str, Any] = {"write_page_index": self.cfg.columnar_write_page_index}
+        kwargs: dict[str, Any] = {
+            "write_page_index": self.cfg.columnar_write_page_index
+        }
         row_group_size = getattr(self.cfg, "columnar_parquet_row_group_size", None)
         if row_group_size:
             kwargs["row_group_size"] = int(row_group_size)
@@ -297,7 +304,11 @@ class SaeVisRunner:
     def _parquet_write_kwargs(self) -> dict[str, Any]:
         """The subset valid on ``ParquetWriter.write_table`` / ``write_batch``."""
         kwargs = self._parquet_writer_kwargs()
-        return {"row_group_size": kwargs["row_group_size"]} if "row_group_size" in kwargs else {}
+        return (
+            {"row_group_size": kwargs["row_group_size"]}
+            if "row_group_size" in kwargs
+            else {}
+        )
 
     @property
     def _preserved_legacy_enabled(self) -> bool:
@@ -1561,7 +1572,7 @@ class SaeVisRunner:
         unembed_matrix = (
             self._get_hf_unembed_matrix(cast(AutoModelForCausalLM, model))
             if self.cfg.use_huggingface
-            else _resolve_unembed_matrix(cast(HookedSAETransformer, model))
+            else _resolve_unembed_matrix(cast("HookedSAETransformer", model))
         )
         sequence_data_generator_cls = (
             LegacySequenceDataGenerator
@@ -1584,7 +1595,7 @@ class SaeVisRunner:
                         feature_batch_index=feature_batch_index,
                         features=features,
                         tokens=tokens,
-                        model=cast(HookedSAETransformer, model),
+                        model=cast("HookedSAETransformer", model),
                         encoder=encoder,
                         unembed_matrix=unembed_matrix,
                         feature_data_generator=feature_data_generator,
@@ -1606,7 +1617,7 @@ class SaeVisRunner:
                         feature_batch_index=feature_batch_index,
                         features=features,
                         tokens=tokens,
-                        model=cast(HookedSAETransformer, model),
+                        model=cast("HookedSAETransformer", model),
                         encoder=encoder,
                         unembed_matrix=unembed_matrix,
                         feature_data_generator=feature_data_generator,
@@ -1624,7 +1635,7 @@ class SaeVisRunner:
                         feature_batch_index=feature_batch_index,
                         features=features,
                         tokens=tokens,
-                        model=cast(HookedSAETransformer, model),
+                        model=cast("HookedSAETransformer", model),
                         encoder=encoder,
                         unembed_matrix=unembed_matrix,
                         feature_data_generator=feature_data_generator,

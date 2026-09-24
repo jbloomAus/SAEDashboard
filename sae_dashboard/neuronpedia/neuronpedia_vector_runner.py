@@ -13,7 +13,6 @@ import wandb.sdk
 from matplotlib import colors
 from sae_lens import ActivationsStore
 from tqdm import tqdm
-from transformer_lens import HookedTransformer
 
 from sae_dashboard.components_config import (
     ActsHistogramConfig,
@@ -31,6 +30,7 @@ from sae_dashboard.neuronpedia.neuronpedia_runner_config import (
     NeuronpediaVectorRunnerConfig,
 )
 from sae_dashboard.neuronpedia.vector_set import VectorSet
+from sae_dashboard.tl_compat import hooked_transformer_cls
 from sae_dashboard.utils_fns import has_duplicate_rows
 from sae_dashboard.vector_vis_data import VectorVisConfig
 from sae_dashboard.vector_vis_runner import VectorVisRunner
@@ -141,7 +141,7 @@ class NeuronpediaVectorRunner:
         self.cfg.model_id = self.model_id
         self.layer = self.vector_set.cfg.hook_layer
         self.cfg.layer = self.layer
-        self.model = HookedTransformer.from_pretrained(
+        self.model = hooked_transformer_cls().from_pretrained(
             model_name=self.model_id,
             device=self.cfg.model_device,
             n_devices=self.cfg.model_n_devices or 1,

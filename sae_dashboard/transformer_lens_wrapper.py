@@ -1,14 +1,18 @@
+from __future__ import annotations
+
 import re
 from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Sequence, Tuple, cast
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Sequence, Tuple, cast
 
 import torch
 import torch.nn as nn
 from jaxtyping import Float, Int
-from sae_lens import HookedSAETransformer
 from torch import Tensor
 from transformer_lens.hook_points import HookPoint
+
+if TYPE_CHECKING:
+    from sae_lens import HookedSAETransformer
 
 DTYPES = {
     "float32": torch.float32,

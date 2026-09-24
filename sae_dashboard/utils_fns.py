@@ -24,7 +24,6 @@ from jaxtyping import Bool, Float, Int
 from sae_lens import ActivationsStore
 from torch import Tensor
 from tqdm import tqdm
-from transformer_lens import utils
 from transformers import PreTrainedTokenizerBase
 
 from sae_dashboard.perf_logging import (
@@ -32,6 +31,7 @@ from sae_dashboard.perf_logging import (
     tensor_runtime_metadata,
     timed_stage,
 )
+from sae_dashboard.tl_compat import to_numpy
 
 T = TypeVar("T")
 HistogramDataT = TypeVar("HistogramDataT", bound="HistogramData")
@@ -447,7 +447,7 @@ class TopK:
         if tensor_mask is None or not tensor_mask.any():
             k = min(self.k, tensor.shape[-1])
             topk = tensor.topk(k=k, largest=self.largest)
-            return utils.to_numpy(topk.values), utils.to_numpy(topk.indices)
+            return to_numpy(topk.values), to_numpy(topk.indices)
 
         # Get the topk of the tensor, but only computed over the values of the tensor which are nontrivial
         assert (
@@ -471,7 +471,7 @@ class TopK:
         )  # shape [... k]
         topk_values[tensor_mask] = topk.values
 
-        return utils.to_numpy(topk_values), utils.to_numpy(topk_indices)
+        return to_numpy(topk_values), to_numpy(topk_indices)
 
 
 def merge_lists(*lists: Iterable[T]) -> list[T]:

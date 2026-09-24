@@ -1,10 +1,15 @@
-from typing import Any, Dict, List, Union
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Dict, List, Union
 
 import einops
 import numpy as np
 import torch
 from sae_lens import SAE
-from transformer_lens import ActivationCache, HookedTransformer
+from transformer_lens import ActivationCache
+
+if TYPE_CHECKING:
+    from transformer_lens import HookedTransformer
 
 
 class DFACalculator:

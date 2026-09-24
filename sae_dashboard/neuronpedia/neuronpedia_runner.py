@@ -19,7 +19,9 @@ import wandb
 import wandb.sdk
 from datasets import Dataset, IterableDataset
 from matplotlib import colors
-from sae_lens import SAE, ActivationsStore, HookedSAETransformer
+from sae_lens import SAE, ActivationsStore
+
+from sae_dashboard.tl_compat import hooked_sae_transformer_cls
 
 # `move_to_model_device` is an opt-in seam added in SAELens (see the coordinated Scalable Dashboards
 # PR set). It lets this runner stage prompt batches once, on the activations-store device, instead of
@@ -915,7 +917,7 @@ class NeuronpediaRunner:
                 "bfloat16": torch.bfloat16,
             }
             torch_dtype = dtype_map.get(self.cfg.model_dtype, torch.float32)
-            self.model = HookedSAETransformer.from_pretrained_no_processing(
+            self.model = hooked_sae_transformer_cls().from_pretrained_no_processing(
                 model_name=self.model_id,  # type: ignore
                 device=self.cfg.model_device,
                 n_devices=self.cfg.model_n_devices or 1,

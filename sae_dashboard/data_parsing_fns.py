@@ -5,10 +5,10 @@ from eindex import eindex
 from jaxtyping import Float, Int
 from sae_lens import SAE
 from torch import Tensor
-from transformer_lens import HookedTransformer, utils
 
 from sae_dashboard.components import LogitsTableData, SequenceData
 from sae_dashboard.sae_vis_data import SaeVisData
+from sae_dashboard.tl_compat import hooked_transformer_cls, to_numpy
 from sae_dashboard.transformer_lens_wrapper import (
     ActivationConfig,
     TransformerLensWrapper,
@@ -77,7 +77,7 @@ def add_neuron_alignment_data(
 ):
     top3_neurons_aligned = TopK(tensor=feature_out_dir.float(), k=n_rows, largest=True)
     feature_out_l1_norm = feature_out_dir.abs().sum(dim=-1, keepdim=True)
-    pct_of_l1: Arr = np.absolute(top3_neurons_aligned.values) / utils.to_numpy(
+    pct_of_l1: Arr = np.absolute(top3_neurons_aligned.values) / to_numpy(
         feature_out_l1_norm.float()
     )
     feature_tables_data["neuron_alignment_indices"] = (
@@ -160,10 +160,10 @@ def get_logits_table_data_batch(
     k = min(n_rows, int(logits32.shape[-1]))
     top_values, top_indices = top_source.topk(k=k, dim=-1, largest=True)
     bottom_values, bottom_indices = bottom_source.topk(k=k, dim=-1, largest=False)
-    top_values_np = utils.to_numpy(top_values)
-    top_indices_np = utils.to_numpy(top_indices)
-    bottom_values_np = utils.to_numpy(bottom_values)
-    bottom_indices_np = utils.to_numpy(bottom_indices)
+    top_values_np = to_numpy(top_values)
+    top_indices_np = to_numpy(top_indices)
+    bottom_values_np = to_numpy(bottom_values)
+    bottom_indices_np = to_numpy(bottom_indices)
     return [
         LogitsTableData(
             bottom_logits=bottom_values_np[row_index].tolist(),
@@ -328,7 +328,7 @@ def parse_prompt_data(
 
     for seq_pos, seq_key in enumerate([f"{t!r} ({i})" for i, t in enumerate(str_toks)]):
         # Filter the feature activations, since we only need the ones that are non-zero
-        feat_acts_nonzero_filter = utils.to_numpy(feat_acts[seq_pos] > 0)
+        feat_acts_nonzero_filter = to_numpy(feat_acts[seq_pos] > 0)
         feat_acts_nonzero_locations = np.nonzero(feat_acts_nonzero_filter)[0].tolist()
         _feat_acts = feat_acts[seq_pos, feat_acts_nonzero_filter]  # [feats_filtered,]
         _feature_idx = np.array(feature_idx)[feat_acts_nonzero_filter]
@@ -365,7 +365,7 @@ def parse_prompt_data(
             continue
 
         # Filter the loss effects, since we only need the ones which have non-zero feature acts on the tokens before them
-        prev_feat_acts_nonzero_filter = utils.to_numpy(feat_acts[seq_pos - 1] > 0)
+        prev_feat_acts_nonzero_filter = to_numpy(feat_acts[seq_pos - 1] > 0)
         _loss_contribution = feats_loss_contribution[
             prev_feat_acts_nonzero_filter, seq_pos - 1
         ]  # [feats_filtered,]
@@ -415,7 +415,7 @@ def get_prompt_data(
     encoder = sae_vis_data.encoder
     assert isinstance(encoder, SAE)
     model = sae_vis_data.model
-    assert isinstance(model, HookedTransformer)
+    assert isinstance(model, hooked_transformer_cls())
     cfg = sae_vis_data.cfg
     assert isinstance(cfg.hook_point, str), f"{cfg.hook_point=}, expected a string"
 

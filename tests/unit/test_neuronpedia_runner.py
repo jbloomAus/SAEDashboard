@@ -23,6 +23,7 @@ from sae_dashboard.neuronpedia.prompt_datasets import (
     load_prompt_dataset,
     resolve_prompt_dataset,
 )
+from sae_dashboard.tl_compat import hooked_sae_transformer_cls
 
 LEGACY_BASELINE_CONTRACT_PATH = (
     Path(__file__).parents[1]
@@ -306,6 +307,10 @@ def test_legacy_preserved_baseline_contract_maps_to_deprecated_legacy_runner() -
 def test_initialize_model_hooked_uses_no_processing_loader(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    try:
+        hooked_cls = hooked_sae_transformer_cls()
+    except ImportError as err:  # transformer-lens >= 4 has no hooked wrapper to test
+        pytest.skip(str(err))
     calls: dict[str, Any] = {}
     fake_model = SimpleNamespace(tokenizer=object())
 
@@ -334,12 +339,12 @@ def test_initialize_model_hooked_uses_no_processing_loader(
         raise AssertionError("hooked runner should not use from_pretrained")
 
     monkeypatch.setattr(
-        neuronpedia_runner_module.HookedSAETransformer,
+        hooked_cls,
         "from_pretrained_no_processing",
         fake_from_pretrained_no_processing,
     )
     monkeypatch.setattr(
-        neuronpedia_runner_module.HookedSAETransformer,
+        hooked_cls,
         "from_pretrained",
         fail_from_pretrained,
     )

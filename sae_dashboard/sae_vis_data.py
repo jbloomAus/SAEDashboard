@@ -1,18 +1,22 @@
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Iterable, Literal
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Literal
 
 from dataclasses_json import dataclass_json
 from rich import print as rprint
 from rich.table import Table
 from sae_lens import SAE
-from transformer_lens import HookedTransformer
 
 from sae_dashboard.feature_data import FeatureData
 from sae_dashboard.layout import SaeVisLayoutConfig
-from sae_dashboard.neuronpedia.neuronpedia_runner_config import DEFAULT_PARQUET_ROW_GROUP_SIZE
+from sae_dashboard.neuronpedia.neuronpedia_runner_config import (
+    DEFAULT_PARQUET_ROW_GROUP_SIZE,
+)
 from sae_dashboard.utils_fns import FeatureStatistics
+
+if TYPE_CHECKING:
+    from transformer_lens import HookedTransformer
 
 SAE_CONFIG_DICT = dict(
     hook_point="The hook point to use for the SAE",
@@ -258,7 +262,7 @@ class SaeVisData:
     feature_data_dict: dict[int, FeatureData] = field(default_factory=dict)
     feature_stats: FeatureStatistics = field(default_factory=FeatureStatistics)
 
-    model: HookedTransformer | None = None
+    model: "HookedTransformer | None" = None
     encoder: SAE | None = None  # type: ignore
 
     def update(self, other: "SaeVisData") -> None:
@@ -293,7 +297,7 @@ class SaeVisData:
         cls,
         filename: str | Path,
         cfg: SaeVisConfig,
-        model: HookedTransformer,
+        model: "HookedTransformer",
         encoder: SAE,  # type: ignore
     ) -> "SaeVisData":
         """
