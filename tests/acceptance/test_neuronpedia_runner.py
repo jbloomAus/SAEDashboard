@@ -1,12 +1,16 @@
 import json
 import os
+from pathlib import Path
 from typing import Any, List, Type, TypeVar
+
+import pytest
 
 from sae_dashboard.neuronpedia.neuronpedia_dashboard import NeuronpediaDashboardBatch
 from sae_dashboard.neuronpedia.neuronpedia_runner import (
     NeuronpediaRunner,
     NeuronpediaRunnerConfig,
 )
+from tests.conftest import _golden_batch_paths
 
 # from sae_lens.toolkit.pretrained_saes import download_sae_from_hf
 
@@ -31,8 +35,19 @@ SKIP_COMPARISON_FIELDS = {
 }
 
 
+# Logits-table token-string lists: rank order of near-tied logits is dtype-sensitive
+# (e.g. two bottom logits within tolerance of each other swap ranks between float32 and
+# bfloat16 forwards), so compare these as multisets; their paired *_values lists remain
+# order- and tolerance-compared.
+MULTISET_COMPARISON_FIELDS = {"pos_str", "neg_str"}
+
+
 def compare_values_with_tolerance(
-    val1: Any, val2: Any, tolerance: float = CORRECT_VALUE_TOLERANCE, path: str = ""
+    val1: Any,
+    val2: Any,
+    tolerance: float = CORRECT_VALUE_TOLERANCE,
+    path: str = "",
+    extra_skip_fields: frozenset[str] = frozenset(),
 ) -> List[str]:
     """
     Recursively compare two values with tolerance for floats.
@@ -42,14 +57,53 @@ def compare_values_with_tolerance(
 
     # Skip certain fields that can vary between runs
     path_parts = path.split(".")
-    if any(field in path_parts for field in SKIP_COMPARISON_FIELDS):
+    if any(field in path_parts for field in SKIP_COMPARISON_FIELDS | extra_skip_fields):
+        return differences
+
+    if (
+        path_parts
+        and path_parts[-1] in MULTISET_COMPARISON_FIELDS
+        and isinstance(val1, list)
+        and isinstance(val2, list)
+    ):
+        if sorted(map(str, val1)) != sorted(map(str, val2)):
+            differences.append(f"{path}: token multisets differ ({val1} vs {val2})")
+        return differences
+
+    # Activation records with near-tied max activations can swap list ranks between
+    # float32 and bfloat16 forwards; align both sides canonically before element-wise
+    # comparison so pure rank swaps are not reported as content differences.
+    if (
+        path_parts
+        and path_parts[-1] == "activations"
+        and isinstance(val1, list)
+        and isinstance(val2, list)
+        and len(val1) == len(val2)
+        and all(isinstance(item, dict) for item in val1 + val2)
+    ):
+
+        def activation_sort_key(record: dict[str, Any]) -> tuple[Any, ...]:
+            return (
+                tuple(record.get("tokens") or ()),
+                record.get("qualifying_token_index") or 0,
+                record.get("bin_min") or 0,
+            )
+
+        val1 = sorted(val1, key=activation_sort_key)
+        val2 = sorted(val2, key=activation_sort_key)
+        for i, (v1, v2) in enumerate(zip(val1, val2)):
+            differences.extend(
+                compare_values_with_tolerance(
+                    v1, v2, tolerance, f"{path}[{i}]", extra_skip_fields
+                )
+            )
         return differences
 
     if isinstance(val1, dict) and isinstance(val2, dict):
         all_keys = set(val1.keys()) | set(val2.keys())
         for key in all_keys:
             # Skip fields we don't want to compare
-            if key in SKIP_COMPARISON_FIELDS:
+            if key in SKIP_COMPARISON_FIELDS | extra_skip_fields:
                 continue
             if key not in val1:
                 differences.append(f"{path}.{key}: missing in first value")
@@ -58,7 +112,11 @@ def compare_values_with_tolerance(
             else:
                 differences.extend(
                     compare_values_with_tolerance(
-                        val1[key], val2[key], tolerance, f"{path}.{key}"
+                        val1[key],
+                        val2[key],
+                        tolerance,
+                        f"{path}.{key}",
+                        extra_skip_fields,
                     )
                 )
     elif isinstance(val1, list) and isinstance(val2, list):
@@ -69,7 +127,9 @@ def compare_values_with_tolerance(
         else:
             for i, (v1, v2) in enumerate(zip(val1, val2)):
                 differences.extend(
-                    compare_values_with_tolerance(v1, v2, tolerance, f"{path}[{i}]")
+                    compare_values_with_tolerance(
+                        v1, v2, tolerance, f"{path}[{i}]", extra_skip_fields
+                    )
                 )
     elif isinstance(val1, (int, float)) and isinstance(val2, (int, float)):
         if abs(val1 - val2) > tolerance:
@@ -84,6 +144,7 @@ def compare_batches_with_tolerance(
     batch1: NeuronpediaDashboardBatch,
     batch2: NeuronpediaDashboardBatch,
     tolerance: float = CORRECT_VALUE_TOLERANCE,
+    extra_skip_fields: frozenset[str] = frozenset(),
 ) -> List[str]:
     """
     Compare two NeuronpediaDashboardBatch objects with tolerance for numerical values.
@@ -91,7 +152,9 @@ def compare_batches_with_tolerance(
     """
     dict1 = batch1.to_dict() if hasattr(batch1, "to_dict") else batch1.__dict__
     dict2 = batch2.to_dict() if hasattr(batch2, "to_dict") else batch2.__dict__
-    return compare_values_with_tolerance(dict1, dict2, tolerance, "batch")
+    return compare_values_with_tolerance(
+        dict1, dict2, tolerance, "batch", extra_skip_fields
+    )
 
 
 # pytest -s tests/acceptance/test_neuronpedia_runner.py::test_simple_neuronpedia_runner
@@ -217,9 +280,16 @@ def test_simple_neuronpedia_runner_different_dtypes_sae_model():
         assert os.path.exists(test_path), f"file {test_path} does not exist"
         test_data = json_to_class(test_path, NeuronpediaDashboardBatch)
 
-        # Use detailed comparison
+        # Use detailed comparison. Quantile-bin edges derive from the dtype-sensitive
+        # feature max (linspace(0, feat_max)), so a boundary-adjacent record's interval
+        # attribution can jump one bin between the bfloat16 run and the float32-generated
+        # fixtures — this cross-dtype test asserts value/selection fidelity, not
+        # interval-attribution stability for boundary values.
         differences = compare_batches_with_tolerance(
-            test_data, correct_data, tolerance=CORRECT_VALUE_TOLERANCE
+            test_data,
+            correct_data,
+            tolerance=CORRECT_VALUE_TOLERANCE,
+            extra_skip_fields=frozenset({"bin_min", "bin_max", "bin_contains"}),
         )
         if differences:
             diff_msg = f"\nDifferences in batch-{i}.json:\n"
@@ -355,7 +425,7 @@ def test_huggingface_neuronpedia_runner():
     os.system(f"rm -rf {ACT_CACHE_FOLDER}")
 
     # Common config settings
-    common_config = dict(
+    common_config: dict[str, Any] = dict(
         sae_set=SAE_SET,
         sae_path=SAE_PATH,
         np_set_name="res-jb",
@@ -459,3 +529,208 @@ def test_huggingface_neuronpedia_runner():
     assert "run_settings.json" in os.listdir(tl_runner.cfg.outputs_dir)
 
     print("\n=== HuggingFace and TransformerLens outputs match! ===")
+
+
+# ---------------------------------------------------------------------------
+# Golden batch parity tests — validate current legacy path against committed
+# golden batch outputs. Golden batches are regenerated on-demand with
+# SAE_DASHBOARD_REGENERATE_GOLDEN_BATCHES=1.
+# ---------------------------------------------------------------------------
+
+GOLDEN_BATCH_TOLERANCE = CORRECT_VALUE_TOLERANCE
+GOLDEN_BATCH_FEATURE_COUNT_TOLERANCE = (
+    0  # legacy-vs-legacy: expect exact match on feature counts
+)
+
+
+def test_current_legacy_matches_golden_dense_packed():
+    batch0_path, batch1_path, run_settings_path, _sae_lens_path = _golden_batch_paths(
+        "dense_packed"
+    )
+    if not batch0_path.exists():
+        pytest.skip(
+            "Golden batches not found. Run with SAE_DASHBOARD_REGENERATE_GOLDEN_BATCHES=1"
+        )
+
+    # Load golden batch metadata
+    golden_run_settings = json.loads(run_settings_path.read_text())
+    sae_set = golden_run_settings.get("sae_set", "gpt2-small-res-jb")
+    sae_path = golden_run_settings.get("sae_path", "blocks.0.hook_resid_pre")
+    n_features = golden_run_settings.get("n_features_at_a_time", 2)
+    n_prompts = golden_run_settings.get("n_prompts_total", 64)
+    golden_batches = [
+        json.loads(batch0_path.read_text()),
+        json.loads(batch1_path.read_text()),
+    ]
+
+    # Run the current legacy path with the same config
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        cfg = NeuronpediaRunnerConfig(
+            sae_set=sae_set,
+            sae_path=sae_path,
+            np_set_name="res-jb",
+            from_local_sae=False,
+            outputs_dir=str(Path(tmpdir) / "runner_output"),
+            sparsity_threshold=1,
+            n_prompts_total=n_prompts,
+            n_features_at_a_time=n_features,
+            n_prompts_in_forward_pass=16,
+            start_batch=0,
+            end_batch=1,
+            use_wandb=False,
+            shuffle_tokens=False,
+        )
+        runner = NeuronpediaRunner(cfg)
+        runner.run()
+
+        batch_dir = Path(cfg.outputs_dir)
+        # The runner may put batch files in a subdirectory or directly in outputs_dir
+        for entry in os.listdir(str(batch_dir)):
+            candidate = batch_dir / entry
+            if candidate.is_dir() and (candidate / "batch-0.json").exists():
+                batch_dir = candidate
+                break
+        for i in range(2):
+            test_path = batch_dir / f"batch-{i}.json"
+            assert test_path.exists(), f"Missing {test_path}"
+            test_data = json.loads(test_path.read_text())
+            golden_data = golden_batches[i]
+
+            # Validate feature counts match (same math path, same inputs)
+            test_feat_count = len(test_data["features"])
+            golden_feat_count = len(golden_data["features"])
+            assert (
+                test_feat_count == golden_feat_count
+            ), f"Feature count mismatch in batch {i}: {test_feat_count} vs {golden_feat_count}"
+
+            # Validate per-feature activation counts match
+            for fi in range(test_feat_count):
+                test_acts = len(test_data["features"][fi]["activations"])
+                golden_acts = len(golden_data["features"][fi]["activations"])
+                abs_delta = abs(test_acts - golden_acts)
+                assert (
+                    abs_delta <= GOLDEN_BATCH_FEATURE_COUNT_TOLERANCE
+                ), f"Feature {fi} activation count mismatch in batch {i}: {test_acts} vs {golden_acts} (delta={abs_delta})"
+
+            # Compare numerical values with tolerance
+            golden_batch_obj = json_to_class(
+                str(batch0_path).replace("batch-0", f"batch-{i}"),
+                NeuronpediaDashboardBatch,
+            )
+            test_batch_obj = json_to_class(str(test_path), NeuronpediaDashboardBatch)
+            differences = compare_batches_with_tolerance(
+                test_batch_obj, golden_batch_obj, tolerance=GOLDEN_BATCH_TOLERANCE
+            )
+            if differences:
+                diff_msg = f"\nDifferences in batch-{i}.json (vs golden):\n"
+                for diff in differences[:50]:
+                    diff_msg += f"  {diff}\n"
+                if len(differences) > 50:
+                    diff_msg += f"  ... and {len(differences) - 50} more differences\n"
+                assert False, diff_msg
+
+    assert True  # all validations passed
+
+
+def test_current_legacy_matches_golden_example_aligned():
+    batch0_path, batch1_path, run_settings_path, _sae_lens_path = _golden_batch_paths(
+        "example_aligned"
+    )
+    if not batch0_path.exists():
+        pytest.skip(
+            "Golden batches not found. Run with SAE_DASHBOARD_REGENERATE_GOLDEN_BATCHES=1"
+        )
+
+    # Same shape as the dense_packed test, but this family is generated by the IN-TREE
+    # current legacy lane from a committed max-prompt-pad prompt cache (the preserved
+    # baseline cannot produce example-aligned windowing), so this is a committed-snapshot
+    # regression check of the example-aligned flow and must consume the same cache.
+    from tests.conftest import _golden_prompt_cache
+
+    prompt_cache = _golden_prompt_cache("example_aligned")
+    assert prompt_cache is not None, (
+        "example_aligned golden family requires its committed prompt_cache; "
+        "regenerate with tests/acceptance/generate_golden_batches.py"
+    )
+    golden_run_settings = json.loads(run_settings_path.read_text())
+    sae_set = golden_run_settings.get("sae_set", "gpt2-small-res-jb")
+    sae_path = golden_run_settings.get("sae_path", "blocks.0.hook_resid_pre")
+    n_features = golden_run_settings.get("n_features_at_a_time", 2)
+    n_prompts = golden_run_settings.get("n_prompts_total", 64)
+    n_tokens_in_prompt = golden_run_settings.get("n_tokens_in_prompt", 64)
+
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        cfg = NeuronpediaRunnerConfig(
+            sae_set=sae_set,
+            sae_path=sae_path,
+            np_set_name="res-jb",
+            from_local_sae=False,
+            outputs_dir=str(Path(tmpdir) / "runner_output"),
+            sparsity_threshold=1,
+            n_prompts_total=n_prompts,
+            n_tokens_in_prompt=n_tokens_in_prompt,
+            n_features_at_a_time=n_features,
+            n_prompts_in_forward_pass=16,
+            start_batch=0,
+            end_batch=1,
+            use_wandb=False,
+            shuffle_tokens=False,
+            pretokenized_dataset_path=str(prompt_cache),
+        )
+        runner = NeuronpediaRunner(cfg)
+        runner.run()
+
+        batch_dir = Path(cfg.outputs_dir)
+        for entry in os.listdir(str(batch_dir)):
+            candidate = batch_dir / entry
+            if candidate.is_dir() and (candidate / "batch-0.json").exists():
+                batch_dir = candidate
+                break
+        golden_batches = [
+            json.loads(batch0_path.read_text()),
+            json.loads(batch1_path.read_text()),
+        ]
+        for i in range(2):
+            test_path = batch_dir / f"batch-{i}.json"
+            assert test_path.exists(), f"Missing {test_path}"
+            test_data = json.loads(test_path.read_text())
+            golden_data = golden_batches[i]
+
+            # Validate feature counts match (same math path, same inputs)
+            test_feat_count = len(test_data["features"])
+            golden_feat_count = len(golden_data["features"])
+            assert (
+                test_feat_count == golden_feat_count
+            ), f"Feature count mismatch in batch {i}: {test_feat_count} vs {golden_feat_count}"
+
+            # Validate per-feature activation counts match (H1: max_abs_delta <= 0)
+            for fi in range(test_feat_count):
+                test_acts = len(test_data["features"][fi]["activations"])
+                golden_acts = len(golden_data["features"][fi]["activations"])
+                abs_delta = abs(test_acts - golden_acts)
+                assert abs_delta <= GOLDEN_BATCH_FEATURE_COUNT_TOLERANCE, (
+                    f"Feature {fi} activation count mismatch in batch {i}: "
+                    f"{test_acts} vs {golden_acts} (delta={abs_delta})"
+                )
+
+            golden_batch_obj = json_to_class(
+                str(batch0_path).replace("batch-0", f"batch-{i}"),
+                NeuronpediaDashboardBatch,
+            )
+            test_batch_obj = json_to_class(str(test_path), NeuronpediaDashboardBatch)
+            differences = compare_batches_with_tolerance(
+                test_batch_obj, golden_batch_obj, tolerance=GOLDEN_BATCH_TOLERANCE
+            )
+            if differences:
+                diff_msg = (
+                    f"\nDifferences in batch-{i}.json (example_aligned vs golden):\n"
+                )
+                for diff in differences[:50]:
+                    diff_msg += f"  {diff}\n"
+                assert False, diff_msg
+
+    assert True

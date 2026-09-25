@@ -150,6 +150,17 @@ class HuggingFaceModelWrapper(nn.Module):
         """The tokenizer for this model."""
         return self._tokenizer
 
+    @staticmethod
+    def _activation_shapes_match_tokens(
+        activation_dict: Dict[str, Tensor],
+        tokens: Int[Tensor, "batch seq"],
+    ) -> bool:
+        from sae_dashboard.transformer_lens_wrapper import (
+            activation_shapes_match_tokens,
+        )
+
+        return activation_shapes_match_tokens(activation_dict, tokens)
+
     @torch.inference_mode()
     def forward(
         self,
@@ -185,9 +196,9 @@ class HuggingFaceModelWrapper(nn.Module):
             stop_handle = self._register_stop_hook()
             handles.append(stop_handle)
 
-            # Run forward pass
+            # Run forward pass (activations are captured by hooks; the output is unused)
             try:
-                outputs = self.model(input_ids=tokens, output_hidden_states=False)
+                self.model(input_ids=tokens, output_hidden_states=False)
             except StopForward:
                 # Expected - we stopped early
                 pass
@@ -276,6 +287,13 @@ class HuggingFaceModelWrapper(nn.Module):
                     f"Cannot find attention module in layer {hook_info.layer_index}"
                 )
 
+        # Any other hook type: the parser has already resolved the module path, and
+        # ``parse_huggingface_hook`` surfaces unrecognised suffixes as a hook_type precisely "so the
+        # wrapper can decide whether it knows how to handle it". Resolving the path it handed us is
+        # how that intent is honoured; refusing here dropped a capability the parser advertises.
+        elif hook_info.hf_module_path:
+            return get_submodule_by_path(self.model, hook_info.hf_module_path)
+
         else:
             raise NotImplementedError(
                 f"Hook type '{hook_type}' is not yet supported for HuggingFace models"
@@ -307,11 +325,28 @@ def to_resid_direction_hf(
     # contain the substrings ``resid`` / ``_out``.
     hook_type = model.primary_hook_info.hook_type
 
-    if (
-        "resid" in hook_type
-        or "_out" in hook_type
-        or "hook_mlp_in" in hook_type
-    ):
+    # NOTE the membership test is deliberate rather than a substring match: an arbitrary module path
+    # yields a hook_type like ``hook_pre_feedforward_layernorm``, which is a sublayer INPUT and needs
+    # no transformation, but which no substring here would match. (Before the capture-side suffix was
+    # normalised away, such a path arrived as ``..._output`` and passed only by the ``_out`` inside
+    # ``_output`` -- an accident that the normalisation correctly removes.)
+    if "resid" in hook_type or "_out" in hook_type or "hook_mlp_in" in hook_type:
+        return direction
+
+    # A hook named by MODULE PATH rather than by TransformerLens convention yields a hook_type no
+    # substring above matches (e.g. ``hook_pre_feedforward_layernorm``, a sublayer input). Decide it
+    # by WIDTH rather than by name: a direction already d_model wide is in residual space and needs no
+    # transformation, and width is a fact about the tensor where the name is a convention that can lie.
+    #
+    # PRECONDITION, stated because width alone does not establish it: an attention ``z`` direction is
+    # ``n_heads * d_head`` wide, which equals d_model on a standard transformer, and it DOES require
+    # the W_O map (see ``transformer_lens_wrapper.to_resid_direction``). Width cannot tell the two
+    # apart. It is safe here only because no z-space direction can reach this function on the
+    # HuggingFace path: z-space directions arrive through DFA, and ``sae_vis_runner`` refuses DFA
+    # outright when ``use_huggingface`` is set. **If HF-path DFA support is ever added, that refusal
+    # goes away and this check must gain an explicit z-space branch rather than inheriting safety from
+    # a guard in another file.**
+    if model.primary_hook_info.hf_module_path and direction.shape[-1] == model.W_U.shape[0]:
         return direction
 
     # For other hook types, we would need to apply transformations

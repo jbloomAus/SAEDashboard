@@ -1,0 +1,13 @@
+{
+  "rows": 64,
+  "windowing_mode": "max-prompt-pad",
+  "prompt_windowing_family": "example_aligned_pad_enabled",
+  "effective_context_size": 49,
+  "prompt_lengths_available": true,
+  "prompt_length_min": 11,
+  "prompt_length_max": 49,
+  "prompt_length_mean": 30.28125,
+  "pad_token_id": 50256,
+  "disable_concat_sequences": true,
+  "streaming_supported": false
+}

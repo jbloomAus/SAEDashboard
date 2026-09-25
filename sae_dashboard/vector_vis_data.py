@@ -1,17 +1,19 @@
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import TYPE_CHECKING, Any, Iterable, Literal, Optional
 
 from dataclasses_json import dataclass_json
 from rich import print as rprint
 from rich.table import Table
-from transformer_lens import HookedTransformer
 
 from sae_dashboard.feature_data import FeatureData
 from sae_dashboard.layout import SaeVisLayoutConfig
 from sae_dashboard.neuronpedia.vector_set import VectorSet
 from sae_dashboard.utils_fns import FeatureStatistics
+
+if TYPE_CHECKING:
+    from transformer_lens import HookedTransformer
 
 VECTOR_CONFIG_DICT = dict(
     hook_point="The hook point to use for the VectorSet",
@@ -58,6 +60,7 @@ class VectorVisConfig:
     # Misc
     seed: int | None = 0
     verbose: bool = False
+    correlation_accumulation_device: Literal["auto", "cpu", "cuda"] = "auto"
     cache_dir: Path | None = None  # Path to cache the data
 
     def to_dict(self) -> dict[str, Any]:
@@ -144,7 +147,7 @@ class VectorVisData:
     vector_data_dict: dict[int, FeatureData] = field(default_factory=dict)
     vector_stats: FeatureStatistics = field(default_factory=FeatureStatistics)
 
-    model: HookedTransformer | None = None
+    model: "HookedTransformer | None" = None
     encoder: VectorSet | None = None
 
     def update(self, other: "VectorVisData") -> None:
@@ -179,7 +182,7 @@ class VectorVisData:
         cls,
         filename: str | Path,
         cfg: VectorVisConfig,
-        model: HookedTransformer,
+        model: "HookedTransformer",
         encoder: VectorSet,
     ) -> "VectorVisData":
         """

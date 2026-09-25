@@ -1,3 +1,4 @@
+# pyright: basic, reportPrivateImportUsage=false
 """Integration tests for transcoder functionality."""
 
 import os
@@ -10,6 +11,17 @@ from sae_dashboard.neuronpedia.neuronpedia_runner import (
     NeuronpediaRunner,
     NeuronpediaRunnerConfig,
 )
+
+
+@pytest.fixture(autouse=True)
+def _free_gpu_between_tests():
+    """Each test loads gemma-2-2b (~6 GiB); reclaim it so the module doesn't OOM."""
+    yield
+    import gc
+
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 
 @pytest.mark.skipif(
@@ -45,8 +57,10 @@ class TestTranscoderIntegration:
         # Create runner and run
         runner = NeuronpediaRunner(config)
 
-        # Verify transcoder was loaded
-        assert hasattr(runner.sae.cfg, "hook_name_out")
+        # Verify transcoder was loaded (sae-lens 6.x carries hook_name_out in cfg.metadata)
+        assert getattr(runner.sae.cfg.metadata, "hook_name_out", None) or getattr(
+            runner.sae.cfg, "hook_name_out", None
+        )
         assert "transcoder" in str(runner.sae.cfg.architecture).lower()
 
         # Run dashboard generation
@@ -96,29 +110,36 @@ class TestTranscoderIntegration:
             use_wandb=False,
         )
 
-        # Create runners
+        # Create the runners sequentially: each loads gemma-2-2b (~6 GiB), so the
+        # first is freed before the second loads to keep the test within one GPU.
+        import gc
+
+        def _resolved_architecture(runner: NeuronpediaRunner) -> str:
+            architecture = runner.sae.cfg.architecture
+            if callable(architecture):
+                architecture = architecture()
+            return str(architecture).lower()
+
         transcoder_runner = NeuronpediaRunner(transcoder_config)
-        sae_runner = NeuronpediaRunner(sae_config)
-
-        # Verify different handling
-        # Transcoders should have hook_name_out
-        assert hasattr(transcoder_runner.sae.cfg, "hook_name_out")
-        assert not hasattr(sae_runner.sae.cfg, "hook_name_out")
-
-        # Both should have hook_name in metadata
+        # Transcoders carry hook_name_out (in cfg.metadata on sae-lens 6.x)
+        assert getattr(
+            transcoder_runner.sae.cfg.metadata, "hook_name_out", None
+        ) or getattr(transcoder_runner.sae.cfg, "hook_name_out", None)
         assert transcoder_runner.hook_name
+        assert "transcoder" in _resolved_architecture(transcoder_runner)
+
+        del transcoder_runner
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+        sae_runner = NeuronpediaRunner(sae_config)
+        assert not (
+            getattr(sae_runner.sae.cfg.metadata, "hook_name_out", None)
+            or getattr(sae_runner.sae.cfg, "hook_name_out", None)
+        )
         assert sae_runner.hook_name
-
-        # Architecture should be different
-        transcoder_arch = transcoder_runner.sae.cfg.architecture
-        if callable(transcoder_arch):
-            transcoder_arch = transcoder_arch()
-        assert "transcoder" in transcoder_arch.lower()  # type: ignore
-
-        sae_arch = sae_runner.sae.cfg.architecture
-        if callable(sae_arch):
-            sae_arch = sae_arch()
-        assert "transcoder" not in sae_arch.lower()  # type: ignore
+        assert "transcoder" not in _resolved_architecture(sae_runner)
 
 
 @pytest.mark.skipif(

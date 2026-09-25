@@ -1,3 +1,4 @@
+# pyright: basic, reportPrivateImportUsage=false
 import json
 from pathlib import Path
 
@@ -74,7 +75,7 @@ def sae_vis_data(
     autoencoder.cfg.device = TEST_DEVICE
     autoencoder.to(TEST_DEVICE)
     data = SaeVisRunner(cfg).run(encoder=autoencoder, model=model, tokens=tokens)  # type: ignore
-    return data
+    return data  # pyright: ignore
 
 
 def test_SaeVisData_create_results_look_reasonable(
@@ -86,29 +87,36 @@ def test_SaeVisData_create_results_look_reasonable(
     sae_vis_data = SaeVisRunner(cfg).run(
         encoder=autoencoder, model=model, tokens=tokens  # type: ignore
     )
-    assert sae_vis_data.encoder == autoencoder
-    assert sae_vis_data.model == model
+    assert sae_vis_data.encoder == autoencoder  # pyright: ignore
+    assert sae_vis_data.model == model  # pyright: ignore
     assert sae_vis_data.cfg == cfg
     # kurtosis and skew are both empty, is this itentional?
-    assert len(sae_vis_data.feature_stats.max) == N_FEATURES
-    assert len(sae_vis_data.feature_stats.frac_nonzero) == N_FEATURES
-    assert len(sae_vis_data.feature_stats.quantile_data) == N_FEATURES
-    assert len(sae_vis_data.feature_stats.quantiles) > 1000
-    for val in sae_vis_data.feature_stats.max:
+    assert len(sae_vis_data.feature_stats.max) == N_FEATURES  # pyright: ignore
+    assert len(sae_vis_data.feature_stats.frac_nonzero) == N_FEATURES  # pyright: ignore
+    assert (
+        len(sae_vis_data.feature_stats.quantile_data) == N_FEATURES  # pyright: ignore
+    )
+    assert len(sae_vis_data.feature_stats.quantiles) > 1000  # pyright: ignore
+    for val in sae_vis_data.feature_stats.max:  # pyright: ignore
         assert val >= 0
-    for val in sae_vis_data.feature_stats.frac_nonzero:
+    for val in sae_vis_data.feature_stats.frac_nonzero:  # pyright: ignore
         assert 0 <= val <= 1
     for prev_val, next_val in zip(
-        sae_vis_data.feature_stats.quantiles[:-1],
-        sae_vis_data.feature_stats.quantiles[1:],
+        sae_vis_data.feature_stats.quantiles[:-1],  # pyright: ignore
+        sae_vis_data.feature_stats.quantiles[1:],  # pyright: ignore
     ):
         assert prev_val <= next_val
-    for bounds, prec in sae_vis_data.feature_stats.ranges_and_precisions:
+    for (
+        bounds,
+        prec,
+    ) in sae_vis_data.feature_stats.ranges_and_precisions:  # pyright: ignore
         assert len(bounds) == 2
         assert bounds[0] <= bounds[1]
         assert prec > 0
     # each feature should get its own key
-    assert set(sae_vis_data.feature_data_dict.keys()) == set(range(N_FEATURES))
+    assert set(sae_vis_data.feature_data_dict.keys()) == set(  # pyright: ignore
+        range(N_FEATURES)
+    )
 
 
 def test_SaeVisData_create_and_save_feature_centric_vis(

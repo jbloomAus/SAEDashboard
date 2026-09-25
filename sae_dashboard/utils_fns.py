@@ -1,3 +1,5 @@
+import importlib
+import json
 import random
 import re
 from dataclasses import dataclass, field
@@ -10,10 +12,10 @@ from typing import (
     Sequence,
     Type,
     TypeVar,
+    cast,
     overload,
 )
 
-import einops
 import numpy as np
 import torch
 from dataclasses_json import dataclass_json
@@ -22,10 +24,17 @@ from jaxtyping import Bool, Float, Int
 from sae_lens import ActivationsStore
 from torch import Tensor
 from tqdm import tqdm
-from transformer_lens import utils
 from transformers import PreTrainedTokenizerBase
 
+from sae_dashboard.perf_logging import (
+    log_perf_event,
+    tensor_runtime_metadata,
+    timed_stage,
+)
+from sae_dashboard.tl_compat import to_numpy
+
 T = TypeVar("T")
+HistogramDataT = TypeVar("HistogramDataT", bound="HistogramData")
 
 # from rich.progress import ProgressColumn, Task # MofNCompleteColumn
 # from rich.text import Text
@@ -164,6 +173,7 @@ def random_range_indices(
     k: int,
     bounds: tuple[float, float],
     buffer: tuple[int, int] | None = (5, -5),
+    upper_inclusive: bool = True,
 ) -> Int[Tensor, "k 2"]:
     """
     Args:
@@ -176,6 +186,9 @@ def random_range_indices(
             The range of values to consider (so we can get quantiles)
         buffer:
             Positions to avoid at the start / end of the sequence, i.e. we can include the slice buffer[0]: buffer[1]
+        upper_inclusive:
+            Whether the upper bound is inclusive (historical default). False gives numpy-histogram-style
+            half-open membership ``[lower, upper)``.
 
     Returns:
         Same thing as k_largest_indices, but the difference is that we're using quantiles rather than top/bottom k.
@@ -187,7 +200,7 @@ def random_range_indices(
     x = x[:, buffer[0] : buffer[1]]
 
     # Creat a mask for where x is in range, and get the indices as a tensor of shape (k, 2)
-    mask = (bounds[0] <= x) & (x <= bounds[1])
+    mask = (bounds[0] <= x) & ((x <= bounds[1]) if upper_inclusive else (x < bounds[1]))
     indices = torch.stack(torch.where(mask), dim=-1)
 
     # If we have more indices than we need, randomly select k of them
@@ -434,7 +447,7 @@ class TopK:
         if tensor_mask is None or not tensor_mask.any():
             k = min(self.k, tensor.shape[-1])
             topk = tensor.topk(k=k, largest=self.largest)
-            return utils.to_numpy(topk.values), utils.to_numpy(topk.indices)
+            return to_numpy(topk.values), to_numpy(topk.indices)
 
         # Get the topk of the tensor, but only computed over the values of the tensor which are nontrivial
         assert (
@@ -458,7 +471,7 @@ class TopK:
         )  # shape [... k]
         topk_values[tensor_mask] = topk.values
 
-        return utils.to_numpy(topk_values), utils.to_numpy(topk_indices)
+        return to_numpy(topk_values), to_numpy(topk_indices)
 
 
 def merge_lists(*lists: Iterable[T]) -> list[T]:
@@ -567,6 +580,8 @@ class FeatureStatistics:
             tuple[list[float], int]
         ] = ASYMMETRIC_RANGES_AND_PRECISIONS,
         batch_size: Optional[int] = None,
+        use_sparse_quantiles: bool = False,
+        valid_mask: Optional[torch.Tensor] = None,
     ) -> "FeatureStatistics":
         """Calculates various statistics for a tensor of activations.
 
@@ -574,10 +589,45 @@ class FeatureStatistics:
             data: A tensor of activations; should be shape (n_features, n_samples (n_prompts * n_prompt_tokens)).
             ranges_and_precisions: A list of tuples of the form (range, precision).
             batch_size: The feature batch size to use for processing the acts. Reduce this if you encounter OOM errors.
+            use_sparse_quantiles: If True, approximate quantiles from each feature's nonzero activations after
+                accounting for the zero mass. This is much cheaper for sparse non-negative activation tensors used in
+                dashboards.
+            valid_mask: Optional boolean mask over the sample dimension. When provided, statistics are computed only
+                over valid positions. This is used by per-example padded prompt mode so ignored pad tokens don't distort
+                density or quantile estimates.
 
         Returns:
             A FeatureStatistics object.
         """
+        payload = cls._compute_statistics_payload(
+            data=data,
+            ranges_and_precisions=ranges_and_precisions,
+            batch_size=batch_size,
+            use_sparse_quantiles=use_sparse_quantiles,
+            valid_mask=valid_mask,
+        )
+
+        return cls(
+            max=payload["max"],
+            frac_nonzero=payload["frac_nonzero"],
+            skew=payload["skew"],
+            kurtosis=payload["kurtosis"],
+            quantile_data=payload["quantile_data"],
+            quantiles=payload["quantiles"],
+            ranges_and_precisions=payload["ranges_and_precisions"],
+        )
+
+    @classmethod
+    def _compute_statistics_payload(
+        cls,
+        data: Optional[torch.Tensor] = None,
+        ranges_and_precisions: list[
+            tuple[list[float], int]
+        ] = ASYMMETRIC_RANGES_AND_PRECISIONS,
+        batch_size: Optional[int] = None,
+        use_sparse_quantiles: bool = False,
+        valid_mask: Optional[torch.Tensor] = None,
+    ) -> dict[str, Any]:
         if not batch_size:
             batch_size = 0 if data is None else data.shape[0]
 
@@ -590,39 +640,103 @@ class FeatureStatistics:
 
         # If data is None, then set the quantiles and quantile_data to None, and return
         if data is None:
-            return cls(
-                max=[],
-                frac_nonzero=[],
-                skew=[],
-                kurtosis=[],
-                quantile_data=[],
-                quantiles=[round(q, 6) for q in quantiles + [1.0]],
-                ranges_and_precisions=ranges_and_precisions,
-            )
+            return {
+                "max": [],
+                "frac_nonzero": [],
+                "skew": [],
+                "kurtosis": [],
+                "quantile_data": [],
+                "quantiles": [round(q, 6) for q in quantiles + [1.0]],
+                "ranges_and_precisions": ranges_and_precisions,
+            }
+
+        if valid_mask is not None:
+            if valid_mask.ndim == 1:
+                if valid_mask.shape[0] != data.shape[-1]:
+                    raise ValueError(
+                        "valid_mask length must match the sample dimension of data"
+                    )
+            elif valid_mask.shape != data.shape:
+                raise ValueError(
+                    "valid_mask must be 1D over samples or match data shape"
+                )
 
         # Process data in batches
         n_features = data.shape[0]
         _max = []
         frac_nonzero = []
+        positive_density = []
         quantile_data = []
 
         for i in range(0, n_features, batch_size):
             batch = data[i : min(i + batch_size, n_features)]
+            batch_mask = None
+            if valid_mask is not None:
+                if valid_mask.ndim == 1:
+                    batch_mask = valid_mask.unsqueeze(0).expand(batch.shape[0], -1)
+                else:
+                    batch_mask = valid_mask[i : min(i + batch_size, n_features)]
+                batch_mask = batch_mask.to(device=batch.device, dtype=torch.bool)
 
-            _max.extend(batch.max(dim=-1).values.tolist())
-            frac_nonzero.extend((batch.abs() > 1e-6).float().mean(dim=-1).tolist())
+            if batch_mask is None:
+                _max.extend(batch.max(dim=-1).values.tolist())
+                frac_nonzero.extend((batch.abs() > 1e-6).float().mean(dim=-1).tolist())
+                positive_density.extend((batch > 0).float().mean(dim=-1).tolist())
+            else:
+                valid_counts = batch_mask.sum(dim=-1)
+                safe_valid_counts = valid_counts.clamp(min=1)
+                masked_for_max = batch.masked_fill(~batch_mask, float("-inf"))
+                batch_max = masked_for_max.max(dim=-1).values
+                batch_max = torch.where(
+                    valid_counts > 0, batch_max, torch.zeros_like(batch_max)
+                )
+                _max.extend(batch_max.tolist())
+                nonzero_counts = ((batch.abs() > 1e-6) & batch_mask).sum(dim=-1)
+                frac_nonzero.extend(
+                    (
+                        nonzero_counts.to(torch.float32)
+                        / safe_valid_counts.to(torch.float32)
+                    ).tolist()
+                )
+                positive_counts = ((batch > 0) & batch_mask).sum(dim=-1)
+                positive_density.extend(
+                    (
+                        positive_counts.to(torch.float32)
+                        / safe_valid_counts.to(torch.float32)
+                    ).tolist()
+                )
 
             quantiles_tensor = torch.tensor(
                 quantiles, dtype=batch.dtype, device=batch.device
             )
 
-            batch_quantile_data = torch.quantile(
-                batch.to(torch.float32),
-                quantiles_tensor.to(torch.float32),
-                dim=-1,
-            )
-
-            quantile_data.extend(batch_quantile_data.T.tolist())
+            if use_sparse_quantiles and not (
+                ((batch < -1e-6) & batch_mask).any()
+                if batch_mask is not None
+                else (batch < -1e-6).any()
+            ):
+                quantile_data.extend(
+                    cls._sparse_quantile_rows(
+                        batch.to(torch.float32),
+                        quantiles_tensor.to(torch.float32),
+                        valid_mask=batch_mask,
+                    )
+                )
+            elif batch_mask is not None:
+                quantile_data.extend(
+                    cls._masked_quantile_rows(
+                        batch.to(torch.float32),
+                        quantiles_tensor.to(torch.float32),
+                        batch_mask,
+                    )
+                )
+            else:
+                batch_quantile_data = torch.quantile(
+                    batch.to(torch.float32),
+                    quantiles_tensor.to(torch.float32),
+                    dim=-1,
+                )
+                quantile_data.extend(batch_quantile_data.T.tolist())
 
         quantiles = [round(q, 6) for q in quantiles + [1.0]]
         quantile_data = [[round(q, 6) for q in qd] for qd in quantile_data]
@@ -634,15 +748,376 @@ class FeatureStatistics:
             )
             quantile_data[i] = qd[first_nonzero:]
 
-        return cls(
-            max=_max,
-            frac_nonzero=frac_nonzero,
-            skew=[],  # Placeholder for skew calculation
-            kurtosis=[],  # Placeholder for kurtosis calculation
-            quantile_data=quantile_data,
-            quantiles=quantiles,
+        return {
+            "max": _max,
+            "frac_nonzero": frac_nonzero,
+            "positive_density": positive_density,
+            "skew": [],  # Placeholder for skew calculation
+            "kurtosis": [],  # Placeholder for kurtosis calculation
+            "quantile_data": quantile_data,
+            "quantiles": quantiles,
+            "ranges_and_precisions": ranges_and_precisions,
+        }
+
+    @classmethod
+    def create_arrow_table(
+        cls,
+        data: Optional[torch.Tensor] = None,
+        ranges_and_precisions: list[
+            tuple[list[float], int]
+        ] = ASYMMETRIC_RANGES_AND_PRECISIONS,
+        batch_size: Optional[int] = None,
+        use_sparse_quantiles: bool = False,
+        valid_mask: Optional[torch.Tensor] = None,
+        include_quantiles: bool = True,
+    ) -> Any:
+        pyarrow = importlib.import_module("pyarrow")
+
+        if not include_quantiles:
+            return cls._create_scalar_arrow_table(pyarrow, data, valid_mask)
+
+        payload = cls._compute_statistics_payload(
+            data=data,
             ranges_and_precisions=ranges_and_precisions,
+            batch_size=batch_size,
+            use_sparse_quantiles=use_sparse_quantiles,
+            valid_mask=valid_mask,
         )
+
+        feature_count = len(cast(list[float], payload["max"]))
+        table = pyarrow.table(
+            {
+                "feature_index": pyarrow.array(range(feature_count)),
+                "max": pyarrow.array(payload["max"]),
+                "frac_nonzero": pyarrow.array(payload["frac_nonzero"]),
+                "positive_density": pyarrow.array(payload["positive_density"]),
+                "quantile_data": pyarrow.array(payload["quantile_data"]),
+            }
+        )
+        metadata = {
+            b"quantiles": json.dumps(payload["quantiles"]).encode("utf-8"),
+            b"ranges_and_precisions": json.dumps(
+                payload["ranges_and_precisions"]
+            ).encode("utf-8"),
+        }
+        return table.replace_schema_metadata(metadata)
+
+    @staticmethod
+    def _create_scalar_arrow_table(
+        pyarrow: Any,
+        data: torch.Tensor | None,
+        valid_mask: torch.Tensor | None,
+    ) -> Any:
+        if data is None:
+            return pyarrow.table(
+                {
+                    "feature_index": pyarrow.array([]),
+                    "max": pyarrow.array([]),
+                    "frac_nonzero": pyarrow.array([]),
+                    "positive_density": pyarrow.array([]),
+                    "positive_count": pyarrow.array([]),
+                    "nonzero_count": pyarrow.array([]),
+                    "valid_count": pyarrow.array([]),
+                }
+            )
+
+        if valid_mask is None:
+            valid_data = data
+            valid_counts = torch.full(
+                (data.shape[0],),
+                data.shape[-1],
+                dtype=torch.int64,
+                device=data.device,
+            )
+            max_values = data.max(dim=-1).values
+            nonzero_counts = (data.abs() > 1e-6).sum(dim=-1)
+            positive_counts = (data > 0).sum(dim=-1)
+        elif valid_mask.ndim == 1:
+            if valid_mask.shape[0] != data.shape[-1]:
+                raise ValueError(
+                    "A 1D valid_mask must have the same sample dimension as data"
+                )
+            valid_mask = valid_mask.to(device=data.device, dtype=torch.bool)
+            valid_count = int(valid_mask.sum().item())
+            valid_counts = torch.full(
+                (data.shape[0],),
+                valid_count,
+                dtype=torch.int64,
+                device=data.device,
+            )
+            if valid_count == data.shape[-1]:
+                valid_data = data
+            elif valid_count > 0:
+                valid_indices = torch.nonzero(valid_mask, as_tuple=False).flatten()
+                valid_data = data.index_select(-1, valid_indices)
+            else:
+                valid_data = data.new_empty((data.shape[0], 0))
+
+            if valid_count > 0:
+                max_values = valid_data.max(dim=-1).values
+                nonzero_counts = (valid_data.abs() > 1e-6).sum(dim=-1)
+                positive_counts = (valid_data > 0).sum(dim=-1)
+            else:
+                max_values = torch.zeros(
+                    data.shape[0], dtype=data.dtype, device=data.device
+                )
+                nonzero_counts = torch.zeros(
+                    data.shape[0], dtype=torch.int64, device=data.device
+                )
+                positive_counts = torch.zeros_like(nonzero_counts)
+        elif valid_mask.ndim == 2:
+            if tuple(valid_mask.shape) != tuple(data.shape):
+                raise ValueError("A 2D valid_mask must have the same shape as data")
+            valid_mask = valid_mask.to(device=data.device, dtype=torch.bool)
+            valid_counts = valid_mask.sum(dim=-1)
+            masked_for_max = data.masked_fill(~valid_mask, float("-inf"))
+            max_values = masked_for_max.max(dim=-1).values
+            max_values = torch.where(
+                valid_counts > 0,
+                max_values,
+                torch.zeros_like(max_values),
+            )
+            nonzero_counts = ((data.abs() > 1e-6) & valid_mask).sum(dim=-1)
+            positive_counts = ((data > 0) & valid_mask).sum(dim=-1)
+        else:
+            raise ValueError("valid_mask must be 1D or 2D when provided")
+
+        safe_valid_counts = valid_counts.clamp(min=1).to(torch.float32)
+        frac_nonzero = nonzero_counts.to(torch.float32) / safe_valid_counts
+        positive_density = positive_counts.to(torch.float32) / safe_valid_counts
+        float_columns = (
+            torch.stack(
+                (
+                    max_values.to(torch.float32),
+                    frac_nonzero,
+                    positive_density,
+                ),
+                dim=1,
+            )
+            .detach()
+            .cpu()
+            .numpy()
+        )
+        count_columns = (
+            torch.stack(
+                (
+                    positive_counts.to(torch.int64),
+                    nonzero_counts.to(torch.int64),
+                    valid_counts.to(torch.int64),
+                ),
+                dim=1,
+            )
+            .detach()
+            .cpu()
+            .numpy()
+        )
+        return pyarrow.table(
+            {
+                "feature_index": pyarrow.array(
+                    np.arange(data.shape[0], dtype=np.int64), type=pyarrow.int64()
+                ),
+                "max": pyarrow.array(np.ascontiguousarray(float_columns[:, 0])),
+                "frac_nonzero": pyarrow.array(
+                    np.ascontiguousarray(float_columns[:, 1])
+                ),
+                "positive_density": pyarrow.array(
+                    np.ascontiguousarray(float_columns[:, 2])
+                ),
+                "positive_count": pyarrow.array(
+                    np.ascontiguousarray(count_columns[:, 0])
+                ),
+                "nonzero_count": pyarrow.array(
+                    np.ascontiguousarray(count_columns[:, 1])
+                ),
+                "valid_count": pyarrow.array(np.ascontiguousarray(count_columns[:, 2])),
+            }
+        )
+
+    @classmethod
+    def create_scalar_arrow_table_from_flat_valid(
+        cls,
+        flat_data: torch.Tensor,
+        valid_flat_indices: torch.Tensor,
+        compute_device: str | torch.device | None = None,
+        row_chunk_size: int = 256,
+    ) -> Any:
+        """Chunked-device equivalent of the runner's gather + `_create_scalar_arrow_table` path.
+
+        ``flat_data`` is the ``[rows, samples_total]`` activation matrix (any device/dtype);
+        ``valid_flat_indices`` selects the valid sample columns. Row chunks are staged onto
+        ``compute_device`` (defaults to ``flat_data.device``), the valid columns gathered
+        there, and the same exact reductions applied (row max, ``abs > 1e-6`` counts,
+        ``> 0`` counts, exact integer/float32 divisions), so the resulting table is
+        identical to gathering on the host first. When no valid columns exist, the
+        zero-substitution semantics of the previous runner path are reproduced
+        (all-zero statistics with ``valid_count == 1``).
+        """
+        pyarrow = importlib.import_module("pyarrow")
+        device = (
+            torch.device(compute_device)
+            if compute_device is not None
+            else flat_data.device
+        )
+        n_rows = int(flat_data.shape[0])
+        n_valid = int(valid_flat_indices.numel())
+        valid_indices_dev = valid_flat_indices.to(device)
+
+        max_chunks: list[torch.Tensor] = []
+        nonzero_chunks: list[torch.Tensor] = []
+        positive_chunks: list[torch.Tensor] = []
+        row_chunk_size = max(1, row_chunk_size)
+        for row_start in range(0, n_rows, max(1, row_chunk_size)):
+            row_end = min(row_start + row_chunk_size, n_rows)
+            chunk = flat_data[row_start:row_end].to(device)
+            if n_valid > 0:
+                valid_chunk = chunk.index_select(-1, valid_indices_dev)
+            else:
+                valid_chunk = torch.zeros(
+                    (row_end - row_start, 1),
+                    dtype=chunk.dtype,
+                    device=device,
+                )
+            max_chunks.append(valid_chunk.max(dim=-1).values.to(torch.float32))
+            nonzero_chunks.append((valid_chunk.abs() > 1e-6).sum(dim=-1))
+            positive_chunks.append((valid_chunk > 0).sum(dim=-1))
+            del chunk, valid_chunk
+
+        max_values = torch.cat(max_chunks) if max_chunks else torch.zeros(0)
+        nonzero_counts = (
+            torch.cat(nonzero_chunks)
+            if nonzero_chunks
+            else torch.zeros(0, dtype=torch.int64)
+        )
+        positive_counts = (
+            torch.cat(positive_chunks)
+            if positive_chunks
+            else torch.zeros(0, dtype=torch.int64)
+        )
+        valid_counts = torch.full(
+            (n_rows,),
+            n_valid if n_valid > 0 else 1,
+            dtype=torch.int64,
+            device=max_values.device,
+        )
+
+        safe_valid_counts = valid_counts.clamp(min=1).to(torch.float32)
+        frac_nonzero = nonzero_counts.to(torch.float32) / safe_valid_counts
+        positive_density = positive_counts.to(torch.float32) / safe_valid_counts
+        float_columns = (
+            torch.stack((max_values, frac_nonzero, positive_density), dim=1)
+            .detach()
+            .cpu()
+            .numpy()
+        )
+        count_columns = (
+            torch.stack(
+                (
+                    positive_counts.to(torch.int64),
+                    nonzero_counts.to(torch.int64),
+                    valid_counts.to(torch.int64),
+                ),
+                dim=1,
+            )
+            .detach()
+            .cpu()
+            .numpy()
+        )
+        return pyarrow.table(
+            {
+                "feature_index": pyarrow.array(
+                    np.arange(n_rows, dtype=np.int64), type=pyarrow.int64()
+                ),
+                "max": pyarrow.array(np.ascontiguousarray(float_columns[:, 0])),
+                "frac_nonzero": pyarrow.array(
+                    np.ascontiguousarray(float_columns[:, 1])
+                ),
+                "positive_density": pyarrow.array(
+                    np.ascontiguousarray(float_columns[:, 2])
+                ),
+                "positive_count": pyarrow.array(
+                    np.ascontiguousarray(count_columns[:, 0])
+                ),
+                "nonzero_count": pyarrow.array(
+                    np.ascontiguousarray(count_columns[:, 1])
+                ),
+                "valid_count": pyarrow.array(np.ascontiguousarray(count_columns[:, 2])),
+            }
+        )
+
+    @classmethod
+    def from_arrow_table(cls, table: Any) -> "FeatureStatistics":
+        columns = table.to_pydict()
+        metadata = table.schema.metadata or {}
+        quantiles_raw = metadata.get(b"quantiles", b"[]")
+        ranges_raw = metadata.get(b"ranges_and_precisions", b"[]")
+        quantile_data_column = columns.get("quantile_data", [])
+        return cls(
+            max=[float(value) for value in columns.get("max", [])],
+            frac_nonzero=[float(value) for value in columns.get("frac_nonzero", [])],
+            skew=[],
+            kurtosis=[],
+            quantile_data=[
+                [float(value) for value in row] for row in quantile_data_column
+            ],
+            quantiles=[float(value) for value in json.loads(quantiles_raw)],
+            ranges_and_precisions=[
+                ([float(bound) for bound in pair[0]], int(pair[1]))
+                for pair in json.loads(ranges_raw)
+            ],
+        )
+
+    @staticmethod
+    def _masked_quantile_rows(
+        batch: torch.Tensor,
+        quantiles_tensor: torch.Tensor,
+        valid_mask: torch.Tensor,
+    ) -> list[list[float]]:
+        quantile_rows = []
+        for row, row_mask in zip(batch, valid_mask):
+            valid_values = row[row_mask]
+            if valid_values.numel() == 0:
+                quantile_rows.append([])
+                continue
+            quantile_rows.append(
+                torch.quantile(valid_values, quantiles_tensor, dim=-1).tolist()
+            )
+        return quantile_rows
+
+    @staticmethod
+    def _sparse_quantile_rows(
+        batch: torch.Tensor,
+        quantiles_tensor: torch.Tensor,
+        valid_mask: torch.Tensor | None = None,
+    ) -> list[list[float]]:
+        quantile_rows = []
+        for row_index, row in enumerate(batch):
+            row_mask = (
+                valid_mask[row_index]
+                if valid_mask is not None
+                else torch.ones_like(row, dtype=torch.bool)
+            )
+            sample_count = int(row_mask.sum().item())
+            if sample_count == 0:
+                quantile_rows.append([])
+                continue
+            valid_values = row[row_mask]
+            nonzero_values = valid_values[valid_values.abs() > 1e-6]
+            if nonzero_values.numel() == 0:
+                quantile_rows.append([])
+                continue
+            frac_nonzero = nonzero_values.numel() / sample_count
+            zero_fraction = 1.0 - frac_nonzero
+            active_quantiles = quantiles_tensor[quantiles_tensor > zero_fraction]
+            if active_quantiles.numel() == 0:
+                quantile_rows.append([])
+                continue
+            nonzero_quantiles = (
+                (active_quantiles - zero_fraction) / frac_nonzero
+            ).clamp(0.0, 1.0)
+            quantile_rows.append(
+                torch.quantile(nonzero_values, nonzero_quantiles, dim=-1).tolist()
+            )
+        return quantile_rows
 
     def update(self, other: "FeatureStatistics"):
         """
@@ -746,10 +1221,10 @@ if MAIN:
 
     print("When 50% of data is 0, and 50% is Unif[0, 1]")
     for v, q, p in zip(values[0], quantiles[0], precisions[0]):
-        print(f"Value: {v:.3f}, Precision: {p}, Quantile: {q:.{p-2}%}")
+        print(f"Value: {v:.3f}, Precision: {p}, Quantile: {q:.{p - 2}%}")
     print("\nWhen 100% of data is Unif[0, 1]")
     for v, q, p in zip(values[1], quantiles[1], precisions[1]):
-        print(f"Value: {v:.3f}, Precision: {p}, Quantile: {q:.{p-2}%}")
+        print(f"Value: {v:.3f}, Precision: {p}, Quantile: {q:.{p - 2}%}")
 
 
 def split_string(
@@ -927,6 +1402,27 @@ if MAIN:
 #         raise NotImplementedError
 
 
+def resolve_correlation_accumulation_device(
+    device: str, policy: str = "auto"
+) -> torch.device:
+    if policy == "cpu":
+        return torch.device("cpu")
+    if policy == "cuda":
+        if not torch.cuda.is_available():
+            raise ValueError(
+                "correlation_accumulation_device='cuda' requires CUDA to be available"
+            )
+        return torch.device("cuda")
+    if policy != "auto":
+        raise ValueError(
+            "correlation_accumulation_device must be one of 'auto', 'cpu', or 'cuda'"
+        )
+    correlation_device = torch.device(device)
+    if correlation_device.type == "cuda" and not torch.cuda.is_available():
+        return torch.device("cpu")
+    return correlation_device
+
+
 class RollingCorrCoef:
     """
     This class helps compute corrcoef (Pearson & cosine sim) between 2 batches of vectors, without having to store the
@@ -974,7 +1470,15 @@ class RollingCorrCoef:
         self.dtype = dtype
         self.device = device
 
-    def update(self, x: Float[Tensor, "X N"], y: Float[Tensor, "Y N"]) -> None:
+    def update(
+        self,
+        x: Float[Tensor, "X N"],
+        y: Float[Tensor, "Y N"],
+        *,
+        perf_enabled: bool = False,
+        perf_label: str = "corrcoef",
+        perf_context: dict[str, Any] | None = None,
+    ) -> None:
         # Get values of x and y, and check for consistency with each other & with previous values
         assert x.ndim == 2 and y.ndim == 2, "Both x and y should be 2D"
         X, Nx = x.shape
@@ -995,26 +1499,112 @@ class RollingCorrCoef:
         self.X = X
         self.Y = Y
 
-        x = x.to(dtype=self.dtype, device=self.device)
-        y = y.to(dtype=self.dtype, device=self.device)
+        perf_fields = dict(perf_context or {})
+        perf_fields.update(
+            {
+                "corrcoef_label": perf_label,
+                "corrcoef_device": str(self.device),
+                "corrcoef_dtype": str(self.dtype),
+                "corrcoef_with_self": self.with_self,
+                "input_x_layout": tensor_runtime_metadata(x) if perf_enabled else None,
+                "input_y_layout": tensor_runtime_metadata(y) if perf_enabled else None,
+            }
+        )
+        same_input = x is y
+        with timed_stage(
+            perf_enabled,
+            f"rolling_{perf_label}_materialize_x",
+            device=str(self.device),
+            capture_runtime_metrics=True,
+            **perf_fields,
+            same_input=same_input,
+        ):
+            x = x.to(dtype=self.dtype, device=self.device)
+        if same_input:
+            y = x
+        else:
+            with timed_stage(
+                perf_enabled,
+                f"rolling_{perf_label}_materialize_y",
+                device=str(self.device),
+                capture_runtime_metrics=True,
+                **perf_fields,
+                same_input=same_input,
+            ):
+                y = y.to(dtype=self.dtype, device=self.device)
+
+        if perf_enabled:
+            log_perf_event(
+                "rolling_tensor_layout",
+                stage=f"rolling_{perf_label}_materialized_inputs",
+                **perf_fields,
+                same_input=same_input,
+                materialized_x_layout=tensor_runtime_metadata(x),
+                materialized_y_layout=tensor_runtime_metadata(y),
+            )
 
         # If this is the first update step, then we need to initialise the sums
         if self.n == 0:
-            self.x_sum = torch.zeros(X, device=x.device, dtype=self.dtype)
-            self.xy_sum = torch.zeros(X, Y, device=x.device, dtype=self.dtype)
-            self.x2_sum = torch.zeros(X, device=x.device, dtype=self.dtype)
-            if not self.with_self:
-                self.y_sum = torch.zeros(Y, device=y.device, dtype=self.dtype)
-                self.y2_sum = torch.zeros(Y, device=y.device, dtype=self.dtype)
+            with timed_stage(
+                perf_enabled,
+                f"rolling_{perf_label}_init_accumulators",
+                device=str(x.device),
+                capture_runtime_metrics=True,
+                **perf_fields,
+                x_rows=X,
+                y_rows=Y,
+                n_cols=Nx,
+            ):
+                self.x_sum = torch.zeros(X, device=x.device, dtype=self.dtype)
+                self.xy_sum = torch.zeros(X, Y, device=x.device, dtype=self.dtype)
+                self.x2_sum = torch.zeros(X, device=x.device, dtype=self.dtype)
+                if not self.with_self:
+                    self.y_sum = torch.zeros(Y, device=y.device, dtype=self.dtype)
+                    self.y2_sum = torch.zeros(Y, device=y.device, dtype=self.dtype)
 
         # Next, update the sums
         self.n += x.shape[-1]
-        self.x_sum += einops.reduce(x, "X N -> X", "sum")
-        self.xy_sum += einops.einsum(x, y, "X N, Y N -> X Y")
-        self.x2_sum += einops.reduce(x**2, "X N -> X", "sum")
+        with timed_stage(
+            perf_enabled,
+            f"rolling_{perf_label}_x_sum_update",
+            device=str(x.device),
+            capture_runtime_metrics=True,
+            **perf_fields,
+        ):
+            self.x_sum += x.sum(dim=-1)
+        with timed_stage(
+            perf_enabled,
+            f"rolling_{perf_label}_xy_sum_update",
+            device=str(x.device),
+            capture_runtime_metrics=True,
+            **perf_fields,
+        ):
+            self.xy_sum.addmm_(x, y.mT)
+        with timed_stage(
+            perf_enabled,
+            f"rolling_{perf_label}_x2_sum_update",
+            device=str(x.device),
+            capture_runtime_metrics=True,
+            **perf_fields,
+        ):
+            self.x2_sum += (x * x).sum(dim=-1)
         if not self.with_self:
-            self.y_sum += einops.reduce(y, "Y N -> Y", "sum")
-            self.y2_sum += einops.reduce(y**2, "Y N -> Y", "sum")
+            with timed_stage(
+                perf_enabled,
+                f"rolling_{perf_label}_y_sum_update",
+                device=str(y.device),
+                capture_runtime_metrics=True,
+                **perf_fields,
+            ):
+                self.y_sum += y.sum(dim=-1)
+            with timed_stage(
+                perf_enabled,
+                f"rolling_{perf_label}_y2_sum_update",
+                device=str(y.device),
+                capture_runtime_metrics=True,
+                **perf_fields,
+            ):
+                self.y2_sum += (y * y).sum(dim=-1)
 
     def corrcoef(
         self,
@@ -1093,6 +1683,59 @@ class RollingCorrCoef:
         return indices, pearson_topk.values.tolist(), cossim_values.tolist()
 
 
+def build_activation_histogram_titles(
+    data: Tensor,
+    valid_mask: Bool[Tensor, "samples"] | Bool[Tensor, "items samples"] | None = None,
+) -> list[str]:
+    """Build activation-density titles using valid-token counts when a mask is provided."""
+    if data.ndim != 2:
+        raise ValueError(
+            "build_activation_histogram_titles expects a 2D tensor with shape (items, samples)"
+        )
+
+    positive_mask = data > 0
+    if valid_mask is None:
+        positive_counts = positive_mask.sum(dim=-1)
+        valid_counts = torch.full(
+            (data.shape[0],),
+            data.shape[-1],
+            dtype=torch.int64,
+            device=data.device,
+        )
+    else:
+        if valid_mask.ndim == 1:
+            if valid_mask.shape[0] != data.shape[1]:
+                raise ValueError(
+                    "A 1D valid_mask must have the same sample dimension as data"
+                )
+            valid_mask = valid_mask.unsqueeze(0).expand(data.shape[0], -1)
+        elif valid_mask.ndim == 2:
+            if tuple(valid_mask.shape) != tuple(data.shape):
+                raise ValueError("A 2D valid_mask must have the same shape as data")
+        else:
+            raise ValueError("valid_mask must be 1D or 2D when provided")
+
+        valid_mask = valid_mask.to(device=data.device, dtype=torch.bool)
+        positive_counts = (positive_mask & valid_mask).sum(dim=-1)
+        valid_counts = valid_mask.sum(dim=-1).clamp_min(1)
+
+    densities = [
+        float(nonzero_count) / float(valid_count)
+        for nonzero_count, valid_count in zip(
+            positive_counts.tolist(),
+            valid_counts.tolist(),
+        )
+    ]
+    return build_activation_histogram_titles_from_densities(densities)
+
+
+def build_activation_histogram_titles_from_densities(
+    densities: Iterable[float],
+) -> list[str]:
+    """Build activation histogram titles from precomputed per-feature densities."""
+    return [f"ACTIVATIONS<br>DENSITY = {float(density):.3%}" for density in densities]
+
+
 @dataclass_json
 @dataclass
 class HistogramData:
@@ -1115,14 +1758,22 @@ class HistogramData:
     tick_vals: list[float] = field(default_factory=list)
     title: str | None = None
 
+    def to_row_dict(self) -> dict[str, object]:
+        return {
+            "bar_heights": self.bar_heights,
+            "bar_values": self.bar_values,
+            "tick_vals": self.tick_vals,
+            "title": self.title,
+        }
+
     @classmethod
     def from_data(
-        cls: Type[T],
+        cls: Type[HistogramDataT],
         data: Tensor,
         n_bins: int,
         tickmode: Literal["ints", "5 ticks"],
         title: str | None,
-    ) -> T:
+    ) -> HistogramDataT:
         """
         Args:
             data: 1D tensor of data which will be turned into histogram
@@ -1147,29 +1798,7 @@ class HistogramData:
         bar_heights = torch.histc(data, bins=n_bins).int().tolist()
         bar_values = [round(x, 5) for x in (bin_edges[:-1] + bin_size / 2).tolist()]
 
-        # Choose tickvalues
-        # TODO - improve this, it's currently a bit hacky (currently I only use the 5 ticks mode)
-        assert tickmode in ["ints", "5 ticks"]
-        if tickmode == "ints":
-            top_tickval = int(max_value)
-            tick_vals = torch.arange(0, top_tickval + 1, 1).tolist()
-        elif tickmode == "5 ticks":
-            # Ticks chosen in multiples of 0.1, set to ensure the longer side of {positive, negative} is 3 ticks long
-            if max_value > -min_value:
-                tickrange = 0.1 * int(1e-4 + max_value / (3 * 0.1)) + 1e-6
-                num_positive_ticks = 3
-                num_negative_ticks = int(-min_value / tickrange)
-            else:
-                tickrange = 0.1 * int(1e-4 + -min_value / (3 * 0.1)) + 1e-6
-                num_negative_ticks = 3
-                num_positive_ticks = int(max_value / tickrange)
-            # Tick values = merged list of negative ticks, zero, positive ticks
-            tick_vals = merge_lists(
-                reversed([-tickrange * i for i in range(1, 1 + num_negative_ticks)]),
-                [0],  # zero (always is a tick)
-                [tickrange * i for i in range(1, 1 + num_positive_ticks)],
-            )
-            tick_vals = [round(t, 1) for t in tick_vals]
+        tick_vals = cls._tick_values(max_value, min_value, tickmode)
 
         return cls(  # type: ignore
             bar_heights=bar_heights,  # type: ignore
@@ -1177,6 +1806,617 @@ class HistogramData:
             tick_vals=tick_vals,  # type: ignore
             title=title,  # type: ignore
         )
+
+    @classmethod
+    def from_data_batch(
+        cls: Type[HistogramDataT],
+        data: Tensor,
+        n_bins: int,
+        tickmode: Literal["ints", "5 ticks"],
+        title: str | None,
+        row_batch_size: int = 64,
+        positive_only: bool = False,
+        titles: Sequence[str | None] | None = None,
+        backend: Literal["torch"] = "torch",
+    ) -> list[HistogramDataT]:
+        """Create one histogram per row of a 2D tensor using batched binning."""
+        histogram_rows = cls._from_data_batch_rows(
+            data=data,
+            n_bins=n_bins,
+            tickmode=tickmode,
+            title=title,
+            row_batch_size=row_batch_size,
+            positive_only=positive_only,
+            titles=titles,
+            backend=backend,
+        )
+        return [cls(**histogram_row) for histogram_row in histogram_rows]  # type: ignore[arg-type]
+
+    @classmethod
+    def from_data_batch_arrow_table(
+        cls: Type[HistogramDataT],
+        data: Tensor,
+        n_bins: int,
+        tickmode: Literal["ints", "5 ticks"],
+        title: str | None,
+        row_batch_size: int = 64,
+        positive_only: bool = False,
+        titles: Sequence[str | None] | None = None,
+        backend: Literal["torch"] = "torch",
+    ) -> Any:
+        pyarrow = importlib.import_module("pyarrow")
+        if not positive_only:
+            tensor_table = cls._from_dense_data_batch_arrow_table(
+                data=data,
+                n_bins=n_bins,
+                tickmode=tickmode,
+                title=title,
+                row_batch_size=row_batch_size,
+                titles=titles,
+            )
+            if tensor_table is not None:
+                return tensor_table
+            # The dense lane computes in float32; keep the rare constant-row fallback
+            # on the same dtype when the caller staged reduced-precision data (callers
+            # historically pre-cast to float32 themselves).
+            if data.dtype in (torch.bfloat16, torch.float16):
+                data = data.to(torch.float32)
+
+        histogram_rows = cls._from_data_batch_rows(
+            data=data,
+            n_bins=n_bins,
+            tickmode=tickmode,
+            title=title,
+            row_batch_size=row_batch_size,
+            positive_only=positive_only,
+            titles=titles,
+            backend=backend,
+        )
+        return pyarrow.table(
+            {
+                "row_index": pyarrow.array(range(len(histogram_rows))),
+                "bar_heights": pyarrow.array(
+                    [row["bar_heights"] for row in histogram_rows]
+                ),
+                "bar_values": pyarrow.array(
+                    [row["bar_values"] for row in histogram_rows]
+                ),
+                "tick_vals": pyarrow.array(
+                    [row["tick_vals"] for row in histogram_rows]
+                ),
+                "title": pyarrow.array([row["title"] for row in histogram_rows]),
+            }
+        )
+
+    @classmethod
+    def from_flat_valid_data_batch_arrow_table(
+        cls: Type[HistogramDataT],
+        flat_data: Tensor,
+        valid_flat_indices: Tensor,
+        n_bins: int,
+        tickmode: Literal["ints", "5 ticks"],
+        titles: Sequence[str | None] | None,
+        compute_device: str | torch.device | None = None,
+        row_chunk_size: int = 128,
+        row_batch_size: int = 64,
+    ) -> Any:
+        """Chunked-device positive-only histogram table from a flat activation matrix.
+
+        Equivalent to masking ``flat_data`` with the valid-position mask and calling
+        `from_data_batch_arrow_table(..., positive_only=True)`: for the positive-only
+        lane, gathering the valid columns yields identical histograms to zero-masking
+        the invalid columns (only ``> 0`` values participate, and rows whose valid
+        values are all non-positive fall back to the same default/constant-row paths).
+        Row chunks are staged onto ``compute_device`` so the binning runs there and
+        only compact per-row outputs are transferred back.
+        """
+        pyarrow = importlib.import_module("pyarrow")
+        device = (
+            torch.device(compute_device)
+            if compute_device is not None
+            else flat_data.device
+        )
+        n_rows = int(flat_data.shape[0])
+        n_valid = int(valid_flat_indices.numel())
+        if titles is not None and len(titles) != n_rows:
+            raise ValueError("titles must match the number of data rows")
+        valid_indices_dev = valid_flat_indices.to(device)
+
+        histogram_rows: list[dict[str, object]] = []
+        row_chunk_size = max(1, row_chunk_size)
+        for row_start in range(0, n_rows, row_chunk_size):
+            row_end = min(row_start + row_chunk_size, n_rows)
+            chunk = flat_data[row_start:row_end].to(device)
+            if n_valid > 0:
+                valid_chunk = chunk.index_select(-1, valid_indices_dev)
+            else:
+                # Reproduce the previous zero-masked behavior: rows with no valid
+                # positions produce the default (empty) histogram rows.
+                valid_chunk = torch.zeros(
+                    (row_end - row_start, 1),
+                    dtype=chunk.dtype,
+                    device=device,
+                )
+            histogram_rows.extend(
+                cls._from_data_batch_rows(
+                    data=valid_chunk,
+                    n_bins=n_bins,
+                    tickmode=tickmode,
+                    title=None,
+                    row_batch_size=row_batch_size,
+                    positive_only=True,
+                    titles=(
+                        list(titles[row_start:row_end]) if titles is not None else None
+                    ),
+                )
+            )
+            del chunk, valid_chunk
+
+        return pyarrow.table(
+            {
+                "row_index": pyarrow.array(range(len(histogram_rows))),
+                "bar_heights": pyarrow.array(
+                    [row["bar_heights"] for row in histogram_rows]
+                ),
+                "bar_values": pyarrow.array(
+                    [row["bar_values"] for row in histogram_rows]
+                ),
+                "tick_vals": pyarrow.array(
+                    [row["tick_vals"] for row in histogram_rows]
+                ),
+                "title": pyarrow.array([row["title"] for row in histogram_rows]),
+            }
+        )
+
+    @classmethod
+    def _from_dense_data_batch_arrow_table(
+        cls: Type[HistogramDataT],
+        data: Tensor,
+        n_bins: int,
+        tickmode: Literal["ints", "5 ticks"],
+        title: str | None,
+        row_batch_size: int,
+        titles: Sequence[str | None] | None,
+    ) -> Any | None:
+        """Build a histogram Arrow table directly from dense row-batched tensors.
+
+        This is the deferred logits-histogram fast path. It avoids materializing the
+        intermediate Python row dictionaries that the eager object path needs.
+        Constant rows are rare for logits and fall back to the reference row path.
+        """
+        pyarrow = importlib.import_module("pyarrow")
+        if data.ndim != 2:
+            raise ValueError(
+                "from_data_batch expects a 2D tensor with shape (items, samples)"
+            )
+        if data.numel() == 0:
+            return pyarrow.table(
+                {
+                    "row_index": pyarrow.array([], type=pyarrow.int64()),
+                    "bar_heights": pyarrow.array([]),
+                    "bar_values": pyarrow.array([]),
+                    "tick_vals": pyarrow.array([]),
+                    "title": pyarrow.array([], type=pyarrow.string()),
+                }
+            )
+        if titles is not None and len(titles) != data.shape[0]:
+            raise ValueError("titles must match the number of data rows")
+
+        # Cast per row batch instead of materializing a full float32 copy of the
+        # input (a (feats, d_vocab) logits matrix costs gigabytes at large vocabs).
+        # float32 embeds bf16/f16 exactly, so per-batch casting is bit-identical to
+        # the previous whole-tensor cast; max/min are element selections, so casting
+        # the reduced vectors matches reducing the cast tensor.
+        compute_dtype = torch.float32
+        max_values = data.max(dim=-1).values.to(compute_dtype)
+        min_values = data.min(dim=-1).values.to(compute_dtype)
+        if not bool((max_values != min_values).all().item()):
+            return None
+
+        row_batch_size = max(1, row_batch_size)
+        bar_heights_chunks = []
+        bar_values_chunks = []
+
+        bin_offsets = (
+            torch.arange(n_bins, dtype=compute_dtype, device=data.device) + 0.5
+        )
+        scatter_source = torch.ones((), dtype=torch.int32, device=data.device)
+        for row_start in range(0, data.shape[0], row_batch_size):
+            row_end = min(row_start + row_batch_size, data.shape[0])
+            batch = data[row_start:row_end].to(compute_dtype)
+            row_max = max_values[row_start:row_end]
+            row_min = min_values[row_start:row_end]
+            row_range = row_max - row_min
+
+            scaled_bins = torch.floor(
+                (batch - row_min[:, None]) * n_bins / row_range[:, None]
+            ).to(torch.int64)
+            scaled_bins = scaled_bins.clamp_(0, n_bins - 1)
+            bar_heights = torch.zeros(
+                (batch.shape[0], n_bins), dtype=torch.int32, device=batch.device
+            )
+            bar_heights.scatter_add_(
+                1,
+                scaled_bins,
+                scatter_source.expand_as(scaled_bins),
+            )
+
+            bin_size = row_range / n_bins
+            bar_values = row_min[:, None] + bin_offsets[None, :] * bin_size[:, None]
+            bar_heights_chunks.append(bar_heights.cpu())
+            bar_values_chunks.append(bar_values.cpu())
+
+        bar_heights_array = np.ascontiguousarray(torch.cat(bar_heights_chunks).numpy())
+        bar_values_array = np.ascontiguousarray(
+            np.round(torch.cat(bar_values_chunks).numpy().astype(np.float64), 5)
+        )
+        title_values = list(titles) if titles is not None else [title] * data.shape[0]
+        tick_values_array = cls._tick_values_arrow_array(
+            pyarrow,
+            max_values=max_values,
+            min_values=min_values,
+            tickmode=tickmode,
+        )
+
+        return pyarrow.table(
+            {
+                "row_index": pyarrow.array(
+                    np.arange(data.shape[0], dtype=np.int64), type=pyarrow.int64()
+                ),
+                "bar_heights": pyarrow.FixedSizeListArray.from_arrays(
+                    pyarrow.array(bar_heights_array.reshape(-1), type=pyarrow.int32()),
+                    n_bins,
+                ),
+                "bar_values": pyarrow.FixedSizeListArray.from_arrays(
+                    pyarrow.array(bar_values_array.reshape(-1), type=pyarrow.float64()),
+                    n_bins,
+                ),
+                "tick_vals": tick_values_array,
+                "title": pyarrow.array(title_values),
+            }
+        )
+
+    @classmethod
+    def _tick_values_arrow_array(
+        cls,
+        pyarrow: Any,
+        max_values: Tensor,
+        min_values: Tensor,
+        tickmode: Literal["ints", "5 ticks"],
+    ) -> Any:
+        if tickmode == "ints":
+            return pyarrow.array(
+                [
+                    cls._tick_values(float(max_value), float(min_value), tickmode)
+                    for max_value, min_value in zip(
+                        max_values.detach().cpu().tolist(),
+                        min_values.detach().cpu().tolist(),
+                    )
+                ]
+            )
+
+        max_array = max_values.detach().cpu().numpy().astype(np.float64, copy=False)
+        min_array = min_values.detach().cpu().numpy().astype(np.float64, copy=False)
+        positive_dominant = max_array > -min_array
+        tick_step_tenths = np.empty(max_array.shape[0], dtype=np.int64)
+        tick_step_tenths[positive_dominant] = (
+            1e-4 + max_array[positive_dominant] / 0.3
+        ).astype(np.int64)
+        tick_step_tenths[~positive_dominant] = (
+            1e-4 + -min_array[~positive_dominant] / 0.3
+        ).astype(np.int64)
+        tick_step_tenths = np.maximum(tick_step_tenths, 1)
+
+        tick_step_values = tick_step_tenths.astype(np.float64) / 10.0
+        denominator = tick_step_values + 1e-6
+        negative_counts = np.empty(max_array.shape[0], dtype=np.int64)
+        positive_counts = np.empty(max_array.shape[0], dtype=np.int64)
+        negative_counts[positive_dominant] = (
+            -min_array[positive_dominant] / denominator[positive_dominant]
+        ).astype(np.int64)
+        negative_counts[~positive_dominant] = 3
+        positive_counts[positive_dominant] = 3
+        positive_counts[~positive_dominant] = (
+            max_array[~positive_dominant] / denominator[~positive_dominant]
+        ).astype(np.int64)
+        negative_counts = np.maximum(negative_counts, 0)
+        positive_counts = np.maximum(positive_counts, 0)
+
+        lengths = negative_counts + 1 + positive_counts
+        offsets = np.empty(max_array.shape[0] + 1, dtype=np.int32)
+        offsets[0] = 0
+        np.cumsum(lengths, out=offsets[1:])
+        values = np.zeros(int(offsets[-1]), dtype=np.float64)
+        row_indices = np.arange(max_array.shape[0], dtype=np.int64)
+
+        total_negative = int(negative_counts.sum())
+        if total_negative:
+            negative_rows = np.repeat(row_indices, negative_counts)
+            negative_starts = np.repeat(offsets[:-1], negative_counts)
+            negative_row_starts = np.repeat(
+                np.cumsum(np.concatenate(([0], negative_counts[:-1]))),
+                negative_counts,
+            )
+            negative_positions = (
+                np.arange(total_negative, dtype=np.int64) - negative_row_starts
+            )
+            values[negative_starts + negative_positions] = (
+                -tick_step_tenths[negative_rows]
+                * (negative_counts[negative_rows] - negative_positions)
+                / 10
+            )
+
+        zero_positions = offsets[:-1] + negative_counts
+        values[zero_positions] = 0.0
+
+        total_positive = int(positive_counts.sum())
+        if total_positive:
+            positive_rows = np.repeat(row_indices, positive_counts)
+            positive_starts = np.repeat(
+                offsets[:-1] + negative_counts + 1, positive_counts
+            )
+            positive_row_starts = np.repeat(
+                np.cumsum(np.concatenate(([0], positive_counts[:-1]))),
+                positive_counts,
+            )
+            positive_positions = (
+                np.arange(total_positive, dtype=np.int64) - positive_row_starts
+            )
+            values[positive_starts + positive_positions] = (
+                tick_step_tenths[positive_rows] * (positive_positions + 1) / 10
+            )
+
+        return pyarrow.ListArray.from_arrays(
+            pyarrow.array(offsets, type=pyarrow.int32()),
+            pyarrow.array(values, type=pyarrow.float64()),
+        )
+
+    @classmethod
+    def from_arrow_table(cls: Type[HistogramDataT], table: Any) -> list[HistogramDataT]:
+        columns = table.to_pydict()
+        row_count = len(columns.get("row_index", []))
+        return [
+            cls(
+                bar_heights=[
+                    float(value) for value in columns["bar_heights"][row_index]
+                ],  # type: ignore[index]
+                bar_values=[float(value) for value in columns["bar_values"][row_index]],  # type: ignore[index]
+                tick_vals=[float(value) for value in columns["tick_vals"][row_index]],  # type: ignore[index]
+                title=columns["title"][row_index],  # type: ignore[index]
+            )
+            for row_index in range(row_count)
+        ]
+
+    @classmethod
+    def _from_data_batch_rows(
+        cls: Type[HistogramDataT],
+        data: Tensor,
+        n_bins: int,
+        tickmode: Literal["ints", "5 ticks"],
+        title: str | None,
+        row_batch_size: int = 64,
+        positive_only: bool = False,
+        titles: Sequence[str | None] | None = None,
+        backend: Literal["torch"] = "torch",
+    ) -> list[dict[str, object]]:
+        """Create one histogram row dict per row of a 2D tensor using batched binning."""
+        if data.ndim != 2:
+            raise ValueError(
+                "from_data_batch expects a 2D tensor with shape (items, samples)"
+            )
+        if data.numel() == 0:
+            return []
+        if titles is not None and len(titles) != data.shape[0]:
+            raise ValueError("titles must match the number of data rows")
+        data = data.to(torch.float32)
+
+        histograms: list[dict[str, object] | None] = [None] * data.shape[0]
+        row_batch_size = max(1, row_batch_size)
+
+        if positive_only:
+            max_values = data.max(dim=-1).values
+            row_has_values = max_values > 0
+
+            positive_row_indices = torch.nonzero(
+                row_has_values, as_tuple=False
+            ).flatten()
+            for row_index_batch in positive_row_indices.split(row_batch_size):
+                batch = data.index_select(0, row_index_batch)
+                positive_coords = torch.nonzero(batch > 0, as_tuple=False)
+                if positive_coords.numel() == 0:
+                    continue
+
+                valid_rows = positive_coords[:, 0]
+                valid_cols = positive_coords[:, 1]
+                valid_values = batch[valid_rows, valid_cols]
+
+                row_max = max_values.index_select(0, row_index_batch)
+                row_min = torch.full_like(row_max, float("inf"))
+                row_min.scatter_reduce_(
+                    0,
+                    valid_rows,
+                    valid_values,
+                    reduce="amin",
+                    include_self=True,
+                )
+                row_range = row_max - row_min
+                nonconstant_mask = row_range != 0
+
+                if nonconstant_mask.any():
+                    nonconstant_valid = nonconstant_mask.index_select(0, valid_rows)
+                    valid_rows_nc = valid_rows[nonconstant_valid]
+                    valid_values_nc = valid_values[nonconstant_valid]
+                    row_min_nc = row_min.index_select(0, valid_rows_nc)
+                    row_range_nc = row_range.index_select(0, valid_rows_nc)
+
+                    scaled_bins = torch.floor(
+                        (valid_values_nc - row_min_nc) * n_bins / row_range_nc
+                    ).to(torch.int64)
+                    scaled_bins = scaled_bins.clamp_(0, n_bins - 1)
+
+                    flat_bin_indices = valid_rows_nc * n_bins + scaled_bins
+                    flat_bar_heights = torch.zeros(
+                        batch.shape[0] * n_bins,
+                        dtype=torch.int64,
+                        device=batch.device,
+                    )
+                    flat_bar_heights.scatter_add_(
+                        0,
+                        flat_bin_indices,
+                        torch.ones_like(flat_bin_indices, dtype=torch.int64),
+                    )
+                    bar_heights = flat_bar_heights.view(batch.shape[0], n_bins)
+
+                    bin_size = row_range / n_bins
+                    bin_offsets = (
+                        torch.arange(n_bins, dtype=batch.dtype, device=batch.device)
+                        + 0.5
+                    )
+                    bar_values = (
+                        row_min[:, None] + bin_offsets[None, :] * bin_size[:, None]
+                    )
+
+                    bar_heights_lists = bar_heights.cpu().tolist()
+                    bar_values_lists = [
+                        [round(float(value), 5) for value in row]
+                        for row in bar_values.cpu().tolist()
+                    ]
+                    max_list = row_max.cpu().tolist()
+                    min_list = row_min.cpu().tolist()
+                    nonconstant_list = nonconstant_mask.cpu().tolist()
+                    for output_index, source_index in enumerate(
+                        row_index_batch.cpu().tolist()
+                    ):
+                        if not nonconstant_list[output_index]:
+                            continue
+                        histograms[source_index] = {
+                            "bar_heights": bar_heights_lists[output_index],
+                            "bar_values": bar_values_lists[output_index],
+                            "tick_vals": cls._tick_values(
+                                max_list[output_index],
+                                min_list[output_index],
+                                tickmode,
+                            ),
+                            "title": (
+                                titles[source_index] if titles is not None else title
+                            ),
+                        }
+
+            row_has_values_list = row_has_values.cpu().tolist()
+            for row_index, histogram in enumerate(histograms):
+                if histogram is None:
+                    if not row_has_values_list[row_index]:
+                        histograms[row_index] = cls().to_row_dict()
+                        continue
+                    row_data = data[row_index]
+                    row_data = row_data[row_data > 0]
+                    histograms[row_index] = cls.from_data(
+                        row_data,
+                        n_bins=n_bins,
+                        tickmode=tickmode,
+                        title=titles[row_index] if titles is not None else title,
+                    ).to_row_dict()
+
+            return cast(list[dict[str, object]], histograms)
+
+        value_mask = torch.ones_like(data, dtype=torch.bool)
+        row_has_values = value_mask.any(dim=-1)
+        max_values = data.max(dim=-1).values
+        min_values = data.min(dim=-1).values
+        nonconstant_mask = max_values != min_values
+
+        batchable_mask = row_has_values & nonconstant_mask
+        if batchable_mask.any():
+            row_indices = torch.nonzero(batchable_mask, as_tuple=False).flatten()
+            for row_index_batch in row_indices.split(row_batch_size):
+                batch = data.index_select(0, row_index_batch)
+                batch_mask = value_mask.index_select(0, row_index_batch)
+                row_max = max_values.index_select(0, row_index_batch)
+                row_min = min_values.index_select(0, row_index_batch)
+                row_range = row_max - row_min
+
+                scaled_bins = torch.floor(
+                    (batch - row_min[:, None]) * n_bins / row_range[:, None]
+                ).to(torch.int64)
+                scaled_bins = scaled_bins.clamp_(0, n_bins - 1)
+                bar_heights = torch.zeros(
+                    (batch.shape[0], n_bins), dtype=torch.int64, device=batch.device
+                )
+                bar_heights.scatter_add_(
+                    1,
+                    scaled_bins,
+                    batch_mask.to(torch.int64),
+                )
+
+                bin_size = row_range / n_bins
+                bin_offsets = (
+                    torch.arange(n_bins, dtype=batch.dtype, device=batch.device) + 0.5
+                )
+                bar_values = row_min[:, None] + bin_offsets[None, :] * bin_size[:, None]
+
+                bar_heights_lists = bar_heights.cpu().tolist()
+                bar_values_lists = [
+                    [round(float(value), 5) for value in row]
+                    for row in bar_values.cpu().tolist()
+                ]
+                max_list = row_max.cpu().tolist()
+                min_list = row_min.cpu().tolist()
+                for output_index, source_index in enumerate(
+                    row_index_batch.cpu().tolist()
+                ):
+                    histograms[source_index] = {
+                        "bar_heights": bar_heights_lists[output_index],
+                        "bar_values": bar_values_lists[output_index],
+                        "tick_vals": cls._tick_values(
+                            max_list[output_index], min_list[output_index], tickmode
+                        ),
+                        "title": titles[source_index] if titles is not None else title,
+                    }
+
+        for row_index, histogram in enumerate(histograms):
+            if histogram is None:
+                if not row_has_values[row_index]:
+                    histograms[row_index] = cls().to_row_dict()
+                    continue
+                row_data = data[row_index]
+                if positive_only:
+                    row_data = row_data[value_mask[row_index]]
+                histograms[row_index] = cls.from_data(
+                    row_data,
+                    n_bins=n_bins,
+                    tickmode=tickmode,
+                    title=titles[row_index] if titles is not None else title,
+                ).to_row_dict()
+
+        return cast(list[dict[str, object]], histograms)
+
+    @staticmethod
+    def _tick_values(
+        max_value: float,
+        min_value: float,
+        tickmode: Literal["ints", "5 ticks"],
+    ) -> list[float]:
+        assert tickmode in ["ints", "5 ticks"]
+        if tickmode == "ints":
+            top_tickval = int(max_value)
+            return list(range(top_tickval + 1))
+
+        if max_value > -min_value:
+            tick_step_tenths = max(1, int(1e-4 + max_value / (3 * 0.1)))
+            num_positive_ticks = 3
+            num_negative_ticks = int(-min_value / (tick_step_tenths / 10 + 1e-6))
+        else:
+            tick_step_tenths = max(1, int(1e-4 + -min_value / (3 * 0.1)))
+            num_negative_ticks = 3
+            num_positive_ticks = int(max_value / (tick_step_tenths / 10 + 1e-6))
+
+        tick_vals = []
+        for i in range(num_negative_ticks, 0, -1):
+            tick_vals.append(-tick_step_tenths * i / 10)
+        tick_vals.append(0)
+        for i in range(1, 1 + num_positive_ticks):
+            tick_vals.append(tick_step_tenths * i / 10)
+        return tick_vals
 
 
 def max_or_1(mylist: Sequence[float | int], abs: bool = False) -> float | int:

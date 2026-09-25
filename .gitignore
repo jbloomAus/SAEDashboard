@@ -201,4 +201,5 @@ clt-technical-description.md
 
 ignore_data/
 
-outputs/
+outputs/test_logs/
+test_logs/

@@ -297,6 +297,17 @@ def transformer_lens_to_hf_hook(hook_name: str, model_type: str = "auto") -> Hoo
     hf_parsed = parse_huggingface_hook(hook_name)
     if hf_parsed is not None:
         layer_index, hook_type, hf_module_path = hf_parsed
+        # A trailing ``.output`` / ``.input`` names the capture SIDE, not a submodule, so it is
+        # consumed here: ``hf_module_path`` must stay resolvable by ``get_submodule_by_path``, which
+        # getattrs every dot-separated part. SAE metadata carries paths in this form (SAELens'
+        # ``hf_hook_name`` is e.g. ``model.layers.5.pre_feedforward_layernorm.output``).
+        capture_side = None
+        for suffix, is_output in ((".output", True), (".input", False)):
+            if hf_module_path.endswith(suffix):
+                hf_module_path = hf_module_path[: -len(suffix)]
+                hook_type = hook_type[: -len(suffix.replace(".", "_"))]
+                capture_side = is_output
+                break
         # For block-level hooks (hook_resid_post) and self_attn, HF transformer
         # blocks return a tuple whose first element is the hidden states.
         if hook_type in ("hook_resid_post", "hook_attn_out"):
@@ -305,6 +316,8 @@ def transformer_lens_to_hf_hook(hook_name: str, model_type: str = "auto") -> Hoo
             capture_output, output_index = True, None
         else:
             capture_output, output_index = True, None
+        if capture_side is not None:
+            capture_output, output_index = capture_side, None
         return HookInfo(
             transformer_lens_name=hook_name,
             layer_index=layer_index,

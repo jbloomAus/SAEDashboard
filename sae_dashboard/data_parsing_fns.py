@@ -5,10 +5,10 @@ from eindex import eindex
 from jaxtyping import Float, Int
 from sae_lens import SAE
 from torch import Tensor
-from transformer_lens import HookedTransformer, utils
 
 from sae_dashboard.components import LogitsTableData, SequenceData
 from sae_dashboard.sae_vis_data import SaeVisData
+from sae_dashboard.tl_compat import hooked_transformer_cls, to_numpy
 from sae_dashboard.transformer_lens_wrapper import (
     ActivationConfig,
     TransformerLensWrapper,
@@ -77,7 +77,7 @@ def add_neuron_alignment_data(
 ):
     top3_neurons_aligned = TopK(tensor=feature_out_dir.float(), k=n_rows, largest=True)
     feature_out_l1_norm = feature_out_dir.abs().sum(dim=-1, keepdim=True)
-    pct_of_l1: Arr = np.absolute(top3_neurons_aligned.values) / utils.to_numpy(
+    pct_of_l1: Arr = np.absolute(top3_neurons_aligned.values) / to_numpy(
         feature_out_l1_norm.float()
     )
     feature_tables_data["neuron_alignment_indices"] = (
@@ -104,11 +104,24 @@ def add_feature_neuron_correlations(
 
 
 def get_logits_table_data(
-    logit_vector: Float[Tensor, "d_vocab"], n_rows: int  # noqa: F821
+    logit_vector: Float[Tensor, "d_vocab"],  # noqa: F821
+    n_rows: int,
+    masked_token_ids: Tensor | None = None,
 ):
-    # Get logits table data
-    top_logits = TopK(logit_vector.float(), k=n_rows, largest=True)
-    bottom_logits = TopK(logit_vector.float(), k=n_rows, largest=False)
+    # Get logits table data. When masked_token_ids is provided, those vocab rows are
+    # excluded from both the top and bottom selections (opt-in masking for untrained
+    # byte-fallback/unused vocab rows); None preserves the unmasked behavior.
+    logit_vector32 = logit_vector.float()
+    top_source = logit_vector32
+    bottom_source = logit_vector32
+    if masked_token_ids is not None and masked_token_ids.numel() > 0:
+        mask_ids = masked_token_ids.to(logit_vector32.device)
+        top_source = logit_vector32.clone()
+        top_source[mask_ids] = float("-inf")
+        bottom_source = logit_vector32.clone()
+        bottom_source[mask_ids] = float("inf")
+    top_logits = TopK(top_source, k=n_rows, largest=True)
+    bottom_logits = TopK(bottom_source, k=n_rows, largest=False)
 
     top_logit_values = top_logits.values.tolist()
     top_token_ids = top_logits.indices.tolist()
@@ -124,6 +137,42 @@ def get_logits_table_data(
     )
 
     return logits_table_data
+
+
+def get_logits_table_data_batch(
+    logits: Float[Tensor, "feats d_vocab"],  # noqa: F821
+    n_rows: int,
+    masked_token_ids: Tensor | None = None,
+) -> list[LogitsTableData]:
+    """Batched `get_logits_table_data`: one top-k / bottom-k pair over the whole
+    feature batch and a single device transfer instead of per-feature top-k calls.
+    When ``masked_token_ids`` is provided those vocab rows are excluded from both
+    selections; None preserves the unmasked behavior."""
+    logits32 = logits.float()
+    top_source = logits32
+    bottom_source = logits32
+    if masked_token_ids is not None and masked_token_ids.numel() > 0:
+        mask_ids = masked_token_ids.to(logits32.device)
+        top_source = logits32.clone()
+        top_source[:, mask_ids] = float("-inf")
+        bottom_source = logits32.clone()
+        bottom_source[:, mask_ids] = float("inf")
+    k = min(n_rows, int(logits32.shape[-1]))
+    top_values, top_indices = top_source.topk(k=k, dim=-1, largest=True)
+    bottom_values, bottom_indices = bottom_source.topk(k=k, dim=-1, largest=False)
+    top_values_np = to_numpy(top_values)
+    top_indices_np = to_numpy(top_indices)
+    bottom_values_np = to_numpy(bottom_values)
+    bottom_indices_np = to_numpy(bottom_indices)
+    return [
+        LogitsTableData(
+            bottom_logits=bottom_values_np[row_index].tolist(),
+            bottom_token_ids=bottom_indices_np[row_index].tolist(),
+            top_logits=top_values_np[row_index].tolist(),
+            top_token_ids=top_indices_np[row_index].tolist(),
+        )
+        for row_index in range(int(logits32.shape[0]))
+    ]
 
 
 # @torch.inference_mode()
@@ -279,7 +328,7 @@ def parse_prompt_data(
 
     for seq_pos, seq_key in enumerate([f"{t!r} ({i})" for i, t in enumerate(str_toks)]):
         # Filter the feature activations, since we only need the ones that are non-zero
-        feat_acts_nonzero_filter = utils.to_numpy(feat_acts[seq_pos] > 0)
+        feat_acts_nonzero_filter = to_numpy(feat_acts[seq_pos] > 0)
         feat_acts_nonzero_locations = np.nonzero(feat_acts_nonzero_filter)[0].tolist()
         _feat_acts = feat_acts[seq_pos, feat_acts_nonzero_filter]  # [feats_filtered,]
         _feature_idx = np.array(feature_idx)[feat_acts_nonzero_filter]
@@ -316,7 +365,7 @@ def parse_prompt_data(
             continue
 
         # Filter the loss effects, since we only need the ones which have non-zero feature acts on the tokens before them
-        prev_feat_acts_nonzero_filter = utils.to_numpy(feat_acts[seq_pos - 1] > 0)
+        prev_feat_acts_nonzero_filter = to_numpy(feat_acts[seq_pos - 1] > 0)
         _loss_contribution = feats_loss_contribution[
             prev_feat_acts_nonzero_filter, seq_pos - 1
         ]  # [feats_filtered,]
@@ -366,7 +415,7 @@ def get_prompt_data(
     encoder = sae_vis_data.encoder
     assert isinstance(encoder, SAE)
     model = sae_vis_data.model
-    assert isinstance(model, HookedTransformer)
+    assert isinstance(model, hooked_transformer_cls())
     cfg = sae_vis_data.cfg
     assert isinstance(cfg.hook_point, str), f"{cfg.hook_point=}, expected a string"
 

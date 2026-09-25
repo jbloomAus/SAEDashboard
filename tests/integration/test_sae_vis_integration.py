@@ -19,7 +19,7 @@ def setup_test_environment() -> (  # type: ignore
         # Set up a small-scale test environment
         device = "cpu"  # Use CUDA for testing
         model = HookedTransformer.from_pretrained("gpt2-small", device=device)
-        sae, _, _ = SAE.from_pretrained(
+        sae = SAE.from_pretrained(
             release="gpt2-small-hook-z-kk", sae_id="blocks.5.hook_z", device=device
         )
         sae.fold_W_dec_norm()  # type: ignore
@@ -28,6 +28,7 @@ def setup_test_environment() -> (  # type: ignore
         activations_store = ActivationsStore.from_sae(
             model=model,
             sae=sae,
+            dataset="NeelNanda/c4-10k",
             streaming=True,
             store_batch_size_prompts=16,
             n_batches_in_buffer=8,
@@ -51,7 +52,7 @@ def test_sae_vis_runner_integration(
     # Configure SaeVisConfig for testing
     test_feature_idx = list(range(64))  # Test with 16 features
     feature_vis_config = SaeVisConfig(
-        hook_point=sae.cfg.hook_name,
+        hook_point=sae.cfg.metadata.hook_name,
         features=test_feature_idx,
         minibatch_size_features=32,
         minibatch_size_tokens=256,

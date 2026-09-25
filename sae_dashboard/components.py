@@ -1,7 +1,7 @@
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, List
+from typing import Any, Callable, List, Sequence
 
 import numpy as np
 from dataclasses_json import dataclass_json
@@ -338,12 +338,14 @@ class SequenceData:
         JavaScript).
         """
         self.seq_len = len(self.token_ids)
-        self.top_logits, self.top_token_ids = self._filter(
-            self.top_logits, self.top_token_ids
-        )
-        self.bottom_logits, self.bottom_token_ids = self._filter(
-            self.bottom_logits, self.bottom_token_ids
-        )
+        if self.top_logits or self.top_token_ids:
+            self.top_logits, self.top_token_ids = self._filter(
+                self.top_logits, self.top_token_ids
+            )
+        if self.bottom_logits or self.bottom_token_ids:
+            self.bottom_logits, self.bottom_token_ids = self._filter(
+                self.bottom_logits, self.bottom_token_ids
+            )
 
     def _filter(
         self, float_list: list[list[float]], int_list: list[list[int]]
@@ -725,6 +727,7 @@ class SequenceMultiGroupData:
         # 'stack-none' then our columns are `(column, 0), (column, 1), (column, 1), (column, 1), (column, 2), ...`
         n_groups = len(self.seq_group_data)
         n_quantile_groups = n_groups - 1
+        cols: Sequence[int | tuple[int, int]]
         match cfg.stack_mode:
             case "stack-all":
                 # Here, we stack all groups into 1st column

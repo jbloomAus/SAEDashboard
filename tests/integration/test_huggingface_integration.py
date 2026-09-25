@@ -9,10 +9,12 @@ import pytest
 import torch
 from sae_lens.saes import StandardSAE, StandardSAEConfig
 
+from sae_dashboard.hook_utils import get_submodule_by_path
 from sae_dashboard.huggingface_model_wrapper import (
     HFActivationConfig,
     HuggingFaceModelWrapper,
     load_huggingface_model,
+    to_resid_direction_hf,
 )
 from sae_dashboard.sae_vis_data import SaeVisConfig
 from sae_dashboard.sae_vis_runner import FeatureDataGeneratorFactory
@@ -164,6 +166,75 @@ class TestHuggingFaceVsTransformerLensActivations:
 
 
 @pytest.mark.slow
+class TestArbitraryModulePathHooks:
+    """Hooks named by HF module path rather than by TransformerLens convention.
+
+    SAE metadata carries capture locations this way (SAELens' ``hf_hook_name``, e.g.
+    ``model.layers.5.pre_feedforward_layernorm.output``), and the parser has always accepted the form.
+    Deliberately exercised on gpt2 rather than on a model whose architecture motivated it, because the
+    capability is general: any module the model exposes should be hookable by path.
+    """
+
+    @pytest.fixture
+    def hf_model_and_tokenizer(self):
+        return load_huggingface_model("sshleifer/tiny-gpt2", device="cpu", dtype="float32")
+
+    @pytest.mark.parametrize(
+        "hook_point",
+        ["transformer.h.0.ln_2", "transformer.h.0.ln_2.output"],
+        ids=["module-path", "module-path-with-capture-side"],
+    )
+    def test_arbitrary_module_path_is_hookable(self, hf_model_and_tokenizer, hook_point):
+        """A sublayer the wrapper has no named hook_type for is still capturable by its path."""
+        model, tokenizer = hf_model_and_tokenizer
+        wrapper = HuggingFaceModelWrapper(
+            model=model,
+            tokenizer=tokenizer,
+            activation_config=HFActivationConfig(primary_hook_point=hook_point, auxiliary_hook_points=[]),
+            dtype=torch.float32,
+        )
+        tokens = tokenizer.encode("Hello world!", return_tensors="pt")
+        result = wrapper.forward(tokens, return_logits=False)
+
+        acts = result[hook_point]
+        assert acts.shape == (1, tokens.shape[1], model.config.n_embd)
+        assert not torch.allclose(acts, torch.zeros_like(acts))
+
+    def test_capture_side_suffix_does_not_reach_the_module_path(self, hf_model_and_tokenizer):
+        """``.output`` names the capture side, not a submodule, so it must not survive into the path.
+
+        Left in place it would be ``getattr``-ed as a child module and raise, which is what made the
+        two spellings behave differently.
+        """
+        model, tokenizer = hf_model_and_tokenizer
+        wrapper = HuggingFaceModelWrapper(
+            model=model,
+            tokenizer=tokenizer,
+            activation_config=HFActivationConfig(
+                primary_hook_point="transformer.h.0.ln_2.output", auxiliary_hook_points=[]
+            ),
+            dtype=torch.float32,
+        )
+        info = wrapper.primary_hook_info
+        assert info.hf_module_path == "transformer.h.0.ln_2"
+        assert info.capture_output is True
+        assert get_submodule_by_path(model, info.hf_module_path) is model.transformer.h[0].ln_2
+
+    def test_module_path_direction_needs_no_transformation(self, hf_model_and_tokenizer):
+        """A d_model-wide direction is already in residual space, whatever the hook is named."""
+        model, tokenizer = hf_model_and_tokenizer
+        wrapper = HuggingFaceModelWrapper(
+            model=model,
+            tokenizer=tokenizer,
+            activation_config=HFActivationConfig(
+                primary_hook_point="transformer.h.0.ln_2", auxiliary_hook_points=[]
+            ),
+            dtype=torch.float32,
+        )
+        direction = torch.randn(3, model.config.n_embd)
+        assert torch.equal(to_resid_direction_hf(direction, wrapper), direction)
+
+
 class TestSaeVisConfigWithHuggingFace:
     """Test SaeVisConfig with use_huggingface flag."""
 

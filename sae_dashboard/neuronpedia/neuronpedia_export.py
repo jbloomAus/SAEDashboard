@@ -23,14 +23,13 @@ dependency here would create a circular dependency.
 from __future__ import annotations
 
 import gzip
+import json
 import os
 import re
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, List, Optional
-
-import orjson
 
 # Hardcoded fallback creator ID used by Neuronpedia bulk-imports when no
 # ``DEFAULT_CREATOR_ID`` env var or explicit override is provided. Matches the
@@ -230,15 +229,23 @@ class FastPseudoCuid:
 # JSON helpers
 # ---------------------------------------------------------------------------
 
-# orjson serializes ``datetime`` natively. Dataclasses are serialized via
-# ``row.__dict__`` to mirror the original
-# ``convert-saedashboard-to-neuronpedia-export.py`` script.
+
+def _json_default(value: Any) -> Any:
+    if isinstance(value, datetime):
+        return value.isoformat()
+    raise TypeError(f"Unsupported value for JSON serialization: {type(value)!r}")
 
 
 def _dump_jsonl(rows: List[Any], path: str) -> None:
     with open(path, "wb") as f:
         for row in rows:
-            f.write(orjson.dumps(row.__dict__))
+            f.write(
+                json.dumps(
+                    row.__dict__,
+                    default=_json_default,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            )
             f.write(b"\n")
 
 
@@ -351,7 +358,7 @@ def export_neuronpedia_dashboards(cfg: NeuronpediaExportConfig) -> str:
         batch_path = os.path.join(cfg.saedashboard_output_dir, batch_file)
         print(f"reading activations from batch file {batch_file}")
         with open(batch_path, "rb") as f:
-            batch_data = orjson.loads(f.read())
+            batch_data = json.loads(f.read())
 
         source_suffix = batch_data.get("sae_id_suffix")
         source_id = _build_source_id(

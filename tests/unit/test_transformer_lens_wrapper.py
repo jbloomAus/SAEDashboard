@@ -1,11 +1,99 @@
+# pyright: basic, reportPrivateImportUsage=false
 import pytest
 import torch
+from torch import nn
 from transformer_lens import HookedTransformer
 
 from sae_dashboard.transformer_lens_wrapper import (
     ActivationConfig,
     TransformerLensWrapper,
 )
+
+
+class _MockHookPoint:
+    def __init__(self, name: str):
+        self.name = name
+        self.ctx: dict[str, torch.Tensor] = {}
+
+
+class _HookContextManager:
+    def __init__(self, model, fwd_hooks):
+        self.model = model
+        self.fwd_hooks = fwd_hooks
+
+    def __enter__(self):
+        self.model.active_hooks = list(self.fwd_hooks)
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.model.active_hooks = []
+        return False
+
+
+class _FinalLayerBridgeBody(nn.Module):
+    def __init__(self, parent):
+        super().__init__()
+        self.parent = parent
+
+    def forward(self, input_ids):
+        activations = input_ids.float().unsqueeze(-1)
+        for hook_name, hook_fn in self.parent.active_hooks:
+            hook_fn(activations, self.parent.hook_dict[hook_name])
+        return activations
+
+
+class _FinalLayerBridgeModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.weight = nn.Parameter(torch.tensor(1.0))
+        self.cfg = type("Cfg", (), {"n_layers": 1})()
+        self.hook_dict = {
+            "blocks.0.hook_resid_pre": _MockHookPoint("blocks.0.hook_resid_pre"),
+        }
+        self.active_hooks: list[tuple[str, object]] = []
+        self.original_model = type(
+            "OriginalModel", (), {"model": _FinalLayerBridgeBody(self)}
+        )()
+        self.run_with_hooks_called = False
+
+    def hooks(self, *, fwd_hooks):
+        return _HookContextManager(self, fwd_hooks)
+
+    def run_with_hooks(self, *args, **kwargs):
+        self.run_with_hooks_called = True
+        raise AssertionError(
+            "run_with_hooks should not be called for final-layer activation-only passes"
+        )
+
+
+class _TruncatingBridgeModel(nn.Module):
+    def __init__(self, safe_batch_size: int = 32):
+        super().__init__()
+        self.safe_batch_size = safe_batch_size
+        self.weight = nn.Parameter(torch.tensor(1.0))
+        self.return_types_seen: list[str | None] = []
+        self.hook_dict = {
+            "blocks.0.hook_resid_pre": _MockHookPoint("blocks.0.hook_resid_pre"),
+            "blocks.0.attn.hook_z": _MockHookPoint("blocks.0.attn.hook_z"),
+        }
+
+    def run_with_hooks(self, tokens, stop_at_layer, fwd_hooks, return_type="logits"):
+        del stop_at_layer
+        self.return_types_seen.append(return_type)
+        effective_batch = min(tokens.shape[0], self.safe_batch_size)
+        truncated_tokens = tokens[:effective_batch].float()
+        for hook_name, hook_fn in fwd_hooks:
+            hook = self.hook_dict[hook_name]
+            if "hook_z" in hook_name:
+                activation = (
+                    truncated_tokens.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, 2, 1)
+                )
+            else:
+                activation = truncated_tokens.unsqueeze(-1)
+            hook_fn(activation, hook)
+        if return_type is None:
+            return None
+        return truncated_tokens.unsqueeze(-1) + 1000.0
 
 
 @pytest.fixture(scope="module")
@@ -143,3 +231,74 @@ def test_property_access(
     assert torch.all(wrapper.W_out == real_model.W_out)
     assert torch.all(wrapper.W_O == real_model.W_O)
     assert wrapper.tokenizer == real_model.tokenizer
+
+
+@pytest.fixture
+def truncating_bridge_wrapper() -> TransformerLensWrapper:
+    config = ActivationConfig(
+        primary_hook_point="blocks.0.hook_resid_pre",
+        auxiliary_hook_points=["blocks.0.attn.hook_z"],
+    )
+    return TransformerLensWrapper(_TruncatingBridgeModel(), config)  # type: ignore[arg-type]
+
+
+def test_forward_repairs_truncated_bridge_batches(
+    truncating_bridge_wrapper: TransformerLensWrapper,
+) -> None:
+    tokens = torch.arange(64 * 5).reshape(64, 5)
+
+    activation_dict = truncating_bridge_wrapper.forward(tokens, return_logits=True)
+
+    assert activation_dict["blocks.0.hook_resid_pre"].shape == (64, 5, 1)
+    assert activation_dict["blocks.0.attn.hook_z"].shape == (64, 5, 2)
+    assert activation_dict["output"].shape == (64, 5, 1)
+    assert torch.equal(
+        activation_dict["blocks.0.hook_resid_pre"].squeeze(-1),
+        tokens.float(),
+    )
+    assert torch.equal(
+        activation_dict["output"].squeeze(-1),
+        tokens.float() + 1000.0,
+    )
+
+
+def test_activation_shape_check_detects_truncation(
+    truncating_bridge_wrapper: TransformerLensWrapper,
+) -> None:
+    tokens = torch.arange(48 * 3).reshape(48, 3)
+    activation_dict = {
+        "blocks.0.hook_resid_pre": tokens[:32].float().unsqueeze(-1),
+    }
+
+    assert not truncating_bridge_wrapper._activation_shapes_match_tokens(
+        activation_dict, tokens
+    )
+
+
+def test_forward_suppresses_logits_when_not_requested(
+    truncating_bridge_wrapper: TransformerLensWrapper,
+) -> None:
+    tokens = torch.arange(8 * 3).reshape(8, 3)
+
+    activation_dict = truncating_bridge_wrapper.forward(tokens, return_logits=False)
+
+    assert "output" not in activation_dict
+    assert truncating_bridge_wrapper.model.return_types_seen == [None]
+
+
+def test_forward_bypasses_lm_head_for_final_layer_activation_only_pass() -> None:
+    config = ActivationConfig(
+        primary_hook_point="blocks.0.hook_resid_pre",
+        auxiliary_hook_points=[],
+    )
+    wrapper = TransformerLensWrapper(_FinalLayerBridgeModel(), config)  # type: ignore[arg-type]
+    tokens = torch.arange(12).reshape(4, 3)
+
+    activation_dict = wrapper.forward(tokens, return_logits=False)
+
+    assert "output" not in activation_dict
+    assert activation_dict["blocks.0.hook_resid_pre"].shape == (4, 3, 1)
+    assert torch.equal(
+        activation_dict["blocks.0.hook_resid_pre"].squeeze(-1), tokens.float()
+    )
+    assert wrapper.model.run_with_hooks_called is False

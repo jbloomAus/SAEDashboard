@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import math
 import random
 import re
 from collections import defaultdict
-from typing import Iterable, List, Union
+from typing import TYPE_CHECKING, Iterable, List, Union
 
 import einops
 import numpy as np
@@ -14,7 +16,6 @@ from sae_lens import SAE
 from sae_lens.config import DTYPE_MAP as DTYPES
 from torch import Tensor
 from tqdm.auto import tqdm
-from transformer_lens import HookedTransformer
 
 from sae_dashboard.components import (
     ActsHistogramData,
@@ -33,9 +34,12 @@ from sae_dashboard.transformer_lens_wrapper import (
     ActivationConfig,
     TransformerLensWrapper,
 )
-from sae_dashboard.utils_fns import FeatureStatistics
+from sae_dashboard.utils_fns import FeatureStatistics, build_activation_histogram_titles
 from sae_dashboard.vector_data_generator import VectorDataGenerator
 from sae_dashboard.vector_vis_data import VectorVisConfig, VectorVisData
+
+if TYPE_CHECKING:
+    from transformer_lens import HookedTransformer
 
 
 class VectorDataGeneratorFactory:
@@ -211,7 +215,10 @@ class VectorVisRunner:
 
                 # Apply the mask to feat_acts
                 nonzero_feat_acts = masked_feat_acts[masked_feat_acts > 0]
-                frac_nonzero = nonzero_feat_acts.numel() / masked_feat_acts.numel()
+                histogram_title = build_activation_histogram_titles(
+                    feat_acts.reshape(1, -1),
+                    valid_mask=ignore_tokens_mask.reshape(1, -1),
+                )[0]
 
                 vector_data_dict[vector_idx].acts_histogram_data = (
                     ActsHistogramData.from_data(
@@ -220,7 +227,7 @@ class VectorVisRunner:
                         ),  # need this otherwise fails on MPS
                         n_bins=layout.act_hist_cfg.n_bins,  # type: ignore
                         tickmode="5 ticks",
-                        title=f"ACTIVATIONS<br>DENSITY = {frac_nonzero:.3%}",
+                        title=histogram_title,
                     )
                 )
 

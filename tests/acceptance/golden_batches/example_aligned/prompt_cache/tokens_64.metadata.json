@@ -1,0 +1,19 @@
+{
+  "dataset_rows": 64,
+  "deduplicate": true,
+  "effective_length_max": 49,
+  "effective_length_mean": 30.28125,
+  "effective_length_min": 11,
+  "effective_lengths_file": "/home/speediedan/repos/SAEDashboard/tests/acceptance/golden_batches/example_aligned/prompt_cache/tokens_64.effective_lengths.pt",
+  "pad_token_id": 50256,
+  "requested_prompts": 64,
+  "source_dataset_mode": "load_from_disk",
+  "source_dataset_path": "/home/speediedan/repos/SAEDashboard/tests/acceptance/golden_batches/example_aligned/prompt_cache",
+  "source_metadata_path": "/home/speediedan/repos/SAEDashboard/tests/acceptance/golden_batches/example_aligned/prompt_cache/sae_lens.json",
+  "tensor_shape": [
+    64,
+    49
+  ],
+  "tokens_per_prompt": 49,
+  "unique_rows": 64
+}
