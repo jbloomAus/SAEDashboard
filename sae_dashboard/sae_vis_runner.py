@@ -164,9 +164,16 @@ class SaeVisRunner:
         else:
             W_U = model.W_U
 
+        # The sequence view drops position 0. To show it, give the view one extra hidden column
+        # in front. The model and the statistics use the real tokens only.
+        sequence_tokens = (
+            torch.cat([tokens[:, :1], tokens], dim=1)
+            if self.cfg.show_first_token
+            else tokens
+        )
         sequence_data_generator = SequenceDataGenerator(
             cfg=self.cfg,
-            tokens=tokens,
+            tokens=sequence_tokens,
             W_U=W_U,
         )
 
@@ -292,6 +299,8 @@ class SaeVisRunner:
                 # ! Calculate all data for the right-hand visualisations, i.e. the sequences
 
                 # Add this feature's sequence data to the list
+                if self.cfg.show_first_token:
+                    masked_feat_acts = torch.nn.functional.pad(masked_feat_acts, (1, 0))
                 feature_data_dict[feat].sequence_data = (
                     sequence_data_generator.get_sequences_data(
                         feat_acts=masked_feat_acts,

@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
+import torch
 from jaxtyping import Int
 from sae_lens import SAE
 from syrupy.assertion import SnapshotAssertion
@@ -109,6 +110,51 @@ def test_SaeVisData_create_results_look_reasonable(
         assert prec > 0
     # each feature should get its own key
     assert set(sae_vis_data.feature_data_dict.keys()) == set(range(N_FEATURES))
+
+
+@pytest.mark.parametrize("show_first_token", [False, True])
+def test_SaeVisRunner_show_first_token(
+    tokens: Int[Tensor, "batch seq"],
+    model: HookedTransformer,
+    autoencoder: SAE,  # type: ignore
+    tmp_path: Path,
+    show_first_token: bool,
+):
+    cfg = SaeVisConfig(
+        hook_point="blocks.2.hook_resid_pre",
+        features=list(range(N_FEATURES)),
+        minibatch_size_features=N_FEATURES,
+        minibatch_size_tokens=2,
+        device=TEST_DEVICE,
+        dtype=TEST_DTYPE,
+        cache_dir=tmp_path,
+        show_first_token=show_first_token,
+    )
+    cfg.feature_centric_layout.seq_cfg = SequencesConfig(
+        stack_mode="stack-all",
+        buffer=None,  # type: ignore
+        compute_buffer=True,
+        n_quantiles=5,
+        top_acts_group_size=20,
+        quantile_group_size=5,
+    )
+    data = SaeVisRunner(cfg).run(encoder=autoencoder, model=model, tokens=tokens)  # type: ignore
+
+    with torch.inference_mode():
+        _, cache = model.run_with_cache(tokens, names_filter=cfg.hook_point)
+        expected = autoencoder.encode(cache[cfg.hook_point])[..., :N_FEATURES]
+    first = 0 if show_first_token else 1
+    n_checked = 0
+    for feat, feature_data in data.feature_data_dict.items():
+        for group in feature_data.sequence_data.seq_group_data:
+            for seq in group.seq_data:
+                row = seq.original_index
+                assert seq.token_ids == tokens[row, first:].tolist()
+                assert seq.feat_acts == pytest.approx(
+                    expected[row, first:, feat].tolist(), abs=1e-3
+                )
+                n_checked += 1
+    assert n_checked > 0
 
 
 def test_SaeVisData_create_and_save_feature_centric_vis(

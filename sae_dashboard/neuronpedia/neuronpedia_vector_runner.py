@@ -31,7 +31,11 @@ from sae_dashboard.neuronpedia.neuronpedia_runner_config import (
     NeuronpediaVectorRunnerConfig,
 )
 from sae_dashboard.neuronpedia.vector_set import VectorSet
-from sae_dashboard.utils_fns import has_duplicate_rows
+from sae_dashboard.utils_fns import (
+    decode_byte_level_token,
+    has_duplicate_rows,
+    is_byte_level_tokenizer,
+)
 from sae_dashboard.vector_vis_data import VectorVisConfig
 from sae_dashboard.vector_vis_runner import VectorVisRunner
 
@@ -373,8 +377,12 @@ class NeuronpediaVectorRunner:
         # get vocab
         vocab_dict = self.model.tokenizer.vocab  # type: ignore
         new_vocab_dict = {}
-        # Replace substrings in the keys of vocab_dict using HTML_ANOMALIES
+        byte_level = is_byte_level_tokenizer(self.model.tokenizer)
+        # Byte-level vocabs are fully decoded; others only get HTML_ANOMALIES replaced.
         for k, v in vocab_dict.items():  # type: ignore
+            if byte_level:
+                new_vocab_dict[v] = decode_byte_level_token(k)
+                continue
             modified_key = k
             for anomaly in HTML_ANOMALIES:
                 modified_key = modified_key.replace(anomaly, HTML_ANOMALIES[anomaly])

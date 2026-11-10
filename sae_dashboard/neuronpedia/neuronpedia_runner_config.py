@@ -61,6 +61,12 @@ class NeuronpediaRunnerConfig:
     # into the sequence that otherwise dominate max activating examples and
     # correlation statistics. A typical value is 10. None disables filtering.
     ignore_high_activation_norm_multiple: Optional[float] = None
+    # Show position 0 in sequences. For models without a BOS, where position 0 is text.
+    show_first_token: bool = False
+
+    # A saved [n_prompts, n_tokens_in_prompt] token tensor to use as the prompts, for
+    # example chat-formatted text. The dataset path is then only the export label.
+    tokens_path: Optional[str] = None
 
     # If True, replace transformer blocks above the SAE's hook layer with
     # ``nn.Identity()`` after loading the model. This frees VRAM since those

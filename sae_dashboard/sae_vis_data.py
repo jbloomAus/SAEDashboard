@@ -47,6 +47,9 @@ class SaeVisConfig:
     # forward-pass minibatch). Useful for models like Qwen which exhibit random
     # high-norm activation sinks deep in the sequence. None disables filtering.
     ignore_high_activation_norm_multiple: float | None = None
+    # Sequence views drop position 0 as a BOS. Set this for a model without a BOS, so
+    # that position 0, which is text, is shown.
+    show_first_token: bool = False
 
     # Model loading
     use_huggingface: bool = (

@@ -56,6 +56,26 @@ def test_get_tokens_no_duplicates(
     )
 
 
+def test_get_tokens_uses_tokens_path(tmp_path: Path) -> None:
+    tokens = torch.arange(4 * 8).reshape(4, 8)
+    tokens_path = tmp_path / "chat_tokens.pt"
+    torch.save(tokens, tokens_path)
+    runner = NeuronpediaRunner.__new__(NeuronpediaRunner)
+    runner.cfg = NeuronpediaRunnerConfig(
+        sae_set="sae/repo",
+        sae_path="blocks.5.hook_resid_pre",
+        outputs_dir=str(tmp_path),
+        n_prompts_total=4,
+        n_tokens_in_prompt=8,
+        tokens_path=str(tokens_path),
+    )
+    assert torch.equal(runner.get_tokens(), tokens)
+
+    runner.cfg.n_tokens_in_prompt = 16
+    with pytest.raises(ValueError, match="expected"):
+        runner.get_tokens()
+
+
 def test_run_neuronpedia_export_uses_neuronpedia_model_name(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

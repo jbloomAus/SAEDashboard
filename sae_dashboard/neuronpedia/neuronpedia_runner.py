@@ -38,7 +38,11 @@ from sae_dashboard.neuronpedia.neuronpedia_export import (
 from sae_dashboard.neuronpedia.neuronpedia_runner_config import NeuronpediaRunnerConfig
 from sae_dashboard.sae_vis_data import SaeVisConfig
 from sae_dashboard.sae_vis_runner import SaeVisRunner
-from sae_dashboard.utils_fns import has_duplicate_rows
+from sae_dashboard.utils_fns import (
+    decode_byte_level_token,
+    has_duplicate_rows,
+    is_byte_level_tokenizer,
+)
 
 # set TOKENIZERS_PARALLELISM to false to avoid warnings
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -122,7 +126,11 @@ class NeuronpediaRunner:
         self._configure_dtypes()
         self._extract_model_info()
         self._initialize_model()
-        self._setup_activation_store()
+        if cfg.tokens_path is None:
+            self._setup_activation_store()
+        self.cached_activations_dir = Path(
+            f"./cached_activations/{self.model_id}_{self.cfg.sae_set}_{self.hook_name}_{self.sae.cfg.d_sae}width_{self.cfg.n_prompts_total}prompts"
+        )
         self._setup_output_directory()
         self.vocab_dict = self.get_vocab_dict()
 
@@ -846,9 +854,6 @@ class NeuronpediaRunner:
             disable_concat_sequences=True,
             device=self.cfg.activation_store_device or "cpu",
         )
-        self.cached_activations_dir = Path(
-            f"./cached_activations/{self.model_id}_{self.cfg.sae_set}_{self.hook_name}_{self.sae.cfg.d_sae}width_{self.cfg.n_prompts_total}prompts"
-        )
 
     def _setup_output_directory(self):
         """Set up the output directory for results."""
@@ -997,7 +1002,15 @@ class NeuronpediaRunner:
 
     def get_tokens(self):
         tokens_file = f"{self.cfg.outputs_dir}/tokens_{self.cfg.n_prompts_total}.pt"
-        if os.path.isfile(tokens_file):
+        if self.cfg.tokens_path is not None:
+            print(f"Loading tokens from {self.cfg.tokens_path}")
+            tokens = torch.load(self.cfg.tokens_path)
+            expected = (self.cfg.n_prompts_total, self.cfg.n_tokens_in_prompt)
+            if tuple(tokens.shape) != expected:
+                raise ValueError(
+                    f"tokens_path has shape {tuple(tokens.shape)}, expected {expected}"
+                )
+        elif os.path.isfile(tokens_file):
             print("Tokens exist, loading them.")
             tokens = torch.load(tokens_file)
         else:
@@ -1019,8 +1032,12 @@ class NeuronpediaRunner:
         # get vocab - use tokenizer which is set for both HuggingFace and TransformerLens
         vocab_dict: dict = self.tokenizer.vocab  # type: ignore
         new_vocab_dict = {}
-        # Replace substrings in the keys of vocab_dict using HTML_ANOMALIES
+        byte_level = is_byte_level_tokenizer(self.tokenizer)
+        # Byte-level vocabs are fully decoded; others only get HTML_ANOMALIES replaced.
         for k, v in vocab_dict.items():  # type: ignore
+            if byte_level:
+                new_vocab_dict[v] = decode_byte_level_token(k)
+                continue
             modified_key = k
             for anomaly in HTML_ANOMALIES:
                 modified_key = modified_key.replace(anomaly, HTML_ANOMALIES[anomaly])
@@ -1077,7 +1094,8 @@ class NeuronpediaRunner:
         tokens = self.get_tokens()
         tokens = self.add_prefix_suffix_to_tokens(tokens)
 
-        del self.activations_store
+        if hasattr(self, "activations_store"):
+            del self.activations_store
 
         with torch.no_grad():
             for feature_batch_count, features_to_process in tqdm(
@@ -1144,6 +1162,7 @@ class NeuronpediaRunner:
                     },
                     ignore_positions=self.cfg.ignore_positions or [],
                     ignore_high_activation_norm_multiple=self.cfg.ignore_high_activation_norm_multiple,
+                    show_first_token=self.cfg.show_first_token,
                     use_dfa=self.cfg.use_dfa,
                     use_huggingface=self.cfg.use_huggingface,
                 )
@@ -1339,6 +1358,17 @@ def main():
         dest="prepend_bos",
         default=None,
         help="Prepend BOS token to sequences (overrides SAE default)",
+    )
+    parser.add_argument(
+        "--show-first-token",
+        action="store_true",
+        help="Show position 0 in sequences. Use for models without a BOS, where position 0 is text.",
+    )
+    parser.add_argument(
+        "--tokens-path",
+        type=str,
+        default=None,
+        help="Saved [n_prompts, n_tokens_in_prompt] token tensor to use as the prompts, e.g. chat-formatted text.",
     )
     parser.add_argument(
         "--use-transcoder",
@@ -1573,6 +1603,8 @@ def main():
         use_huggingface=args.huggingface,
         layer=args.layer_num,
         ignore_high_activation_norm_multiple=args.ignore_high_activation_norm_multiple,
+        show_first_token=args.show_first_token,
+        tokens_path=args.tokens_path,
         free_unused_model_layers=args.free_unused_model_layers,
         output_neuronpedia_exports=args.output_neuronpedia_exports,
         neuronpedia_exports_dir=args.neuronpedia_exports_dir,

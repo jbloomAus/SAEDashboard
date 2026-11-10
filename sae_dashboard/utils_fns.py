@@ -1,3 +1,4 @@
+import json
 import random
 import re
 from dataclasses import dataclass, field
@@ -1194,3 +1195,51 @@ def max_or_1(mylist: Sequence[float | int], abs: bool = False) -> float | int:
         return max(max(x, -x) for x in mylist)
     else:
         return max(mylist)
+
+
+def _bytes_to_unicode() -> dict[int, str]:
+    """GPT-2's map from each byte to the printable character a byte-level vocab uses for it."""
+    bs = (
+        list(range(ord("!"), ord("~") + 1))
+        + list(range(ord("¡"), ord("¬") + 1))
+        + list(range(ord("®"), ord("ÿ") + 1))
+    )
+    cs = bs[:]
+    n = 0
+    for b in range(256):
+        if b not in bs:
+            bs.append(b)
+            cs.append(256 + n)
+            n += 1
+    return dict(zip(bs, [chr(c) for c in cs]))
+
+
+BYTE_LEVEL_DECODER = {c: b for b, c in _bytes_to_unicode().items()}
+
+
+def is_byte_level_tokenizer(tokenizer: Any) -> bool:
+    """True for GPT-2-style tokenizers (GPT-2, Qwen, Llama 3) whose vocab strings encode bytes."""
+    if hasattr(tokenizer, "byte_decoder"):
+        return True
+    backend = getattr(tokenizer, "backend_tokenizer", None)
+    if backend is None:
+        return False
+    decoder = json.loads(backend.to_str()).get("decoder") or {}
+    types = {decoder.get("type")}
+    types.update(d.get("type") for d in decoder.get("decoders") or [])
+    return "ByteLevel" in types
+
+
+def decode_byte_level_token(token: str) -> str:
+    """Turns a byte-level vocab string (e.g. "èĻ½çĦ¶") into real text (e.g. "虽然").
+
+    A token that holds part of a split UTF-8 character gets U+FFFD, as decode() does.
+    Added tokens that are not byte-level (e.g. "<|im_start|>") come back unchanged.
+    """
+    try:
+        raw = bytes(BYTE_LEVEL_DECODER[c] for c in token)
+    except KeyError:
+        return token
+    text = raw.decode("utf-8", errors="replace")
+    # Postgres text cannot hold NUL, and Neuronpedia stores these strings there.
+    return token if "\x00" in text else text
