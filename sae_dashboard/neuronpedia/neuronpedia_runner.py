@@ -1219,9 +1219,7 @@ class NeuronpediaRunner:
         if missing:
             raise ValueError(
                 "--output-neuronpedia-exports requires all of: "
-                + ", ".join(
-                    f"--{name.replace('_', '-')}" for name in missing
-                )
+                + ", ".join(f"--{name.replace('_', '-')}" for name in missing)
             )
         if not self.cfg.np_set_name:
             raise ValueError(
@@ -1262,9 +1260,7 @@ class NeuronpediaRunner:
             hf_weights_repo_id=(
                 self.cfg.neuronpedia_hf_weights_repo_id or self.cfg.sae_set
             ),
-            hf_weights_path=(
-                self.cfg.neuronpedia_hf_weights_path or self.cfg.sae_path
-            ),
+            hf_weights_path=(self.cfg.neuronpedia_hf_weights_path or self.cfg.sae_path),
             hook_point=derive_hook_point_from_hook_name(str(self.hook_name)),
             layer_num=self.layer,
             prompts_huggingface_dataset_path=self.cfg.huggingface_dataset_path,
@@ -1547,18 +1543,13 @@ def main():
         "--neuronpedia-hf-weights-repo-id",
         type=str,
         default=None,
-        help=(
-            "HuggingFace repo ID for the SAE weights. Defaults to --sae-set."
-        ),
+        help="HuggingFace repo ID for the SAE weights. Defaults to --sae-set.",
     )
     parser.add_argument(
         "--neuronpedia-hf-weights-path",
         type=str,
         default=None,
-        help=(
-            "HuggingFace path to the SAE weights folder. Defaults to "
-            "--sae-path."
-        ),
+        help="HuggingFace path to the SAE weights folder. Defaults to --sae-path.",
     )
     parser.add_argument(
         "--neuronpedia-zero-out-bos-token",

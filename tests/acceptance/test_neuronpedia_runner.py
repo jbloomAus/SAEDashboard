@@ -355,7 +355,7 @@ def test_huggingface_neuronpedia_runner():
     os.system(f"rm -rf {ACT_CACHE_FOLDER}")
 
     # Common config settings
-    common_config = dict(
+    common_config: dict[str, Any] = dict(
         sae_set=SAE_SET,
         sae_path=SAE_PATH,
         np_set_name="res-jb",

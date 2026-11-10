@@ -155,16 +155,12 @@ def _process_source_dir(source_dir: str, new_model_name: str) -> None:
         full_subdir = os.path.join(source_dir, subdir)
         if not os.path.isdir(full_subdir):
             continue
-        gz_files = sorted(
-            f for f in os.listdir(full_subdir) if f.endswith(".jsonl.gz")
-        )
+        gz_files = sorted(f for f in os.listdir(full_subdir) if f.endswith(".jsonl.gz"))
         if not gz_files:
             continue
         print(f"  Rewriting {len(gz_files)} {subdir} file(s)...")
         for fn in gz_files:
-            _rewrite_gzip_jsonl(
-                os.path.join(full_subdir, fn), field, new_model_name
-            )
+            _rewrite_gzip_jsonl(os.path.join(full_subdir, fn), field, new_model_name)
 
 
 def _atomic_dir_swap(src_dir: str, dst_dir: str) -> None:
@@ -175,9 +171,7 @@ def _atomic_dir_swap(src_dir: str, dst_dir: str) -> None:
     that earlier with a clearer message.
     """
     if os.path.exists(dst_dir):
-        raise FileExistsError(
-            f"Refusing to overwrite existing directory: {dst_dir}"
-        )
+        raise FileExistsError(f"Refusing to overwrite existing directory: {dst_dir}")
     os.rename(src_dir, dst_dir)
 
 
@@ -231,9 +225,7 @@ def main() -> int:
     new_model_name = args.new_model_name
 
     if old_model_name == new_model_name:
-        print(
-            f"Old and new model name are both {old_model_name!r}; nothing to do."
-        )
+        print(f"Old and new model name are both {old_model_name!r}; nothing to do.")
         return 0
 
     parent_dir = os.path.dirname(model_dir)
@@ -252,7 +244,9 @@ def main() -> int:
         if os.path.isdir(os.path.join(model_dir, name))
     )
     if not source_dirs:
-        print(f"ERROR: no source subdirectories found under {model_dir}", file=sys.stderr)
+        print(
+            f"ERROR: no source subdirectories found under {model_dir}", file=sys.stderr
+        )
         return 2
 
     print(f"Old model name (from --model-dir basename): {old_model_name}")

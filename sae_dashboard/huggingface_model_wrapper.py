@@ -187,7 +187,7 @@ class HuggingFaceModelWrapper(nn.Module):
 
             # Run forward pass
             try:
-                outputs = self.model(input_ids=tokens, output_hidden_states=False)
+                self.model(input_ids=tokens, output_hidden_states=False)
             except StopForward:
                 # Expected - we stopped early
                 pass
@@ -307,11 +307,7 @@ def to_resid_direction_hf(
     # contain the substrings ``resid`` / ``_out``.
     hook_type = model.primary_hook_info.hook_type
 
-    if (
-        "resid" in hook_type
-        or "_out" in hook_type
-        or "hook_mlp_in" in hook_type
-    ):
+    if "resid" in hook_type or "_out" in hook_type or "hook_mlp_in" in hook_type:
         return direction
 
     # For other hook types, we would need to apply transformations
