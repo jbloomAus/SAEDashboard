@@ -1,7 +1,12 @@
 import pytest
 from transformers import AutoTokenizer
 
-from sae_dashboard.utils_fns import decode_byte_level_token, is_byte_level_tokenizer
+from sae_dashboard.utils_fns import (
+    decode_byte_level_token,
+    get_decode_html_safe_fn,
+    is_byte_level_tokenizer,
+    unprocess_str_tok,
+)
 
 
 @pytest.mark.parametrize(
@@ -52,3 +57,24 @@ def test_decoded_vocab_matches_tokenizer_decode():
     vocab = tokenizer.get_vocab()
     for raw in ["èĻ½çĦ¶", "ä¿±ä¹Ĳéĥ¨", "Ġsocial", "ðŁĺī"]:
         assert decode_byte_level_token(raw) == tokenizer.decode([vocab[raw]])
+
+
+@pytest.mark.parametrize(
+    "model_id, text, expected",
+    [
+        ("Qwen/Qwen3.5-2B-Base", "虽然", "虽然"),
+        ("openai-community/gpt2", " café", "&nbsp;café"),
+        ("openai-community/gpt2", "→", "→"),
+        ("Qwen/Qwen3.5-2B-Base", " Привет", "&nbsp;Привет"),
+        ("openai-community/gpt2", " social", "&nbsp;social"),
+        ("openai-community/gpt2", "\n", "&bsol;n"),
+    ],
+)
+def test_dashboard_decode_fn_shows_real_text(model_id: str, text: str, expected: str):
+    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    (token_id,) = tokenizer.encode(text, add_special_tokens=False)
+    decode = get_decode_html_safe_fn(tokenizer)
+    assert decode(token_id) == expected
+    if text != "\n":
+        # the dashboard shows unprocess_str_tok(...) of this string
+        assert unprocess_str_tok(decode(token_id)) == tokenizer.decode([token_id])

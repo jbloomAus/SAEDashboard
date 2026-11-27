@@ -226,6 +226,14 @@ def get_decode_html_safe_fn(
     tokenizer: PreTrainedTokenizerBase, html: bool = False
 ) -> Callable[[int | list[int]], str | list[str]]:
     vocab_dict = {v: k for k, v in tokenizer.vocab.items()}  # type: ignore
+    if is_byte_level_tokenizer(tokenizer):
+        # Byte-level vocab strings (GPT-2, Qwen, Llama 3) show non-ASCII text as
+        # mapped bytes, e.g. "èĻ½çĦ¶" for "虽然". Decode those, but keep whitespace in
+        # its "Ġ"/"Ċ"/"ĉ" form so HTML_ANOMALIES renders it as for ASCII tokens.
+        vocab_dict = {
+            v: (_decode_keeping_whitespace(k) if _has_non_ascii_byte(k) else k)
+            for v, k in vocab_dict.items()
+        }
 
     def decode(token_id: int | list[int]) -> str | list[str]:
         """
@@ -1228,6 +1236,15 @@ def is_byte_level_tokenizer(tokenizer: Any) -> bool:
     types = {decoder.get("type")}
     types.update(d.get("type") for d in decoder.get("decoders") or [])
     return "ByteLevel" in types
+
+
+def _has_non_ascii_byte(token: str) -> bool:
+    return any(BYTE_LEVEL_DECODER.get(c, 0) >= 0x80 for c in token)
+
+
+def _decode_keeping_whitespace(token: str) -> str:
+    text = decode_byte_level_token(token)
+    return text.replace(" ", "Ġ").replace("\n", "Ċ").replace("\t", "ĉ")
 
 
 def decode_byte_level_token(token: str) -> str:
